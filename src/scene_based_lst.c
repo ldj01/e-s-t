@@ -62,13 +62,13 @@ int main (int argc, char *argv[])
         sprintf (errstr, "calling get_args");
         LST_ERROR (errstr, "main");
     }
-#if 0
+
     /* Validate the input metadata file */
     if (validate_xml_file (xml_name) != SUCCESS)
     {  /* Error messages already written */
         LST_ERROR (errstr, "main");
     }
-#endif
+
     /* Initialize the metadata structure */
     init_metadata_struct (&xml_metadata);
 
@@ -255,9 +255,7 @@ NOTES:
 ******************************************************************************/
 void usage ()
 {
-    printf ("LST identify the cloud, shadow, snow, water and clear pixels using "
-            "the input Landsat scene (top of atmosphere (TOA) reflection and "
-            "brightness temperature (BT) for band 6) output from LEDAPS\n\n");
+    printf ("scene_base_lst \\n\n");
     printf ("usage: ./scene_based_lst "
             "--xml=input_xml_filename "
             "--dem=input_dem_filename "
@@ -270,7 +268,9 @@ void usage ()
     printf ("    -verbose: should intermediate messages be printed? (default "
             "is false)\n");
     printf ("\n./scene_based_lst --help will print the usage statement\n");
-    printf ("\nExample: ./cfmask --xml=LE70390032010263EDC00.xml "
-            "--dem 17_30_DEM.tif "
-            "--emi AG100B.v003.-20.122.0001.bin --verbose\n");
+    printf ("\nExample: ./scene_based_lst --xml=LE70390032010263EDC00.xml "
+            "--dem=17_30_DEM.tif "
+            "--emi=AG100B.v003.-20.122.0001.bin --verbose\n");
+    printf("Note: the scene_based_lst must run from the directory "
+           "where the input data are located\n\n");
 }

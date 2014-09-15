@@ -38,6 +38,8 @@ Input_t *OpenInput(Espa_internal_meta_t *metadata)
     RETURN_ERROR("getting input from header file", "OpenInput", NULL);
   }
 
+  printf("this->file_name_th=%s\n",this->file_name_th);
+
   /* Open files for access */
   if (this->file_type == INPUT_TYPE_BINARY) {
     if ( this->nband_th == 1 || this->nband_th == 2 ) {
@@ -292,6 +294,7 @@ bool GetXMLInput(Input_t *this, Espa_internal_meta_t *metadata)
         th_indx = 5;
         this->meta.gain_th = metadata->band[th_indx].toa_gain;
         this->meta.bias_th = metadata->band[th_indx].toa_bias;
+        this->file_name_th = strdup (metadata->band[th_indx].file_name);
     }
     else /* this->meta.inst == INST_OLI_TIRS */
     {
@@ -301,6 +304,7 @@ bool GetXMLInput(Input_t *this, Espa_internal_meta_t *metadata)
         th_indx = 9;
         this->meta.gain_th = metadata->band[th_indx].toa_gain;
         this->meta.bias_th = metadata->band[th_indx].toa_bias;
+        this->file_name_th = strdup (metadata->band[th_indx].file_name);
     }
 
     /* Pull the reflectance info from thermal in the XML file */
