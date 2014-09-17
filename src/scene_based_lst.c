@@ -48,6 +48,7 @@ int main (int argc, char *argv[])
     float sun_azi_temp = 0.0;/* Keep the original sun azimuth angle */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     Envi_header_t envi_hdr;   /* output ENVI header information */
+    FILE *fd1;
   
     time_t now;
     time(&now);
@@ -111,8 +112,21 @@ int main (int argc, char *argv[])
         printf ("DEBUG:   therm_gain: %f, therm_bias: %f\n", 
                 input->meta.gain_th, input->meta.bias_th);
 
-        printf("DEBUG: SUN AZIMUTH is %f\n", input->meta.sun_az);
-        printf("DEBUG: SUN ZENITH is %f\n", input->meta.sun_zen);
+        printf("DEBUG: SUN AZIMUTH: %f\n", input->meta.sun_az);
+        printf("DEBUG: SUN ZENITH: %f\n", input->meta.sun_zen);
+        printf("DEBUG: Year, Month, Day, Hour, Minute, Second: %d, "
+               "%d, %d, %d, %d,%f\n", input->meta.acq_date.year,
+               input->meta.acq_date.month, input->meta.acq_date.day,
+               input->meta.acq_date.hour, input->meta.acq_date.minute,
+               input->meta.acq_date.second);
+        printf("DEBUG: UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
+               input->meta.ul_map_corner.y);
+        printf("DEBUG: LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
+               input->meta.lr_map_corner.y);
+        printf("DEBUG: UL_GEO_CORNER: %f, %f\n", input->meta.ul_geo_corner.lat,
+               input->meta.ul_geo_corner.lon);
+        printf("DEBUG: LR_GEO_CORNER: %f, %f\n", input->meta.lr_geo_corner.lat,
+               input->meta.lr_geo_corner.lon);
     }
 
 #if 0
@@ -135,15 +149,96 @@ int main (int argc, char *argv[])
             printf ("  Polar or ascending scene.  Readjusting solar azimuth by "
                 "180 degrees.\n  New value: %f degrees\n", input->meta.sun_az);
     }
+#endif
+    /* Write out the intermediate values */
+    fd1 = fopen("datetime.txt", "w"); 
+    if (fd1 == NULL)
+    {
+        sprintf (errstr, "Opening file: datetime.txt\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
 
-    /* Retrieve the NARR data */
-    status = system("narr_retrieval.bash input->meta.acq_date.year input->meta.acq_date.month input->meta.acq_date.day input->meta.acq_date.hour input->meta.acq_date.minute input->meta.acq_date.second");
+    /* Write out the intermediate file */
+    fprintf(fd1, "%d,%d,%d,%d,%d,%f\n", input->meta.acq_date.year, 
+            input->meta.acq_date.month, input->meta.acq_date.day, 
+            input->meta.acq_date.hour, input->meta.acq_date.minute, 
+            input->meta.acq_date.second);
+
+    /* Close the intermediate file */
+    status = fclose(fd1);
+    if ( status )
+    {
+        sprintf (errstr, "Closing file: datetime.txt\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("cp $BIN/narr_retrieval.bash .");
     if (status != SUCCESS)
     {
-        RETURN_ERROR (errstr, "pcloud", FAILURE);
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+    
+    status = system("./narr_retrieval.bash");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }    
+    
+    status = system("rm datetime.txt");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
 
+    status = system("rm script*");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
 
+    status = system("rm narr_retrieval.bash");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rm *_grb2txt");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rm wgrib");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rm get_*.pl");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rmdir HGT");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rmdir SHUM");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rmdir TMP");
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+#if 0
     /* Reassign solar azimuth angle for output purpose if south up north 
        down scene is involved */
     if (input->meta.ul_corner.is_fill &&

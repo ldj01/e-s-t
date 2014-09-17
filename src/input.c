@@ -388,12 +388,12 @@ bool GetXMLInput(Input_t *this, Espa_internal_meta_t *metadata)
     this->meta.lr_map_corner.is_fill = true;
 
     /* Get the geo graphic coordinates */
-    this->meta.ul_map_corner.x = metadata->global.ul_corner[0];
-    this->meta.ul_map_corner.y = metadata->global.ul_corner[1];
-    this->meta.ul_map_corner.is_fill = true;
-    this->meta.lr_map_corner.x = metadata->global.lr_corner[0];
-    this->meta.lr_map_corner.y = metadata->global.lr_corner[1];
-    this->meta.lr_map_corner.is_fill = true;
+    this->meta.ul_geo_corner.lat = metadata->global.ul_corner[0];
+    this->meta.ul_geo_corner.lon = metadata->global.ul_corner[1];
+    this->meta.ul_geo_corner.is_fill = true;
+    this->meta.lr_geo_corner.lat = metadata->global.lr_corner[0];
+    this->meta.lr_geo_corner.lon = metadata->global.lr_corner[1];
+    this->meta.lr_geo_corner.is_fill = true;
 
     /* Convert the acquisition date/time values */
     sprintf (temp, "%sT%s", acq_date, acq_time);

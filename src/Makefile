@@ -30,6 +30,15 @@ scene_based_lst: $(OBJ) $(INC)
 install:
 	cp $(EXE) $(BIN)
 	cp ../scripts/narr_retrieval.bash $(BIN)
+	cp ../scripts/script_HGT_generic $(BIN)
+	cp ../scripts/script_SHUM_generic $(BIN)
+	cp ../scripts/script_TMP_generic $(BIN)
+	cp ../scripts/get_grib.pl $(BIN)
+	cp ../scripts/get_inv.pl $(BIN)
+	cp ../scripts/HGT_grb2txt $(BIN)
+	cp ../scripts/SHUM_grb2txt $(BIN)
+	cp ../scripts/TMP_grb2txt $(BIN)
+	cp ../scripts/wgrib $(BIN)
 
 clean:
 	$(RM) *.o $(EXE)
