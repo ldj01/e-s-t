@@ -41,6 +41,7 @@ int main (int argc, char *argv[])
     Input_t *input = NULL;              /* input data and meta data */
     char envi_file[MAX_STR_LEN];        /* output ENVI file name */
     char scene_name[MAX_STR_LEN];       /* input data scene name */
+    char command[MAX_STR_LEN];
     unsigned char **pixel_mask;    /* pixel mask */
     int status;                    /* return value from function call */
     Output_t *output = NULL; /* output structure and metadata */
@@ -49,6 +50,10 @@ int main (int argc, char *argv[])
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     Envi_header_t envi_hdr;   /* output ENVI header information */
     FILE *fd1;
+    float alb = 0.1;
+    int entry;
+    int i;
+    int num_points;
   
     time_t now;
     time(&now);
@@ -175,67 +180,196 @@ int main (int argc, char *argv[])
     status = system("cp $BIN/narr_retrieval.bash .");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "cp $BIN/narr_retrieval.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
     
-    status = system("./narr_retrieval.bash");
+    status = system("narr_retrieval.bash");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "narr_retrieval.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }    
     
     status = system("rm datetime.txt");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rm datetime.txt\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rm script*");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rm script*\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rm narr_retrieval.bash");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rm narr_retrieval.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rm *_grb2txt");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rm *_grb2txt\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rm wgrib");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rm get_*.pl");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rm get_*.pl\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rmdir HGT");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rmdir HGT\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rmdir SHUM");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rmdir SHUM\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     status = system("rmdir TMP");
     if (status != SUCCESS)
     {
+        sprintf (errstr, "rmdir TMP\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    /* Allocate memory */
+    case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (case_list == NULL)
+    {
+        sprintf (errstr, "Allocating case_list memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    command_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (command_list == NULL)
+    {
+        sprintf (errstr, "Allocating command_list memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* call first_files to generate tape5 file and commandList */
+    status = first_files(input, case_list, command_list, &entry, &num_points, verbose);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Calling first_files\n");
+        LST_ERROR (errstr, "scene_based_lst");
+    }
+
+    /* perform modtran runs by calling command_list */
+    for (i = 0; i < entry; i++)
+    {
+        status = system("command_list[i]");
+        if (status != SUCCESS)
+        {
+            sprintf (errstr, "executing command_list[i]");
+            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        }
+    } 
+
+    /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), copy program 
+       to delete headers and parse wavelength and total radiance from tape6 file*/
+    for (i = 0; i < entry; i++)
+    {
+        sprintf(command,"ln $BIN/elim2.sed %s || while [ ! -e %s/elim2.sed", case_list[i], 
+                case_list[i]);
+        status = system("command");
+        if (status != SUCCESS)
+        {
+            sprintf (errstr, "link elim2.sed\n");
+            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        }
+
+        status = system("sleep 5");
+        if (status != SUCCESS)
+        {
+            sprintf (errstr, "sleep 5 seconds\n");
+            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        }
+
+        sprintf(command,"ln $BIN/elim2.sed %s", case_list[i]);
+        status = system("command");
+        if (status != SUCCESS)
+        {
+            sprintf (errstr, "link elim2.sed again\n");
+            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        }
+        status = system("tape6parser.bash");
+        if (status != SUCCESS)
+        {
+            sprintf (errstr, "tape6parser.bash\n");
+            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        }
+    }
+
+    /* Free memory allocation */
+    status = free_2d_array((void **command_list));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: command_list\n");
+        RETURN_ERROR (errstr, "first_files", FAILURE);              
+    }
+
+    /* Allocate memory for results */
+    results = (float **)allocate_2d_array(6, num_points * NUM_ELEVATIONS, 
+              sizeof(float)); 
+    if (results == NULL)
+    {
+        sprintf (errstr, "Allocating results memory");
+        LST_ERROR (errstr, "second_narr");
+    }
+
+    /* call second_narr to generate parameters for each height and NARR point */
+    status = second_narr(input, num_points, alb, case_list, results, verbose);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Calling first_files\n");
+        LST_ERROR (errstr, "scene_based_lst");
+    }
+
+    /* Free memory allocation */
+    status = free_2d_array((void **case_list));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: current_case\n");
+        RETURN_ERROR (errstr, "first_files", FAILURE);              
+    }
+
+    /* call third_pixels_post to generate parameters for each Landsat pixel */
+    status = third_pixels_post(input, num_points, dem_infile, emi_infile, results, verbose);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Calling first_files\n");
+        LST_ERROR (errstr, "scene_based_lst");
+    }
+
+    /* Free memory allocation */
+    status = free_2d_array((void **results));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: results\n");
+        RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
 #if 0

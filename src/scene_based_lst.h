@@ -15,6 +15,7 @@
 #include "raw_binary_io.h"
 
 #define LST_VERSION "1.0.0"
+#define NUM_ELEVATIONS 9
 
 typedef signed short int16;
 typedef unsigned char uint8;
@@ -70,5 +71,38 @@ typedef enum {
   GAIN_LOW, 
   GAIN_MAX
 } Gain_t;
+
+int first_files
+(
+    Input_t *input,             /*I: input structure */
+    char **case_list,           /*O: modtran run list */
+    char **command_list,        /*O: modtran run command list */
+    int *entry,                 /*O: number of cases/commands */
+    int *num_points,            /*O: number of NARR points */
+    bool verbose                /*I: value to indicate if intermediate messages 
+                                     be printed */
+);
+
+int second_narr
+(
+    Input_t *input,             /*I: input structure */
+    int num_points,             /*I: number of narr points */
+    float alb,                  /*I: albedo */ 
+    char **case_list,           /*I: modtran run list */
+    double **results,           /*O: atmospheric parameter for modtarn run */
+    bool verbose                /*I: value to indicate if intermediate messages 
+                                     be printed */
+);
+
+int third_pixels_post
+(
+    Input_t *input,             /*I: input structure */
+    int num_points,             /*I: number of narr points */
+    char **dem_infile,          /*I: address of input DEM filename */
+    char **emi_infile,          /*I: address of input ASTER emissivity filename */
+    double **results,           /*I: atmospheric parameter for modtarn run */
+    bool verbose                /*I: value to indicate if intermediate messages 
+                                     be printed */
+);
 
 #endif

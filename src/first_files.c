@@ -21,6 +21,8 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+NOTE: need to revise row/col in array as in idl it is array[col, row] and in c it is array[row][col]
+
 /******************************************************************************
 MODULE:  convert_geopotential_geometric
 
@@ -33,7 +35,7 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/22/2013   Song Guo         Original Development
+9/22/2014   Song Guo         Original Development
 ******************************************************************************/
 int convert_geopotential_geometric
 (
@@ -122,7 +124,7 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/22/2013   Song Guo         Original Development
+9/22/2014   Song Guo         Original Development
 ******************************************************************************/
 convert_sh_rh
 (
@@ -267,16 +269,15 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/21/2013   Song Guo         Original Development
+9/21/2014   Song Guo         Original Development
 ******************************************************************************/
 int first_files
 (
     Input_t *input,             /*I: input structure */
-    float cloud_prob_threshold, /*I: cloud probability threshold */
-    float *ptm,                 /*O: percent of clear-sky pixels */
-    float *t_templ,             /*O: percentile of low background temp */
-    float *t_temph,             /*O: percentile of high background temp */
-    unsigned char **pixel_mask, /*I/O: pixel mask */
+    char **case_list,           /*O: modtran run list */
+    char **command_list,        /*O: modtran run command list */
+    int *entry,                 /*O: number of cases/commands */
+    int *num_points,            /*O: number of NARR points */
     bool verbose                /*I: value to indicate if intermediate messages 
                                      be printed */
 )
@@ -326,7 +327,6 @@ int first_files
     int min_jay;
     int num_eyes;
     int num_jays;
-    int num_points;
     float **pressure;
     int rem1;
     int rem2;
@@ -344,8 +344,6 @@ int first_files
     float *temp_rh;
     float gndalt[NUM_ELEVATIONS] = {0.0, 0.6, 1.1, 1.6, 2.1, 2.6, 3.1, 3.6, 4.05};
     int num_cases;
-    char **case_list;
-    char **command_list;
     char command[MAX_STR_LEN];
     char current_gdalt[MAX_STR_LEN];
     char current_temp[MAX_STR_LEN];
@@ -361,7 +359,6 @@ int first_files
     int *counter;
     float tmp[3] = {273.0, 310.0, 0.0};
     float alb[3] = {0.0, 0.0, 0.1};
-    int entry = 0;
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -693,31 +690,31 @@ int first_files
     }
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;
-    num_points = num_eyes * num_jays;
+    *num_points = num_eyes * num_jays;
 
     /* Allocate memory for height of NARR points within the rectangular */
-    narr_lat = (float *)malloc(num_points * sizeof(float)); 
+    narr_lat = (float *)malloc(*num_points * sizeof(float)); 
     if (narr_lat == NULL)
     {
         sprintf (errstr, "Allocating narr_lat memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_lon = (float *)malloc(num_points * sizeof(float)); 
+    narr_lon = (float *)malloc(*num_points * sizeof(float)); 
     if (narr_lon == NULL)
     {
         sprintf (errstr, "Allocating narr_lon memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_hgt1 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_hgt1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_hgt1 == NULL)
     {
         sprintf (errstr, "Allocating narr_hgt1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_hgt2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_hgt2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_hgt2 == NULL)
     {
         sprintf (errstr, "Allocating narr_hgt2 memory");
@@ -725,14 +722,14 @@ int first_files
     }
 
     /* Allocate memory for humidity of NARR points within the rectangular */
-    narr_shum1 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_shum1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_shum1 == NULL)
     {
         sprintf (errstr, "Allocating narr_shum1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_shum2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_shum2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_shum2 == NULL)
     {
         sprintf (errstr, "Allocating narr_shum2 memory");
@@ -740,14 +737,14 @@ int first_files
     }
 
     /* Allocate memory for temperature of NARR points within the rectangular */
-    narr_tmp1 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_tmp1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_tmp1 == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_tmp2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_tmp2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_tmp2 == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp2 memory");
@@ -845,42 +842,42 @@ int first_files
     }
 
     /* Allocate memory */
-    pressure = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    pressure = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (pressure == NULL)
     {
         sprintf (errstr, "Allocating pressure memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_height1 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_height1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_height1 == NULL)
     {
         sprintf (errstr, "Allocating narr_height1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_height2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_height2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_height2 == NULL)
     {
         sprintf (errstr, "Allocating narr_height2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_rh1 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_rh1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_rh1 == NULL)
     {
         sprintf (errstr, "Allocating narr_rh1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_rh2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_rh2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_rh2 == NULL)
     {
         sprintf (errstr, "Allocating narr_rh2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < *num_points; i++)
     {
         for ( j = 0; j < P_LAYER; j++)
         {
@@ -889,7 +886,7 @@ int first_files
     }
 
     /* convert grib data to variables to be input to MODTRAN */
-    status = convert_geopotential_geometric(num_points, narr_lat, narr_ght1, 
+    status = convert_geopotential_geometric(*num_points, narr_lat, narr_ght1, 
                                             geo_height1);
     if (status != SUCCESS)
     {
@@ -897,7 +894,7 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
  
-    status = convert_geopotential_geometric(num_points, narr_lat, narr_ght2, 
+    status = convert_geopotential_geometric(*num_points, narr_lat, narr_ght2, 
                                             geo_height2);
     if (status != SUCCESS)
     {
@@ -905,7 +902,7 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
  
-    status = convert_sh_rh(num_points, narr_lat, narr_shum1, narr_tmp1, 
+    status = convert_sh_rh(*num_points, narr_lat, narr_shum1, narr_tmp1, 
                            pressure, narr_rh1);
     if (status != SUCCESS)
     {
@@ -913,7 +910,7 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
  
-    status = convert_sh_rh(num_points, narr_lat, narr_shum2, narr_tmp2, 
+    status = convert_sh_rh(*num_points, narr_lat, narr_shum2, narr_tmp2, 
                            pressure, narr_rh2);
     if (status != SUCCESS)
     {
@@ -965,7 +962,7 @@ int first_files
            / 60.0;
 
     /* Allocate memory */
-    narr_height = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_height = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_height == NULL)
     {
         sprintf (errstr, "Allocating narr_height memory");
@@ -973,7 +970,7 @@ int first_files
     }
 
     /* Allocate memory */
-    narr_rh = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_rh = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_rh == NULL)
     {
         sprintf (errstr, "Allocating narr_rh memory");
@@ -981,7 +978,7 @@ int first_files
     }
 
     /* Allocate memory */
-    narr_tmp = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    narr_tmp = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
     if (narr_tmp == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp memory");
@@ -992,7 +989,7 @@ int first_files
        for NARR points within Landsat scene this is the NARR data corresponding 
        to the acquisition time of the Landsat image converted to appropriated
        variable for MODTRAN input */
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < *num_points; i++)
     {
         for ( j = 0; j < P_LAYER; j++)
         {
@@ -1107,23 +1104,9 @@ int first_files
     }
 
     /* determine number of MODTRAN runs */
-    num_cases = num_points * NUM_ELEVATIONS * 3;  
+    num_cases = *num_points * NUM_ELEVATIONS * 3;  
 
     /* Allocate memory */
-    case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
-    if (case_list == NULL)
-    {
-        sprintf (errstr, "Allocating case_list memory");
-        LST_ERROR (errstr, "first_files");
-    }
-
-    command_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
-    if (command_list == NULL)
-    {
-        sprintf (errstr, "Allocating command_list memory");
-        LST_ERROR (errstr, "first_files");
-    }
-
     counter = (int *)malloc(STAN_LAYER * sizeof(int));
     if (counter == NULL)
     {
@@ -1131,7 +1114,7 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
 
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < *num_points; i++)
     {
         if (narr_lon[i] < 0)
             narr_lon[i] = -narr_lon[i];
@@ -1448,8 +1431,9 @@ int first_files
                 /* create string for case list containing location of current tape5 file
                    create string for command list containing commands for modtran run
                    iterate entry count*/
-                sprintf(current_case[entry], "%s", current_alb);
-                sprintf(command_list[entry], "pushd %s ; ln -s /home/sguo/MODTRAN/DATA; /home/sguo/MODTRAN/Mod90_5.2.2.exe; popd'", current_alb); 
+                *entry = 0;
+                sprintf(case_list[*entry], "%s", current_alb);
+                sprintf(command_list[*entry], "pushd %s ; ln -s /home/sguo/MODTRAN/DATA; /home/sguo/MODTRAN/Mod90_5.2.2.exe; popd'", current_alb); 
                 entry++;
             }
         }
@@ -1493,9 +1477,9 @@ int first_files
     }
 
     /* Write out the caseList file */
-    for (k = 0; k < entry; k++)
+    for (k = 0; k < *entry; k++)
     {
-        fprintf(fd, "%s\n", current_case[k]);
+        fprintf(fd, "%s\n", case_list[k]);
     }
 
     /* Close the caseList file */
@@ -1515,7 +1499,7 @@ int first_files
     }
 
     /* Write out the commandList file */
-    for (k = 0; k < entry; k++)
+    for (k = 0; k < *entry; k++)
     {
         fprintf(fd, "%s\n", command_list[k]);
     }
@@ -1526,21 +1510,6 @@ int first_files
     {
         sprintf (errstr, "Closing file: commandList\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);
-    }
-
-    /* Free memory allocation */
-    status = free_2d_array((void **current_case));
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing memory: current_case\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
-    }
-
-    status = free_2d_array((void **command_list));
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing memory: command_list\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
     return SUCCESS;
