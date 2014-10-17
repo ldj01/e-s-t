@@ -4,15 +4,7 @@
 #include "2d_array.h"
 #include "input.h"
 #include "const.h"
-
-#define NARR_ROW 349
-#define NARR_COL 277
-#define P_LAYER 29
-#define STAN_LAYER 30
-#define NUM_ELEVATIONS 9
-#define MINSIGMA 1e-5
-#define MAX_STR_LEN 510
-#define MAX_MODTRAN_LAYER 150
+#include "scene_based_lst.h"
 
 #ifndef max
 #define max(a,b) (((a) (b)) ? (a) : (b))

@@ -58,6 +58,7 @@ typedef struct {
   char *file_name_th;      /* Name of the thermal input image files */
   bool open_th;            /* thermal open flag */
   FILE *fp_bin_th;         /* File pointer for thermal binary file */
+  int16 *therm_buf;        /* Input data buffer (one line of thermal data) */
 } Input_t;
 
 /* Prototypes */

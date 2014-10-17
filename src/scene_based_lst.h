@@ -16,6 +16,13 @@
 
 #define LST_VERSION "1.0.0"
 #define NUM_ELEVATIONS 9
+#define NARR_ROW 349
+#define NARR_COL 277
+#define P_LAYER 29
+#define STAN_LAYER 30
+#define MINSIGMA 1e-5
+#define MAX_STR_LEN 510
+#define MAX_MODTRAN_LAYER 150
 
 typedef signed short int16;
 typedef unsigned char uint8;
