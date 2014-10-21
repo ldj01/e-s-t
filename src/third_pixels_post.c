@@ -198,7 +198,7 @@ void dn_to_radiance
                    input->meta.bmeta[7].toa_bias);
         }   
         if (this->meta.inst == INST_TM && this->meta.sat == SAT_LANDSAT_5)
-            input->therm_buf[pix] += 0.044;
+         input->therm_buf[pix] = (int16) (input->therm_buf[pix] + 0.044);
     }
 }
 
@@ -355,7 +355,6 @@ int third_pixels_post
     double **modtran_results,   /*I: atmospheric parameter for modtarn run */
     bool verbose,               /*I: value to indicate if intermediate messages 
                                      be printed */
-    double **landsat_results    /*O: atmospheric parameter for landsat pixels */
 )
 { 
     int row, col;
@@ -409,6 +408,15 @@ int third_pixels_post
     float current_height[NUM_ELEVATIONS];
     float current_atm[3][NUM_ELEVATIONS];
     float parameters[3];
+    char *therm_fname[] = "therm_radiance";
+    char *up_fname[] = "upwell_radiance";
+    char *down_fname[] = "downwell_radiance";
+    char *trans_fname[] = "atmos_transmittance";
+    FILE *therm_fptr = NULL;
+    FILE *trans_fptr = NULL;
+    FILE *up_fptr = NULL;
+    FILE *down_fptr = NULL;
+    float **landsat_results;
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -594,18 +602,33 @@ int third_pixels_post
     /* Convert NARR lat/lon to UTM */
     convert_ll_utm(input, narr_lat, narr_lon, *num_points, narr_utm);
 
+    /* Free allocated memory */
+    status = free_2d_array((void **narr_lat));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: narr_lat\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+
+    status = free_2d_array((void **narr_lon));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: narr_lon\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+
     /* Dynamic allocate the 2d memory */
     east_grid = (float **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(float)); 
     if (eye == NULL)
     {
-        sprintf (errstr, "Allocating eye memory");
+        sprintf (errstr, "Allocating easy_grid memory");
         LST_ERROR (errstr, "third_pixels_post");
     }
 
     north_grid = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(float)); 
     if (jay == NULL)
     {
-        sprintf (errstr, "Allocating jay memory");
+        sprintf (errstr, "Allocating north_grid memory");
         LST_ERROR (errstr, "third_pixels_post");
     }
 
@@ -639,6 +662,44 @@ int third_pixels_post
     {
         sprintf (errmsg, "Error allocating memory for the DEM data");
 	RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
+    }
+
+    /* Open the intermediate binary files for writing
+       Note: Needs to be deleted before release */
+    therm_fptr = fopen(therm_fname, "wb"); 
+    if (therm_fptr == NULL)
+    {
+        sprintf(errstr, "Opening report file: %s", therm_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    trans_fptr = fopen(trans_fname, "wb"); 
+    if (trans_fptr == NULL)
+    {
+        sprintf(errstr, "Opening report file: %s", trans_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    up_fptr = fopen(up_fname, "wb"); 
+    if (up_fptr == NULL)
+    {
+        sprintf(errstr, "Opening report file: %s", up_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    down_fptr = fopen(_fname, "wb"); 
+    if (down_fptr == NULL)
+    {
+        sprintf(errstr, "Opening report file: %s", down_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    /* Allocate memory for landsat_results */
+    landsat_results = (float **)allocate_2d_array(3, input->size_th.s, sizeof(float)); 
+    if (landsat_results == NULL)
+    {
+        sprintf (errstr, "Allocating landsat_results memory");
+        LST_ERROR (errstr, "third_pixels_post");
     }
 
     if (verbose)
@@ -869,8 +930,109 @@ int third_pixels_post
                 interpolate_to_location(coordinates, at_height, current_easting,
                                         current_northing, parameters);
 
+                /* convert radiances to W*m^(-2)*sr(-1) */
+                landsat_results[0][col] = parameters[0];
+                landsat_results[1][col] = 10000.0 * parameters[1];
+                landsat_results[2][col] = 10000.0 * parameters[2];
+
             }
         }
+
+        /* Write out the temporary binary output files
+           Note: needs to be deleted before release */
+        status = fwrite(&input->therm_buf[0], sizeof(int16), 
+                 input->size_th.s, therm_fptr);
+        if (status != input->size_th.s)
+        {
+            sprintf(errstr, "Writing to %s", therm_fname);
+            ERROR (errstr, "main");
+        }
+
+        status = fwrite(&landsat_results[0][0], sizeof(float), 
+                 input->size_th.s, trans_fptr);
+        if (status != input->size_th.s)
+        {
+            sprintf(errstr, "Writing to %s", trans_fname);
+            ERROR (errstr, "main");
+        }
+
+        status = fwrite(&landsat_results[1][0], sizeof(float), 
+                 input->size_th.s, up_fptr);
+        if (status != input->size_th.s)
+        {
+            sprintf(errstr, "Writing to %s", up_fname);
+            ERROR (errstr, "main");
+        }
+
+        status = fwrite(&landsat_results[2][0], sizeof(float), 
+                 input->size_th.s, down_fptr);
+        if (status != input->size_th.s)
+        {
+            sprintf(errstr, "Writing to %s", down_fname);
+            ERROR (errstr, "main");
+        }
+    }
+
+    /* free allocated memory */
+    free(inlat);
+    free(inlon);
+    free(distances);
+    free(distance_copy);
+    status = free_2d_array((void **east_grid));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: east_grid\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+    status = free_2d_array((void **north_grid));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: north_grid\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+
+    status = free_2d_array((void **narr_utm));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: narr_utm\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+
+    status = free_2d_array((void **landsat_results));
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: landsat_results\n");
+        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
+    }
+
+    /* Close the intermediate binary files
+       Note: needs to be deleted before release */
+    status = fclose(therm_fptr);
+    if ( status )
+    {
+        sprintf(errstr, "Closing file %s", therm_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    status = fclose(trans_fptr);
+    if ( status )
+    {
+        sprintf(errstr, "Closing file %s", trans_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    status = fclose(up_fptr);
+    if ( status )
+    {
+        sprintf(errstr, "Closing file %s", up_fname);
+        ERROR (errstr, "third_pixels_post");
+    }
+
+    status = fclose(down_fptr);
+    if ( status )
+    {
+        sprintf(errstr, "Closing file %s", down_fname);
+        ERROR (errstr, "third_pixels_post");
     }
 
     return SUCCESS;

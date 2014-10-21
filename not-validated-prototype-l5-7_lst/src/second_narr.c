@@ -523,9 +523,8 @@ int second_narr
     char zero_temp6[MAX_STR_LEN];
     float zero_temp;
     float **current_data;
-    float x[2][2];
-    float y[2][1];
-    float a[2];
+    float x[2];
+    float y[2];
     float tau, lu, ld;
     float ems = 1 - alb;
 
@@ -799,7 +798,7 @@ int second_narr
             }
 
             index = 0;
-            /* iterature through three pairs of parameters */
+            /* iterate through three pairs of parameters */
             for (k = 0; k < 2; k++)
             {
                 /* define current file */
@@ -869,28 +868,27 @@ int second_narr
 
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
-            x[0][0] = 1.0;
-            x[1][0] = 1.0;
-            x[0][1] = temp_radiance_273;
-            x[1][1] = temp_radiance_300;
+            x[0] = temp_radiance_273;
+            x[1] = temp_radiance_300;
             status = calculate_lobs(current_data[0], current_data[1], spectral_response, 
-                     num_srs, y[0][0]);
+                     num_srs, y[0]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 1");
                 LST_ERROR (errstr, "second_narr");
             }
             status = calculate_lobs(current_data[0], current_data[2], spectral_response, 
-                     num_srs, y[1][0]);
+                     num_srs, y[1]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 2");
                 LST_ERROR (errstr, "second_narr");
             }         
 
-            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y */
-            tau = a[1];
-            lu = a[0];
+            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
+               Note: I slove the two equations analytically */
+            tau = (y[0] - y[1]) / (x[0] - x[1]);
+            lu = (x[1]*y[0] - x[0]*y[1]) / (x[0] - x[1]);
 
             /* determine Lobs and Lt when modtran was run a 0 K - calculate downwelled */
             if (this->meta.inst == INST_TM && this->meta.sat == SAT_LANDSAT_5)

@@ -42,7 +42,6 @@ int main (int argc, char *argv[])
     char envi_file[MAX_STR_LEN];        /* output ENVI file name */
     char scene_name[MAX_STR_LEN];       /* input data scene name */
     char command[MAX_STR_LEN];
-    unsigned char **pixel_mask;    /* pixel mask */
     int status;                    /* return value from function call */
     Output_t *output = NULL; /* output structure and metadata */
     bool verbose;            /* verbose flag for printing messages */
@@ -54,6 +53,9 @@ int main (int argc, char *argv[])
     int entry;
     int i;
     int num_points;
+    char **case_list;
+    char **command_list;
+    float **results;
   
     time_t now;
     time(&now);
@@ -442,14 +444,6 @@ int main (int argc, char *argv[])
 
     /* Free the metadata structure */
     free_metadata (&xml_metadata);
-
-    /* Free the pixel mask */
-    status = free_2d_array((void **)pixel_mask);
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing mask memory");
-        LST_ERROR(errstr, "main");
-    }
 
     /* Close the input file and free the structure */
     CloseInput (input);
