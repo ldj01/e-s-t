@@ -47,11 +47,6 @@ int get_args
     int c;                         /* current argument index */
     int option_index;              /* index for the command-line option */
     static int verbose_flag=0;     /* verbose flag */
-    static int cldpix_default = 3; /* Default buffer for cloud pixel dilate */
-    static int sdpix_default = 3;  /* Default buffer for shadow pixel dilate */
-    static int max_pixel_default = 0;  /* Default maxium cloud pixel number for
-                                          cloud division, 0 means no division */
-    static float cloud_prob_default = 22.5;   /* Default cloud probability */
     char errmsg[MAX_STR_LEN];      /* error message */
     char FUNC_NAME[] = "get_args"; /* function name */
     static struct option long_options[] =

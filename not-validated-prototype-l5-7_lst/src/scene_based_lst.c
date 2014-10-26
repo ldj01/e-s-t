@@ -32,30 +32,26 @@ NOTES: type ./scene_based_lst --help for information to run the code
 int main (int argc, char *argv[])
 {
     char errstr[MAX_STR_LEN];           /* error string */
-    char *cptr = NULL;                  /* pointer to the file extension */
     char *xml_name = NULL;              /* input XML filename */
     char *dem_name = NULL;              /* input DEM filename */
     char *emissivity_name = NULL;       /* input Emissivity filename */
     char directory[MAX_STR_LEN];        /* input/output data directory */
     char extension[MAX_STR_LEN];        /* input TOA file extension */
     Input_t *input = NULL;              /* input data and meta data */
-    char envi_file[MAX_STR_LEN];        /* output ENVI file name */
     char scene_name[MAX_STR_LEN];       /* input data scene name */
     char command[MAX_STR_LEN];
     int status;                    /* return value from function call */
     Output_t *output = NULL; /* output structure and metadata */
     bool verbose;            /* verbose flag for printing messages */
-    float sun_azi_temp = 0.0;/* Keep the original sun azimuth angle */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
-    Envi_header_t envi_hdr;   /* output ENVI header information */
     FILE *fd1;
     float alb = 0.1;
     int entry;
     int i;
     int num_points;
-    char **case_list;
-    char **command_list;
-    float **results;
+    char **case_list = NULL;
+    char **command_list = NULL;
+    float **results = NULL;
   
     time_t now;
     time(&now);
@@ -256,21 +252,6 @@ int main (int argc, char *argv[])
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
-    /* Allocate memory */
-    case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
-    if (case_list == NULL)
-    {
-        sprintf (errstr, "Allocating case_list memory");
-        LST_ERROR (errstr, "first_files");
-    }
-
-    command_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
-    if (command_list == NULL)
-    {
-        sprintf (errstr, "Allocating command_list memory");
-        LST_ERROR (errstr, "first_files");
-    }
-
     /* call first_files to generate tape5 file and commandList */
     status = first_files(input, case_list, command_list, &entry, &num_points, verbose);
     if (status != SUCCESS)
@@ -326,11 +307,11 @@ int main (int argc, char *argv[])
     }
 
     /* Free memory allocation */
-    status = free_2d_array((void **command_list));
+    status = free_2d_array((void **)command_list);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: command_list\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
 
     /* Allocate memory for results */
@@ -346,32 +327,33 @@ int main (int argc, char *argv[])
     status = second_narr(input, num_points, alb, case_list, results, verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Calling first_files\n");
+        sprintf (errstr, "Calling scene_based_list\n");
         LST_ERROR (errstr, "scene_based_lst");
     }
 
     /* Free memory allocation */
-    status = free_2d_array((void **case_list));
+    status = free_2d_array((void **)case_list);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: current_case\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
 
     /* call third_pixels_post to generate parameters for each Landsat pixel */
-    status = third_pixels_post(input, num_points, dem_infile, emi_infile, results, verbose);
+    status = third_pixels_post(input, num_points, dem_name, emissivity_name, results, 
+             verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Calling first_files\n");
+        sprintf (errstr, "Calling scene_based_list\n");
         LST_ERROR (errstr, "scene_based_lst");
     }
 
     /* Free memory allocation */
-    status = free_2d_array((void **results));
+    status = free_2d_array((void **)results);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: results\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
 
 #if 0

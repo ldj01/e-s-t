@@ -69,28 +69,25 @@ Input_t *OpenInput(Espa_internal_meta_t *metadata)
 bool GetInputThermLine(Input_t *this, int iline)
 {
   void *buf = NULL;
-  int i;               /* looping variable */
   long loc;            /* pointer location in the raw binary file */
-  float therm_val;     /* tempoary thermal value for conversion from Kelvin
-                          to Celsius */
 
   /* Check the parameters */
   if (this == (Input_t *)NULL) 
     RETURN_ERROR("invalid input structure", "GetIntputThermLine", false);
-  if (!this->open_therm)
+  if (!this->open_th)
     RETURN_ERROR("file not open", "GetInputThermLine", false);
-  if (iline < 0 || iline >= this->size.l)
+  if (iline < 0 || iline >= this->size_th.l)
     RETURN_ERROR("invalid line number", "GetInputThermLine", false);
 
   /* Read the data */
-  if (this->meta.inst == OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
+  if (this->meta.inst == INST_OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
   {
       buf = (void *)this->therm_buf;
-      loc = (long) (iline * this->size.s * sizeof(int16));
-      if (fseek(this->fp_bin_therm, loc, SEEK_SET))
+      loc = (long) (iline * this->size_th.s * sizeof(int16));
+      if (fseek(this->fp_bin_th, loc, SEEK_SET))
           RETURN_ERROR("error seeking thermal line (binary)", "GetInputThermLine",
           false);
-      if (read_raw_binary(this->fp_bin_therm, 1, this->size.s, sizeof(int16), buf)
+      if (read_raw_binary(this->fp_bin_th, 1, this->size_th.s, sizeof(int16), buf)
           != SUCCESS)
           RETURN_ERROR("error reading thermal line (binary)", "GetInputThermLine",
                 false);
@@ -98,15 +95,15 @@ bool GetInputThermLine(Input_t *this, int iline)
   else
   {
       uint8 *line;
-      line = malloc(input->input->size_th.s * sizeof(uint8)); 
+      line = malloc(this->size_th.s * sizeof(uint8)); 
       if (line ==NULL)
           RETURN_ERROR("error allocating memory", "GetInputThermLine", false);
       buf = (void *)line;
-      loc = (long) (iline * this->size.s * sizeof(uint8));
-      if (fseek(this->fp_bin_therm, loc, SEEK_SET))
+      loc = (long) (iline * this->size_th.s * sizeof(uint8));
+      if (fseek(this->fp_bin_th, loc, SEEK_SET))
           RETURN_ERROR("error seeking thermal line (binary)", "GetInputThermLine",
           false);
-      if (read_raw_binary(this->fp_bin_therm, 1, this->size.s, sizeof(uint8), buf)
+      if (read_raw_binary(this->fp_bin_th, 1, this->size_th.s, sizeof(uint8), buf)
           != SUCCESS)
           RETURN_ERROR("error reading thermal line (binary)", "GetInputThermLine",
                 false);

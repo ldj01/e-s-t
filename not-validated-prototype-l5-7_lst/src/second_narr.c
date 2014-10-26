@@ -494,7 +494,7 @@ int second_narr
     int num_points,             /*I: number of narr points */
     float alb,                  /*I: albedo */ 
     char **case_list,           /*I: modtran run list */
-    double **results,           /*O: atmospheric parameter for modtarn run */
+    float **results,            /*O: atmospheric parameter for modtarn run */
     bool verbose                /*I: value to indicate if intermediate messages 
                                      be printed */
 )

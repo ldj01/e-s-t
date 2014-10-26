@@ -212,35 +212,35 @@ convert_sh_rh
     } 
 
     /* Free allocated memory */
-    status = free_2d_array((void **temp_c));
+    status = free_2d_array((void **)temp_c);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: temp_c\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **ewater));
+    status = free_2d_array((void **)ewater);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: ewater\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **e2));
+    status = free_2d_array((void **)e2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: e2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **goff));
+    status = free_2d_array((void **)goff);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: goff\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **ph20));
+    status = free_2d_array((void **)ph20);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: ph20\n");
@@ -763,70 +763,70 @@ int first_files
     }
 
     /* Release memory */
-    status = free_2d_array((void **eye));
+    status = free_2d_array((void **)eye);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: eye\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **jay));
+    status = free_2d_array((void **)jay);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: jay\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **lat));
+    status = free_2d_array((void **)lat);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: lat\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **lon));
+    status = free_2d_array((void **)lon);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: lon\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void hgt1**));
+    status = free_2d_array((void **)hgt1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: hgt1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void shum1**));
+    status = free_2d_array((void **)shum1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: shum1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **tmp1));
+    status = free_2d_array((void **)tmp1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: tmp1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **ght2));
+    status = free_2d_array((void **)ght2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: ght2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **shum2));
+    status = free_2d_array((void **)shum2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: shum2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **tmp2));
+    status = free_2d_array((void **)tmp2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: tmp2\n");
@@ -911,28 +911,28 @@ int first_files
     }
 
     /* free allocated memory */
-    status = free_2d_array((void **narr_ght1));
+    status = free_2d_array((void **)narr_ght1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_ght1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_ght2));
+    status = free_2d_array((void **)narr_ght2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_ght2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_shum1));
+    status = free_2d_array((void **)narr_shum1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_shum1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_shum2));
+    status = free_2d_array((void **)narr_shum2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_shum2\n");
@@ -995,42 +995,42 @@ int first_files
     }
 
     /* Free allocated memory */
-    status = free_2d_array((void **narr_height1));
+    status = free_2d_array((void **)narr_height1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_height1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
     
-    status = free_2d_array((void **narr_height2));
+    status = free_2d_array((void **)narr_height2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_height2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
     
-    status = free_2d_array((void **narr_rh1));
+    status = free_2d_array((void **)narr_rh1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_rh1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
     
-    status = free_2d_array((void **narr_rh2));
+    status = free_2d_array((void **)narr_rh2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_rh2\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
     
-    status = free_2d_array((void **narr_tmp1));
+    status = free_2d_array((void **)narr_tmp1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_tmp1\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
     
-    status = free_2d_array((void **narr_tmp2));
+    status = free_2d_array((void **)narr_tmp2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_tmp2\n");
@@ -1103,6 +1103,20 @@ int first_files
     if (counter == NULL)
     {
         sprintf (errstr, "Allocating counter memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (case_list == NULL)
+    {
+        sprintf (errstr, "Allocating case_list memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    command_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (command_list == NULL)
+    {
+        sprintf (errstr, "Allocating command_list memory");
         LST_ERROR (errstr, "first_files");
     }
 
@@ -1432,28 +1446,28 @@ int first_files
     }
 
     /* Free memory allocation */
-    status = free_2d_array((void **pressure));
+    status = free_2d_array((void **)pressure);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: pressure\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_height));
+    status = free_2d_array((void **)narr_height);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_height\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_rh));
+    status = free_2d_array((void **)narr_rh);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_rh\n");
         RETURN_ERROR (errstr, "first_files", FAILURE);              
     }
 
-    status = free_2d_array((void **narr_tmp));
+    status = free_2d_array((void **)narr_tmp);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: narr_tmp\n");
