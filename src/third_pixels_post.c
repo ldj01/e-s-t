@@ -511,8 +511,8 @@ int third_pixels_post
     {
         for (j = 0; j < NARR_COL - 1; j++)
         {
-            if (lat[row][col] < narr_ul_lat && lat[row][col] > narr_lr_lat &&
-                lon[row][col] < narr_lr_lon && lon[row][col] > narr_ul_lon)
+            if (lat[i][j] < narr_ul_lat && lat[i][j] > narr_lr_lat &&
+                lon[i][j] < narr_lr_lon && lon[i][j] > narr_ul_lon)
             {
                 inlat[in_counter] = i;
                 inlon[in_counter] = j;
@@ -859,7 +859,7 @@ int third_pixels_post
                  if ((min_inlon + 2) < num_jays)
                      distance_in_utm(east_grid[min_inlat][min_inlon+2], 
                          north_grid[min_inlat][min_inlon+2], 
-                         current_easting, current_northing, &stay_right);
+                         current_easting, current_northing, &move_right);
                  else
                      stay_right = (float) SHRT_MAX;
 
@@ -878,9 +878,9 @@ int third_pixels_post
                  if ((min_inlat + 2) < num_eyes)
                      distance_in_utm(east_grid[min_inlat+2][min_inlon], 
                          north_grid[min_inlat+2][min_inlon], 
-                         current_easting, current_northing, &stay_down);
+                         current_easting, current_northing, &move_down);
                  else
-                     stay_right = (float) SHRT_MAX;
+                     move_down = (float) SHRT_MAX;
 
                  if ((move_right - stay_right) < MINSIGMA)
                     min_inlon++;
