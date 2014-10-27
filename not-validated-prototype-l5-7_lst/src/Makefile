@@ -10,7 +10,7 @@ INCDIR  = -I. -I$(XML2INC) -I$(ESPAINC)
 NCFLAGS = $(EXTRA) $(INCDIR)
 
 # Define the source code and object files
-SRC = error.c input.c 2d_array.c scene_based_lst.c first_files.c, second_narr.c,\
+SRC = error.c input.c 2d_array.c scene_based_lst.c first_files.c second_narr.c\
       third_pixels_post.c date.c split_filename.c misc.c output.c
 OBJ = $(SRC:.c=.o)
 
