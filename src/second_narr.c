@@ -380,6 +380,12 @@ void interpol
     int m;
 
     m = nums - 2;
+
+    if ((x[1] - x[0]) >= MINSIGMA)
+        s1 = 1;
+    else
+        s1 = -1;
+
     for (i = 0; i < nums; i++)
     {
         d = (int) (s1 * (u[i] - x[ix]));

@@ -41,7 +41,7 @@ int main (int argc, char *argv[])
     char scene_name[MAX_STR_LEN];       /* input data scene name */
     char command[MAX_STR_LEN];
     int status;                    /* return value from function call */
-    Output_t *output = NULL; /* output structure and metadata */
+    //    Output_t *output = NULL; /* output structure and metadata */
     bool verbose;            /* verbose flag for printing messages */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     FILE *fd1;

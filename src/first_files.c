@@ -37,7 +37,7 @@ int convert_geopotential_geometric
 {
     float *radlat;
     int i, j;
-    int num_pressures;
+    int num_pressures = P_LAYER;
     float g_0 = 9.80665;
     float r_max = 6378.137;
     float r_min = 6356.752;
@@ -215,35 +215,35 @@ int convert_sh_rh
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: temp_c\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        LST_ERROR (errstr, "first_files");              
     }
 
     status = free_2d_array((void **)ewater);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: ewater\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        LST_ERROR (errstr, "first_files");              
     }
 
     status = free_2d_array((void **)e2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: e2\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        LST_ERROR (errstr, "first_files");              
     }
 
     status = free_2d_array((void **)goff);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: goff\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        LST_ERROR (errstr, "first_files");              
     }
 
     status = free_2d_array((void **)ph20);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Freeing memory: ph20\n");
-        RETURN_ERROR (errstr, "first_files", FAILURE);              
+        LST_ERROR (errstr, "first_files");              
     }
 
     return SUCCESS;
@@ -916,14 +916,14 @@ int first_files
     status = free_2d_array((void **)narr_hgt1);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: narr_ght1\n");
+        sprintf (errstr, "Freeing memory: narr_hgt1\n");
         LST_ERROR (errstr, "first_files");              
     }
 
     status = free_2d_array((void **)narr_hgt2);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: narr_ght2\n");
+        sprintf (errstr, "Freeing memory: narr_hgt2\n");
         LST_ERROR (errstr, "first_files");              
     }
 

@@ -3,6 +3,7 @@
 *****************************************************************************/
 
 #include "input.h"
+#include "error.h"
 
 /* Functions */
 Input_t *OpenInput(Espa_internal_meta_t *metadata)
