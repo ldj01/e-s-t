@@ -23,7 +23,7 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
-void planck_eq
+int planck_eq
 (
     float *wavelength,
     int num_srs, 
@@ -36,18 +36,15 @@ void planck_eq
     float h;
     float k;
     float c;
+    char errstr[MAX_STR_LEN];
    
     /* Allocate memory */
     lambda = (float *)malloc(num_srs * sizeof(float));  
-    if (temp == NULL)
+    if (lambda == NULL)
     {
         sprintf (errstr, "Allocating lambda memory");
         LST_ERROR (errstr, "second_narr");
     }
-
-    /* Lambda intervals of Landsat5 spectral response locations microns 
-       units: m */
-    lambda = wavelengths * (float)10e-6;
 
     /* Planck Const hecht pg, 585 ## units: Js */
     h = 6.6260755 * (float)10e-34;
@@ -56,21 +53,21 @@ void planck_eq
     k = 1.3806503 * (float)10e-23;
 
     /* Speed of Light ## units: m/s */
-    c = 299792458.0
+    c = 299792458.0;
 
-     for (i = 0; i < num_srs; i++)
+    for (i = 0; i < num_srs; i++)
     {
         /* Lambda intervals of Landsat5 spectral response locations microns 
            units: m */
-        lambda[i] = wavelengths[i] * (float)10e-6;
+        lambda[i] = wavelength[i] * (float)10e-6;
 
         /* Compute the Planck Blackbody Eq [W/m^2 sr um] */  
-        blank_radiance[i] = 2.0 * h * (pow(c, 2.0)) * ((float)(10e-6) * 
+        black_radiance[i] = 2.0 * h * (pow(c, 2.0)) * ((float)(10e-6) * 
             pow(lambda[i],-5.0)) * (1.0/(exp((h * c) / (lambda[i] * k * 
             temperature)) -1.0));
 
         /* convert to W/cm^2 sr micron to match modtran units */
-        blank_radiance[i] /= 10000.0; 
+        black_radiance[i] /= 10000.0; 
     }
     free(lambda);
 
@@ -102,14 +99,15 @@ void spline
     float *y2
 )
 {
-    fint  i,k;
+    int  i,k;
     float p,qn,sig,un,*u;
+    char errstr[MAX_STR_LEN];
 
     u=(float *)malloc((unsigned) (n-1)*sizeof(float));
     if (!u)
     {
-        error_string = "Can't allocate memory";
-        RETURN_ERROR(error_string, "second_narr", NULL);
+        sprintf(errstr, "Can't allocate memory");
+        LST_ERROR(errstr, "second_narr");
     }
 
     if (yp1 > 0.99e30)
@@ -152,7 +150,7 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/29/2014   Song Guo         
+9/29/2014   Song Guo         Modified from online code
 ******************************************************************************/
 void splint
 (
@@ -164,8 +162,7 @@ void splint
     float *y
 )
 {
-    fint  r = 0;
-    fint  k;
+    int  k;
     float h,b,a;
 
     if ( klo < 0 )
@@ -209,9 +206,9 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/29/2014   Song Guo         
+9/29/2014   Song Guo         Original Development
 ******************************************************************************/
-void int_tabulated
+int int_tabulated
 (
     float *x,                 /*I: The tabulated X-value data */
     float *f,                 /*I: The tabulated F-value data */ 
@@ -223,8 +220,10 @@ void int_tabulated
     float *z;
     float xmin;
     float xmax;
+    int i;
     int ii;
     float h;
+    char errstr[MAX_STR_LEN];
 
     /* Allocate memory */
     temp = (float *)malloc(nums * sizeof(float));  
@@ -244,29 +243,28 @@ void int_tabulated
     /* integrate spectral response over wavelength */
     /* Call spline to get second derivatives, since the Numerical Recipes function 
        assumesthat arrays are 1-based, adjust the pointer values accordingly */
-    spline(spectral_response[0] - 1, spectral_response[1] - 1, nums, 
-           2.0, 2.0, temp - 1);
+    spline(x - 1, f - 1, nums, 2.0, 2.0, temp - 1);
     
     /* Call splint for interpolations. one-based arrays are considered */
     for (i = 0; i < nums; i++) 
     {
-        splint(spectral_response[0] - 1, spectral_response[1] - 1, temp - 1, 
-              num_srs, i, z[i]);
+        splint(x - 1, f - 1, temp - 1, nums, i, z);
     }
 
-    xmin = spectral_response[0][0];
-    xmax = spectral_response[0][nums];  
+    xmin = x[0];
+    xmax = x[nums];  
     h = (xmax - xmin) / (float) nums;
-    ii = (((nums - 1) / 4) + 1) * 4;
+    ii = (int)(((nums - 1) / 4) + 1) * 4;
 
-    result = 0.0; 
-
+    *result = 0.0;
     /* Compute the integral using the 5-point Newton-Cotes formula */
     for (i = 0; i < nums; i++) 
     {
-        result += 2.0 * h * (7.0 * (z[ii-4] + z[ii]) + 
+        *result += 2.0 * h * (7.0 * (z[ii-4] + z[ii]) + 
                  32.0 * (z[ii-3] + z[ii-1]) + 12.0 * z[ii-2]) / 45.0;
     }
+
+    return SUCCESS;
 }
 
 /******************************************************************************
@@ -281,7 +279,7 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/29/2014   Song Guo         
+9/29/2014   Song Guo         Original Development
 ******************************************************************************/
 int calculate_lt
 (
@@ -296,6 +294,8 @@ int calculate_lt
     float temp_integral;
     float *blackbody_radiance;
     float *product;
+    char errstr[MAX_STR_LEN];
+    int status;
 
     /* Allocate memory */
     blackbody_radiance = (float *)malloc(num_srs * sizeof(float));  
@@ -313,7 +313,13 @@ int calculate_lt
     }
 
     /* integrate spectral response over wavelength */
-    int_tabulated(spectral_response[0], spectral_response[1], &rs_integral);
+    status = int_tabulated(spectral_response[0], spectral_response[1], num_srs, 
+                           &rs_integral);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Calling int_tabulated\n");
+        LST_ERROR (errstr, "second_narr");              
+    }
 
     /* using planck's equaiton to calculate radiance at each wavelength for 
        current temp*/
@@ -322,7 +328,7 @@ int calculate_lt
     if (status != SUCCESS)
     {
         sprintf (errstr, "Calling planck_eq\n");
-        RETURN_ERROR (errstr, "second_narr", FAILURE);              
+        LST_ERROR (errstr, "second_narr");              
     }
 
     /* multiply the caluclated planck radiance by the spectral reponse and integrate 
@@ -332,10 +338,10 @@ int calculate_lt
         product[i] = blackbody_radiance[i] * spectral_response[1][i];
     }
 
-    int_tabulated(spectral_response[0], product, &temp_integral);
+    int_tabulated(spectral_response[0], product, num_srs, &temp_integral);
 
     /* divide above result by integral of spectral response function */
-    radiance = temp_integral / rs_integral;
+    *radiance = temp_integral / rs_integral;
 
     /* Free allocated memory */
     free(blackbody_radiance);
@@ -356,9 +362,9 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-10/3/2014   Song Guo         
+10/3/2014   Song Guo         Original Development
 ******************************************************************************/
-int interpol
+void interpol
 (
     float *v,         
     float *x,           
@@ -383,12 +389,12 @@ int interpol
         {
             if (d > 0) 
             {
-                while ((s1*(u(i)-x(ix+1)) > MINSIGMA) && (ix < m -2))
+                while ((s1*(u[i]-x[ix+1]) > MINSIGMA) && (ix < m -2))
                     ix++;    
             }
             else
             {
-                while ((s1*(u(i)-x(ix)) < MINSIGMA) && (ix > 0))
+                while ((s1*(u[i]-x[ix]) < MINSIGMA) && (ix > 0))
                     ix--;
             }
             r[i] = v[ix] + (u[i]-x[ix])*(v[ix+1]-v[ix])/(x[ix+1]-x[ix]);
@@ -409,11 +415,11 @@ RETURN: SUCCESS
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
-9/29/2014   Song Guo         
+9/29/2014   Song Guo         Original Development
 ******************************************************************************/
 int calculate_lobs
 (
-    float wavelengths,          /*I: wavelength */
+    float *wavelengths,          /*I: wavelength */
     float *modtran,             /*I: modtran results */
     float **spectral_response,  /*I: spectral response function */
     int num_srs,                /*I: number of spectral response points */
@@ -422,9 +428,10 @@ int calculate_lobs
 { 
     int i;
     float *temp_rad;
-    float rsr_integral;
+    float rs_integral;
     float temp_integral;
     float *product;
+    char errstr[MAX_STR_LEN];
 
     /* Allocate memory */
     temp_rad = (float *)malloc(num_srs * sizeof(float));  
@@ -442,17 +449,12 @@ int calculate_lobs
     }
 
     /* integrate spectral response over wavelength */
-    int_tabulated(spectral_response[0], spectral_response[1], &rs_integral);
+    int_tabulated(spectral_response[0], spectral_response[1], num_srs, &rs_integral);
 
     /* using planck's equaiton to calculate radiance at each wavelength for 
        current temp*/
-    status = interpol(modtran, wavelengths, spectral_response[0], num_srs, 
+    interpol(modtran, wavelengths, spectral_response[0], num_srs, 
                       temp_rad);
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Calling interpol\n");
-        RETURN_ERROR (errstr, "second_narr", FAILURE);              
-    }
 
     /* multiply the caluclated radiance by the spectral reponse and integrate 
        over wavelength to get one number for current temp*/
@@ -461,10 +463,10 @@ int calculate_lobs
         product[i] = temp_rad[i] * spectral_response[1][i];
     }
 
-    int_tabulated(spectral_response[0], product, &temp_integral);
+    int_tabulated(spectral_response[0], product, num_srs, &temp_integral);
 
     /* divide above result by integral of spectral response function */
-    radiance = temp_integral / rs_integral;
+    *radiance = temp_integral / rs_integral;
 
     /* Free allocated memory */
     free(temp_rad);
@@ -502,7 +504,6 @@ int second_narr
     FILE *fd;
     int i, j, k, m;
     float **spectral_response;
-    char **case_list;
     float temp_radiance_0;
     float obs_radiance_0;
     float temp_radiance_273;
@@ -527,15 +528,19 @@ int second_narr
     float y[2];
     float tau, lu, ld;
     float ems = 1 - alb;
+    char errstr[MAX_STR_LEN];
+    char *path = NULL;
+    char full_path[MAX_STR_LEN];
+    int status;
 
     path = getenv("LST");
     if (path == NULL)
     {
-        error_string = "LST environment variable is not set";
-        RETURN_ERROR(error_string, "second_narr", NULL);
+        sprintf (errstr, "LST environment variable is not set");
+        LST_ERROR(errstr, "second_narr");
     }
 
-    if (this->meta.inst == INST_TM && this->meta.sat == SAT_LANDSAT_5)
+    if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
     {
         /* Dynamic allocate the 2d memory */
         spectral_response = (float **)allocate_2d_array(2, 171,sizeof(float)); 
@@ -549,22 +554,22 @@ int second_narr
         fd = fopen(full_path, "r");
         if (fd == NULL)
         {
-            error_string = "Can't open L5v2.rsp file";
-            RETURN_ERROR(error_string, "second_narr", NULL);
+            sprintf(errstr, "Can't open L5v2.rsp file");;
+            LST_ERROR(errstr, "second_narr");
         }
 
         for (i = 0; i < 171; i++)
         {
-            if (fscanf(fd, "%f %f", spectral_response[0][i], 
-                   spectral_response[1][i]) == EOF)  
+            if (fscanf(fd, "%f %f", &spectral_response[0][i], 
+                   &spectral_response[1][i]) == EOF)  
             {
-                error_string = "End of file (EOF) is met before 171 lines";
-                RETURN_ERROR(error_string, "second_narr", NULL);
+                sprintf(errstr, "End of file (EOF) is met before 171 lines");;
+                LST_ERROR(errstr, "second_narr");
             }
         }
         fclose(fd);
     }
-    else if (this->meta.inst == INST_ETM && this->meta.sat == SAT_LANDSAT_7)
+    else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
     {
         /* Dynamic allocate the 2d memory */
         spectral_response = (float **)allocate_2d_array(2, 47,sizeof(float)); 
@@ -578,22 +583,22 @@ int second_narr
         fd = fopen(full_path, "r");
         if (fd == NULL)
         {
-            error_string = "Can't open L7.rsp file";
-            RETURN_ERROR(error_string, "second_narr", NULL);
+            sprintf(errstr, "Can't open L7.rsp file");;
+            LST_ERROR(errstr, "second_narr");
         }
 
         for (i = 0; i < 47; i++)
         {
-            if (fscanf(fd, "%f %f", spectral_response[0][i], 
-                   spectral_response[1][i]) == EOF)  
+            if (fscanf(fd, "%f %f", &spectral_response[0][i], 
+                   &spectral_response[1][i]) == EOF)  
             {
-                error_string = "End of file (EOF) is met before 47 lines";
-                RETURN_ERROR(error_string, "second_narr", NULL);
+                sprintf(errstr, "End of file (EOF) is met before 47 lines");
+                LST_ERROR(errstr, "second_narr");
             }
         }
         fclose(fd);
     }
-    else if (this->meta.inst == OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
+    else if (input->meta.inst == INST_OLI_TIRS && input->meta.sat == SAT_LANDSAT_8)
     {
         /* Dynamic allocate the 2d memory */
         spectral_response = (float **)allocate_2d_array(2, 101,sizeof(float)); 
@@ -607,25 +612,25 @@ int second_narr
         fd = fopen(full_path, "r");
         if (fd == NULL)
         {
-            error_string = "Can't open L8_B10.rsp file";
-            RETURN_ERROR(error_string, "second_narr", NULL);
+            sprintf (errstr, "Can't open L8_B10.rsp file");
+            LST_ERROR(errstr, "second_narr");
         }
 
         for (i = 0; i < 47; i++)
         {
-            if (fscanf(fd, "%f %f", spectral_response[0][i], 
-                   spectral_response[1][i]) == EOF)  
+            if (fscanf(fd, "%f %f", &spectral_response[0][i], 
+                   &spectral_response[1][i]) == EOF)  
             {
-                error_string = "End of file (EOF) is met before 101 lines";
-                RETURN_ERROR(error_string, "second_narr", NULL);
+                sprintf (errstr, "End of file (EOF) is met before 101 lines");
+                LST_ERROR(errstr, "second_narr");
             }
         }
         fclose(fd);
     }
     else
     {
-        error_string = "invalid instrument type";
-        RETURN_ERROR(error_string, "second_narr", NULL);
+        sprintf (errstr, "invalid instrument type");;
+        LST_ERROR(errstr, "second_narr");
     }
 #if 0
     /* Allocate memory */
@@ -641,7 +646,7 @@ int second_narr
     if (fd == NULL)
     {
         sprintf (errstr, "Opening file: caseList\n");
-        RETURN_ERROR (errstr, "second_narr", FAILURE);
+        LST_ERROR (errstr, "second_narr");
     }
 
     /* Write out the caseList file */
@@ -655,11 +660,11 @@ int second_narr
     if ( status )
     {
         sprintf (errstr, "Closing file: caseList\n");
-        RETURN_ERROR (errstr, "second_narr", FAILURE);
+        LST_ERROR (errstr, "second_narr");
     }
 #endif
     /* calculate Lt for each temperature */
-    if (this->meta.inst == INST_TM && this->meta.sat == SAT_LANDSAT_5)
+    if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
     {
         status = calculate_lt(273, spectral_response, 171, &temp_radiance_273);
         if (status != SUCCESS)
@@ -674,7 +679,7 @@ int second_narr
             LST_ERROR (errstr, "second_narr");
         }
     }
-    else if (this->meta.inst == INST_ETM && this->meta.sat == SAT_LANDSAT_7)
+    else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
     {
         status = calculate_lt(273, spectral_response, 47, &temp_radiance_273);
         if (status != SUCCESS)
@@ -689,7 +694,7 @@ int second_narr
             LST_ERROR (errstr, "second_narr");
         }
     }
-    else if (this->meta.inst == INST_OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
+    else if (input->meta.inst == INST_OLI_TIRS && input->meta.sat == SAT_LANDSAT_8)
     {
         status = calculate_lt(273, spectral_response, 101, &temp_radiance_273);
         if (status != SUCCESS)
@@ -706,8 +711,8 @@ int second_narr
     }
     else
     {
-        error_string = "invalid instrument type";
-        RETURN_ERROR(error_string, "second_narr", NULL);
+        sprintf (errstr, "invalid instrument type");
+        LST_ERROR(errstr, "second_narr");
     }
 
     /* iterate through all points in the scene and all heights in one point */
@@ -720,8 +725,8 @@ int second_narr
             sprintf(command, "echo %s|tr '/' '\\n'",case_list[counter]);
 
             /* Open the command for reading. */
-            fp = popen(command, "r");
-            if (fp == NULL) 
+            fd = popen(command, "r");
+            if (fd == NULL) 
             {
                 sprintf (errstr, "Allocating results memory");
                 LST_ERROR (errstr, "second_narr");
@@ -729,18 +734,18 @@ int second_narr
 
             index = 0;
             /* Read the output a line at a time - output it. */
-            while (fgets(spec[index], sizeof(spec[index])-1, fp) != NULL) 
+            while (fgets(spec[index], sizeof(spec[index])-1, fd) != NULL) 
                 index++;
 
             /* close the command file */
-            pclose(fp);
+            pclose(fd);
 
             /* Split lat and lon */
             sprintf(command, "echo %s|tr '_' '\\n'",spec[7]);
 
             /* Open the command for reading. */
-            fp = popen(command, "r");
-            if (fp == NULL) 
+            fd = popen(command, "r");
+            if (fd == NULL) 
             {
                 sprintf (errstr, "Allocating results memory");
                 LST_ERROR (errstr, "second_narr");
@@ -748,49 +753,49 @@ int second_narr
 
             index = 0;
             /* Read the output a line at a time - output it. */
-            while (fgets(coordinates[index], sizeof(coordinates[index])-1, fp) 
+            while (fgets(coordinates[index], sizeof(coordinates[index])-1, fd) 
                    != NULL) 
                 index++;
 
             /* close the command file */
-            pclose(fp);
+            pclose(fd);
 
             /* get lat, lon and height */
-            sprintf(lat, "%f",  coordinates[0]);          
-            sprintf(lon, "%f",  coordinates[1]);          
-            sprintf(height, "%f",  spec[8]);          
+            sscanf(coordinates[0], "%f", &lat);          
+            sscanf(coordinates[1], "%f", &lon);          
+            sscanf(spec[8], "%f", &height);          
 
             /* determine number of entries in current file */
             sprintf(command, "wc %s/parsed | awk '{print $1}'", case_list[i]);
 
             /* Open the command for reading. */
-            fp = popen(command, "r");
-            if (fp == NULL) 
+            fd = popen(command, "r");
+            if (fd == NULL) 
             {
                 sprintf (errstr, "Allocating results memory");
                 LST_ERROR (errstr, "second_narr");
             }
 
             /* Read the output a line at a time - output it. */
-            fgets(num_entry, sizeof(num_entry)-1, fp); 
+            fgets(num_entry, sizeof(num_entry)-1, fd); 
 
             /* close the command file */
-            pclose(fp);
+            pclose(fd);
 
             /* get number of entries */
-            sprintf(num_entries, "%d", num_entry);          
+            sscanf(num_entry, "%d", &num_entries);  
 
             /* for each height, read in radiance inforomation for three modtran 
                runs, columns of array are organized:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
-            current_data = allocate_2d_array(num_entries, 4, sizeof(float)); 
+            current_data = (float **)allocate_2d_array(num_entries, 4, sizeof(float)); 
             if (current_data == NULL)
             {
                 sprintf (errstr, "Allocating current_data memory");
                 LST_ERROR (errstr, "second_narr");
             }
 
-            temp1 = allocate_2d_array(num_entries, 2, sizeof(float)); 
+            temp1 = (float **)allocate_2d_array(num_entries, 2, sizeof(float)); 
             if (temp1 == NULL)
             {
                 sprintf (errstr, "Allocating current_data memory");
@@ -807,17 +812,17 @@ int second_narr
                 fd = fopen(current_file, "r");
                 if (fd == NULL)
                 {
-                    error_string = "Can't open current_file file";
-                    RETURN_ERROR(error_string, "second_narr", NULL);
+                    sprintf (errstr, "Can't open current_file file");
+                    LST_ERROR(errstr, "second_narr");
                 }
 
                 for (m = 0; m < num_entries ; m++)
                 {
-                    if (fscanf(fd, "%f %f", temp1[m][0], temp1[m][1]) == EOF)  
+                    if (fscanf(fd, "%f %f", &temp1[m][0], &temp1[m][1]) == EOF)  
                     {
-                        error_string = "End of file (EOF) is met before num_entries "
-                                       " lines";
-                        RETURN_ERROR(error_string, "second_narr", NULL);
+                        sprintf (errstr, "End of file (EOF) is met before num_entries "
+                                 " lines");
+                        LST_ERROR(errstr, "second_narr");
                     }
                 }
                 fclose(fd);
@@ -842,25 +847,25 @@ int second_narr
                     /* determine temperature at lowest atmospheric layer 
                        (when MODTRAN is run at 0K) */
                     sprintf(zero_tape6, "%s/tape6", case_list[counter]);
-                    sprintf(command, "grep "TARGET-PIXEL (H2) SURFACE TEMPERATURE" %s |" 
-                                     "awk '{print $7}'", zero_tape6);
+                    sprintf(command, "grep \"TARGET-PIXEL (H2) SURFACE TEMPERATURE\" %s | " 
+                                     "awk '{print $7}'", zero_tape6 );
 
                     /* Open the command for reading. */
-                    fp = popen(command, "r");
-                    if (fp == NULL) 
+                    fd = popen(command, "r");
+                    if (fd == NULL) 
                     {
-                        sprintf (errstr, "");
+                        sprintf (errstr, "Popening command");
                         LST_ERROR (errstr, "second_narr");
                     }
 
                     /* Read the output a line at a time - output it. */
-                    while (fgets(zero_temp6, sizeof(zero_temp6)-1, fp) != NULL) 
+                    while (fgets(zero_temp6, sizeof(zero_temp6)-1, fd) != NULL) 
 
                     /* close the command file */
-                    pclose(fp);
+                    pclose(fd);
 
                     /* get zero_temp */
-                    sprintf(zero_temp, "%f", zero_temp6);          
+                    sscanf(zero_temp6, "%f", &zero_temp);          
                 }
                 counter++;
                 index++;
@@ -871,19 +876,34 @@ int second_narr
             x[0] = temp_radiance_273;
             x[1] = temp_radiance_300;
             status = calculate_lobs(current_data[0], current_data[1], spectral_response, 
-                     num_srs, y[0]);
+                     num_entries, &y[0]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 1");
                 LST_ERROR (errstr, "second_narr");
             }
             status = calculate_lobs(current_data[0], current_data[2], spectral_response, 
-                     num_srs, y[1]);
+                     num_entries, &y[1]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 2");
                 LST_ERROR (errstr, "second_narr");
             }         
+
+            /* Free the allocated memory in the loop*/
+            status = free_2d_array((void **)current_data);
+            if (status != SUCCESS)
+            {
+                sprintf (errstr, "Freeing memory: current_data\n");
+                LST_ERROR (errstr, "second_narr");              
+            }
+
+            status = free_2d_array((void **)temp1);
+            if (status != SUCCESS)
+            {
+                sprintf (errstr, "Freeing memory: temp\n");
+                LST_ERROR (errstr, "second_narr");              
+            }
 
             /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
                Note: I slove the two equations analytically */
@@ -891,7 +911,7 @@ int second_narr
             lu = (x[1]*y[0] - x[0]*y[1]) / (x[0] - x[1]);
 
             /* determine Lobs and Lt when modtran was run a 0 K - calculate downwelled */
-            if (this->meta.inst == INST_TM && this->meta.sat == SAT_LANDSAT_5)
+            if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
             {
                 status = calculate_lt(zero_temp, spectral_response, 171, &temp_radiance_0);
                 if (status != SUCCESS)
@@ -900,7 +920,7 @@ int second_narr
                     LST_ERROR (errstr, "second_narr");
                 }
             }
-            else if (this->meta.inst == INST_ETM && this->meta.sat == SAT_LANDSAT_7)
+            else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
             {
                 status = calculate_lt(zero_temp, spectral_response, 47, &temp_radiance_0);
                 if (status != SUCCESS)
@@ -909,9 +929,8 @@ int second_narr
                     LST_ERROR (errstr, "second_narr");
                 }
             }
-            else if (this->meta.inst == INST_OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
+            else if (input->meta.inst == INST_OLI_TIRS && input->meta.sat == SAT_LANDSAT_8)
             {
-            }
                 status = calculate_lt(zero_temp, spectral_response, 101, &temp_radiance_0);
                 if (status != SUCCESS)
                 { 
@@ -921,11 +940,11 @@ int second_narr
             }
             else
             {
-                error_string = "invalid instrument type";
-                RETURN_ERROR(error_string, "second_narr", NULL);
+                sprintf (errstr, "invalid instrument type");
+                LST_ERROR(errstr, "second_narr");
             }
             status = calculate_lobs(current_data[0], current_data[2], spectral_response, 
-                     num_srs, &obs_radiance_0);
+                     num_entries, &obs_radiance_0);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 2");
@@ -946,13 +965,21 @@ int second_narr
         }
     }
 #if 0
+    /* Free allocated memory */
+    status = free_2d_array((void **)spectral_response);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: spectral_response\n");
+        LST_ERROR (errstr, "second_narr");              
+    }
+
     /* write results to a file */
     sprintf(full_path,"%s/%s", path, "atmosphericParameters.txt");
     fd = fopen(full_path, "w");
     if (fd == NULL)
     {
-        error_string = "Can't open atmosphericParameters.txt file";
-        RETURN_ERROR(error_string, "second_narr", NULL);
+        sprintf (errstr, "Can't open atmosphericParameters.txt file");
+        LST_ERROR(error_string, "second_narr");
     }
     for (k = 0; k < num+points * NUM_ELEVATIONS; k++)
     {

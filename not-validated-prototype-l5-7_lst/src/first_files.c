@@ -1359,7 +1359,7 @@ int first_files
 
             /* determine number of layers for current ground altitude and insert 
                into head file */
-            sprinf(temp_out, "%s", index); /* is this needed? */
+            memcpy(temp_out, &index, sizeof(index)); 
             sprintf(command,"cat head.txt | sed 's/nml/%s/' > newHead.txt", temp_out); 
             status = system("command");
             if (status != SUCCESS)
@@ -1369,7 +1369,7 @@ int first_files
             }
 
             /* insert current ground altitude into head file */
-            sprinf(temp_out, "%s", gndalt[j]); /* is this needed? */
+            memcpy(temp_out, &gndalt[j], sizeof(gndalt[j])); 
             sprintf(command,"cat newHead.txt | sed 's/gdalt/%s/' > newHead2.txt", temp_out); 
             status = system("command");
             if (status != SUCCESS)
