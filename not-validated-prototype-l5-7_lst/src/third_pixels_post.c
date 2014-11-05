@@ -451,10 +451,10 @@ int third_pixels_post
         LST_ERROR (errstr, "third_pixels_post");
     }
 
-    lst_path = getenv("LST");
+    lst_path = getenv("LST_DATA");
     if (lst_path == NULL)
     {
-        sprintf (errstr, "LST environment variable is not set");
+        sprintf (errstr, "LST_DATA environment variable is not set");
         LST_ERROR(errstr, "third_pixels_post");
     }
 
@@ -489,8 +489,8 @@ int third_pixels_post
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
-    narr_ul_lon = input->meta.ul_geo_corner.lon + 0.5;
-    narr_lr_lat = input->meta.lr_geo_corner.lat + 0.5;
+    narr_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
+    narr_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
     narr_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
 
     /* determine what points in the NARR dataset fall within the Landsat image using 
@@ -532,10 +532,6 @@ int third_pixels_post
         min_eye = min(max_eye, eye[inlat[i]][inlon[i]]); 
         max_jay = max(max_jay, jay[inlat[i]][inlon[i]]); 
         min_jay = min(max_jay, jay[inlat[i]][inlon[i]]); 
-        max_eye--;
-        min_eye--;
-        max_jay--;
-        min_jay--;
     }
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;

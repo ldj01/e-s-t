@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
+#include <sys/stat.h>
 #include "2d_array.h"
 #include "input.h"
 #include "const.h"
@@ -300,7 +301,6 @@ int first_files
     float **narr_rh2;
     float **narr_tmp;
     int i, j, k;
-    int cur_line;
     int p[P_LAYER] = {1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 
         650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100};
     char full_path[MAX_STR_LEN];
@@ -352,7 +352,9 @@ int first_files
     float tmp[3] = {273.0, 310.0, 0.0};
     float alb[3] = {0.0, 0.0, 0.1};
     char *path = NULL; 
-    int status;    
+    struct stat s;
+    int status;
+    int temp_int1, temp_int2;    
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -383,10 +385,10 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
 
-    path = getenv("LST");
+    path = getenv("LST_DATA");
     if (path == NULL)
     {
-        sprintf (errstr, "LST environment variable is not set");
+        sprintf (errstr, "LST_DATA environment variable is not set");
         LST_ERROR(errstr, "first_files");
     }
 
@@ -398,9 +400,9 @@ int first_files
         LST_ERROR(errstr, "first_files");
     }
 
-    for (i = 0; i < NARR_ROW; i++)
+    for (j = 0; j < NARR_COL; j++)
     {
-        for (j = 0; j < NARR_ROW; j++)
+        for (i = 0; i < NARR_ROW; i++)
         {
             if (fscanf(fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j], 
                        &lon[i][j]) == EOF)
@@ -414,21 +416,21 @@ int first_files
     fclose(fd);
 
     /* Dynamic allocate the 2d memory */
-    hgt1 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    hgt1 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (hgt1 == NULL)
     {
         sprintf (errstr, "Allocating hgt_1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    shum1 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    shum1 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (shum1 == NULL)
     {
         sprintf (errstr, "Allocating shum_1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    tmp1 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    tmp1 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (tmp1 == NULL)
     {
         sprintf (errstr, "Allocating tmp_1 memory");
@@ -438,30 +440,28 @@ int first_files
     /* Read in NARR height for time before landsat acqusition */ 
     for (i = 0; i < P_LAYER - 1; i++)
     {
-        sprintf(full_path,"%s/%d%s","GHT_1/", p[i], ".txt");
+        sprintf(full_path,"%s/%d%s","HGT_1/", p[i], ".txt");
         fd = fopen(full_path, "r");
         if (fd == NULL)
         {
-            sprintf (errstr, "Can't GHT_1 txt file");
+            sprintf (errstr, "Can't HGT_1 txt file");
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &hgt1[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &hgt1[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd);
     }
+
+    printf("hgt1[0][0]=%f\n",hgt1[0][0]);
  
     /* Read in NARR specific humidity for time before landsat acqusition */ 
     for (i = 0; i < P_LAYER - 1; i++)
@@ -474,19 +474,15 @@ int first_files
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &shum1[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &shum1[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd);
     }
@@ -502,39 +498,35 @@ int first_files
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &tmp1[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &tmp1[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd); 
     }
 
     /* Dynamic allocate the 2d memory */
-    hgt2 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    hgt2 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (hgt2 == NULL)
     {
         sprintf (errstr, "Allocating hgt_2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    shum2 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    shum2 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (shum2 == NULL)
     {
         sprintf (errstr, "Allocating shum_2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    tmp2 = (float **)allocate_2d_array(NARR_ROW * NARR_COL, P_LAYER, sizeof(float)); 
+    tmp2 = (float **)allocate_2d_array(P_LAYER, NARR_ROW * NARR_COL, sizeof(float)); 
     if (tmp2 == NULL)
     {
         sprintf (errstr, "Allocating tmp_2 memory");
@@ -544,27 +536,23 @@ int first_files
     /* Read in NARR height for time after landsat acqusition */ 
     for (i = 0; i < P_LAYER - 1; i++)
     {
-        sprintf(full_path,"%s/%d%s","GHT_2/", p[i], ".txt");
+        sprintf(full_path,"%s/%d%s","HGT_2/", p[i], ".txt");
         fd = fopen(full_path, "r");
         if (fd == NULL)
         {
-            sprintf (errstr, "Can't GHT_2 txt file");
+            sprintf (errstr, "Can't HGT_2 txt file");
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &hgt2[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &hgt2[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd);
     }
@@ -580,19 +568,15 @@ int first_files
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &shum2[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &shum2[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd);
     }
@@ -608,19 +592,15 @@ int first_files
             LST_ERROR(errstr, "first_files");
         }
 
-        cur_line = 0;
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        fscanf(fd, "%d %d", &temp_int1, &temp_int2);
+        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
         {
-            if (cur_line != 0)
+            if (fscanf(fd, "%f", &tmp2[i][j]) == EOF)
             {
-                if (fscanf(fd, "%f", &tmp2[j-1][i]) == EOF)
-                {
-                    sprintf (errstr, "End of file (EOF) is met before "
-                          "NARR_ROW * NARR_COL lines");
-                    LST_ERROR(errstr, "first_files");
-                }
-            }    
-            cur_line++;        
+                sprintf (errstr, "End of file (EOF) is met before "
+                         "NARR_ROW * NARR_COL lines");
+                LST_ERROR(errstr, "first_files");
+            }
         }
         fclose(fd); 
     }
@@ -634,8 +614,8 @@ int first_files
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
-    narr_ul_lon = input->meta.ul_geo_corner.lon + 0.5;
-    narr_lr_lat = input->meta.lr_geo_corner.lat + 0.5;
+    narr_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
+    narr_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
     narr_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
 
     /* determine what points in the NARR dataset fall within the Landsat image using 
@@ -666,6 +646,8 @@ int first_files
         }
     }    
 
+    printf("in_counter=%d\n",in_counter);
+
     /* determine indices to pull out rectangle of NARR points */
     max_eye = eye[0][0];
     min_eye = eye[0][0];
@@ -677,14 +659,12 @@ int first_files
         min_eye = min(max_eye, eye[inlat[i]][inlon[i]]); 
         max_jay = max(max_jay, jay[inlat[i]][inlon[i]]); 
         min_jay = min(max_jay, jay[inlat[i]][inlon[i]]); 
-        max_eye--;
-        min_eye--;
-        max_jay--;
-        min_jay--;
     }
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;
     *num_points = num_eyes * num_jays;
+
+    printf("*num_points=%d\n", *num_points);
 
     /* Allocate memory for height of NARR points within the rectangular */
     narr_lat = (float *)malloc(*num_points * sizeof(float)); 
@@ -1084,8 +1064,7 @@ int first_files
         if (fscanf(fd, "%f,%f,%f,%f", &stan_height[i], &stan_pre[i], &stan_temp[i], 
                 &stan_rh[i]) == EOF)
         {
-            sprintf (errstr, "End of file (EOF) is met before NARR_ROW * "
-                  "NARR_COL lines");
+            sprintf (errstr, "End of file (EOF) is met before STAN_LAYER lines");
             LST_ERROR(errstr, "firstfile");
         }
     }
@@ -1124,17 +1103,23 @@ int first_files
 
     for (i = 0; i < *num_points; i++)
     {
+        /* create a directory for the current NARR point */
         if (narr_lon[i] < 0)
             narr_lon[i] = -narr_lon[i];
         else
             narr_lon[i] = 360.0 - narr_lon[i];
         sprintf(current_point,"%f_%f", narr_lat[i], narr_lon[i]); 
 
-        status = system("mkdir current_point");
-        if (status != SUCCESS)
+        printf("i,current_point=%d,%s\n", i, current_point);
+
+        if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
         {
-            sprintf (errstr, "system call 1");
-            LST_ERROR (errstr, "scene_based_lst");
+            status = mkdir(current_point, 0755);
+            if (status != SUCCESS)
+            {
+                sprintf (errstr, "system call 1");
+                LST_ERROR (errstr, "scene_based_lst");
+            }
         }
 
         /* set lowest altitude is the first geometric height at that NARR point 
@@ -1220,12 +1205,14 @@ int first_files
             /* create a directory for the current height */
             sprintf(current_gdalt, "%s/%f", current_point, gndalt[j]);
 
-            sprintf(command,"mkdir %s", current_gdalt);
-            status = system("command");
-            if (status != SUCCESS)
+            if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
             {
-                sprintf (errstr, "system call 4");
-                LST_ERROR (errstr, "first_file");
+                status = mkdir(current_gdalt, 0755);
+                if (status != SUCCESS)
+                {
+                    sprintf (errstr, "system call 4");
+                    LST_ERROR (errstr, "first_file");
+                }
             }
 
             /* determine layers below current gndalt and closest index 
@@ -1237,22 +1224,22 @@ int first_files
                     index_below = k - 1;
                     index_above = k;
                 }
-                
-                /* linearly interpolate pressure, temperature, and relative 
-                   humidity to gndalt for lowest layer */
-                new_pressure = pressure[i][index_below] + (gndalt[j] -
-                    narr_height[i][index_below]) * ((pressure[i][index_above] - 
-                    pressure[i][index_below]) / (narr_height[index_above] - 
-                    narr_height[index_below]));
-                new_temp = narr_tmp[i][index_below] + (gndalt[j] -
-                    narr_height[i][index_below]) * ((narr_tmp[i][index_above] - 
-                    narr_tmp[i][index_below]) / (narr_height[index_above] - 
-                    narr_height[index_below]));
-                new_rh = narr_rh[i][index_below] + (gndalt[j] -
-                    narr_height[i][index_below]) * ((narr_rh[i][index_above] - 
-                    narr_rh[i][index_below]) / (narr_height[index_above] - 
-                    narr_height[index_below]));
             }
+                
+            /* linearly interpolate pressure, temperature, and relative 
+               humidity to gndalt for lowest layer */
+            new_pressure = pressure[i][index_below] + (gndalt[j] -
+                narr_height[i][index_below]) * ((pressure[i][index_above] - 
+                pressure[i][index_below]) / (narr_height[i][index_above] - 
+                narr_height[i][index_below]));
+            new_temp = narr_tmp[i][index_below] + (gndalt[j] -
+                narr_height[i][index_below]) * ((narr_tmp[i][index_above] - 
+                narr_tmp[i][index_below]) / (narr_height[i][index_above] - 
+                narr_height[i][index_below]));
+            new_rh = narr_rh[i][index_below] + (gndalt[j] -
+                narr_height[i][index_below]) * ((narr_rh[i][index_above] - 
+                narr_rh[i][index_below]) / (narr_height[i][index_above] - 
+                narr_height[i][index_below]));           
 
             /* create arrays containing only layers to be included in current 
                tape5 file */
@@ -1387,13 +1374,15 @@ int first_files
                     sprintf(temp_out, "%f", tmp[k]);
 
                 /* create directory for the current temperature */
-                sprintf(current_temp, "%s%s", current_gdalt, temp_out);
-                sprintf(command,"mkdir current_temp"); 
-                status = system("command");
-                if (status != SUCCESS)
+                if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
                 {
-                    sprintf (errstr, "system call 7");
-                    LST_ERROR (errstr, "first_file");
+                    sprintf(current_temp, "%s/%s", current_gdalt, temp_out);
+                    status = mkdir(current_temp, 0755);
+                    if (status != SUCCESS)
+                    {
+                        sprintf (errstr, "system call 7");
+                        LST_ERROR (errstr, "first_file");
+                    }
                 }
 
                 /* insert current temperature into head file */
@@ -1406,13 +1395,15 @@ int first_files
                 }
 
                 /* create directory for the current albedo */
-                sprintf(current_alb, "%s%f", current_gdalt, alb[k]);
-                sprintf(command,"mkdir current_alb"); 
-                status = system("command");
-                if (status != SUCCESS)
+                sprintf(current_alb, "%s/%f", current_temp, alb[k]);
+                if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
                 {
-                    sprintf (errstr, "system call 9");
-                    LST_ERROR (errstr, "first_file");
+                    status = mkdir(current_alb, 0755);
+                    if (status != SUCCESS)
+                    {
+                        sprintf (errstr, "system call 9");
+                        LST_ERROR (errstr, "first_file");
+                    }
                 }
 
                 /* insert current albedo into head file */

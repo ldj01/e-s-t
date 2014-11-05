@@ -153,6 +153,7 @@ int main (int argc, char *argv[])
                 "180 degrees.\n  New value: %f degrees\n", input->meta.sun_az);
     }
 #endif
+#if 0
     /* Write out the intermediate values */
     fd1 = fopen("datetime.txt", "w"); 
     if (fd1 == NULL)
@@ -251,7 +252,7 @@ int main (int argc, char *argv[])
         sprintf (errstr, "rmdir TMP\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
-
+#endif
     /* call first_files to generate tape5 file and commandList */
     status = first_files(input, case_list, command_list, &entry, &num_points, verbose);
     if (status != SUCCESS)

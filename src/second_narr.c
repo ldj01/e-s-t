@@ -539,10 +539,10 @@ int second_narr
     char full_path[MAX_STR_LEN];
     int status;
 
-    path = getenv("LST");
+    path = getenv("LST_DATA");
     if (path == NULL)
     {
-        sprintf (errstr, "LST environment variable is not set");
+        sprintf (errstr, "LST_DATA environment variable is not set");
         LST_ERROR(errstr, "second_narr");
     }
 
@@ -729,6 +729,7 @@ int second_narr
             /* determine current latlon and height depends on number of steps 
                in path */
             sprintf(command, "echo %s|tr '/' '\\n'",case_list[counter]);
+            printf("command=%s\n",command);
 
             /* Open the command for reading. */
             fd = popen(command, "r");
