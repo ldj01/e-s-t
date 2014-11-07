@@ -309,8 +309,6 @@ int first_files
     float narr_ul_lon;
     float narr_lr_lat;
     float narr_lr_lon;
-    int *inlat;
-    int *inlon;
     int in_counter = 0;
     int max_eye;
     int min_eye;
@@ -411,6 +409,10 @@ int first_files
                       "NARR_COL lines");
                 LST_ERROR(errstr, "firstfile");
             }
+            if ((lon[i][j] - 180.0) > MINSIGMA)
+                lon[i][j] = 360.0 - lon[i][j];
+            else
+                lon[i][j] = - lon[i][j];
         }
     }
     fclose(fd);
@@ -461,8 +463,6 @@ int first_files
         fclose(fd);
     }
 
-    printf("hgt1[0][0]=%f\n",hgt1[0][0]);
- 
     /* Read in NARR specific humidity for time before landsat acqusition */ 
     for (i = 0; i < P_LAYER - 1; i++)
     {
@@ -623,48 +623,34 @@ int first_files
        are less than or greater than the edges of the Landsat corners values respectively
        pixels that are true in both fall within the Landsat scene
        the same thing is done with longitude values */
-    inlat = malloc(NARR_ROW * NARR_COL * sizeof(int));
-    inlon = malloc(NARR_ROW * NARR_COL * sizeof(int));
-    if (inlat == NULL || inlon == NULL)
-    {
-	 sprintf (errstr, "Allocating inlandsat memory");
-	 LST_ERROR (errstr, "first_files");
-
-    }
-
+    max_eye = 0;
+    min_eye = 1000;
+    max_jay = 0;
+    min_jay = 1000;
     for (i = 0; i < NARR_ROW - 1; i++)
     {
         for (j = 0; j < NARR_COL - 1; j++)
         {
-            if (lat[i][j] < narr_ul_lat && lat[i][j] > narr_lr_lat &&
-                lon[i][j] < narr_lr_lon && lon[i][j] > narr_ul_lon)
+            if ((lat[i][j] - narr_ul_lat) < MINSIGMA && 
+                (lat[i][j] - narr_lr_lat) > MINSIGMA &&
+                (lon[i][j] - narr_lr_lon) < MINSIGMA && 
+                (lon[i][j] - narr_ul_lon) > MINSIGMA)
             {
-                inlat[in_counter] = i;
-                inlon[in_counter] = j;
+                max_eye = max(max_eye, eye[i][j]); 
+                min_eye = min(min_eye, eye[i][j]); 
+                max_jay = max(max_jay, jay[i][j]); 
+                min_jay = min(min_jay, jay[i][j]); 
                 in_counter++;
             }
         }
     }    
-
-    printf("in_counter=%d\n",in_counter);
-
-    /* determine indices to pull out rectangle of NARR points */
-    max_eye = eye[0][0];
-    min_eye = eye[0][0];
-    max_jay = eye[0][0];
-    min_jay = eye[0][0];
-    for (i = 0; i < in_counter - 1; in_counter++)
-    {
-        max_eye = max(max_eye, eye[inlat[i]][inlon[i]]); 
-        min_eye = min(max_eye, eye[inlat[i]][inlon[i]]); 
-        max_jay = max(max_jay, jay[inlat[i]][inlon[i]]); 
-        min_jay = min(max_jay, jay[inlat[i]][inlon[i]]); 
-    }
+    max_eye--;
+    min_eye--;
+    max_jay--;
+    min_jay--;
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;
     *num_points = num_eyes * num_jays;
-
-    printf("*num_points=%d\n", *num_points);
 
     /* Allocate memory for height of NARR points within the rectangular */
     narr_lat = (float *)malloc(*num_points * sizeof(float)); 

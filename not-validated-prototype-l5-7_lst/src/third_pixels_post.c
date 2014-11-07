@@ -373,8 +373,6 @@ int third_pixels_post
     float narr_ul_lon;
     float narr_lr_lat;
     float narr_lr_lon;
-    int *inlat;
-    int *inlon;
     int in_counter = 0;
     int counter;
     int max_eye;
@@ -466,23 +464,23 @@ int third_pixels_post
         LST_ERROR(errstr, "third_pixels_post");
     }
 
-    for (i = 0; i < NARR_ROW; i++)
+    for (j = 0; j < NARR_COL; j++)
     {
-        for (j = 0; j < NARR_ROW; j++)
+        for (i = 0; i < NARR_ROW; i++)
         {
             if (fscanf(fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j], 
                        &lon[i][j]) == EOF)
             {
                 sprintf (errstr, "End of file (EOF) is met before NARR_ROW * "
-                         "NARR_COL lines");
-                LST_ERROR(errstr, "third_pixels_post");
+                      "NARR_COL lines");
+                LST_ERROR(errstr, "firstfile");
             }
 
             /* adjust longitude range to [-180, 180] */ 
             if ((lon[i][j] - 180.0) > MINSIGMA)
                 lon[i][j] = 360.0 - lon[i][j];
-            if ((lon[i][j] - 180.0) < MINSIGMA)
-                lon[i][j] = 360.0 - lon[i][j];
+            else
+                lon[i][j] = - lon[i][j];
         }
     }
     fclose(fd);
@@ -498,41 +496,31 @@ int third_pixels_post
        are less than or greater than the edges of the Landsat corners values respectively
        pixels that are true in both fall within the Landsat scene
        the same thing is done with longitude values */
-    inlat = malloc(NARR_ROW * NARR_COL * sizeof(int));
-    inlon = malloc(NARR_ROW * NARR_COL * sizeof(int));
-    if (inlat == NULL || inlon == NULL)
-    {
-	 sprintf (errstr, "Allocating inlandsat memory");
-	 RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
-
-    }
-
+    max_eye = 0;
+    min_eye = 1000;
+    max_jay = 0;
+    min_jay = 1000;
     for (i = 0; i < NARR_ROW - 1; i++)
     {
         for (j = 0; j < NARR_COL - 1; j++)
         {
-            if (lat[i][j] < narr_ul_lat && lat[i][j] > narr_lr_lat &&
-                lon[i][j] < narr_lr_lon && lon[i][j] > narr_ul_lon)
+            if ((lat[i][j] - narr_ul_lat) < MINSIGMA && 
+                (lat[i][j] - narr_lr_lat) > MINSIGMA &&
+                (lon[i][j] - narr_lr_lon) < MINSIGMA && 
+                (lon[i][j] - narr_ul_lon) > MINSIGMA)
             {
-                inlat[in_counter] = i;
-                inlon[in_counter] = j;
+                max_eye = max(max_eye, eye[i][j]); 
+                min_eye = min(min_eye, eye[i][j]); 
+                max_jay = max(max_jay, jay[i][j]); 
+                min_jay = min(min_jay, jay[i][j]); 
                 in_counter++;
             }
         }
     }    
-
-    /* determine indices to pull out rectangle of NARR points */
-    max_eye = eye[0][0];
-    min_eye = eye[0][0];
-    max_jay = eye[0][0];
-    min_jay = eye[0][0];
-    for (i = 0; i < in_counter - 1; in_counter++)
-    {
-        max_eye = max(max_eye, eye[inlat[i]][inlon[i]]); 
-        min_eye = min(max_eye, eye[inlat[i]][inlon[i]]); 
-        max_jay = max(max_jay, jay[inlat[i]][inlon[i]]); 
-        min_jay = min(max_jay, jay[inlat[i]][inlon[i]]); 
-    }
+    max_eye--;
+    min_eye--;
+    max_jay--;
+    min_jay--;
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;
 
@@ -600,21 +588,6 @@ int third_pixels_post
 
     /* Convert NARR lat/lon to UTM */
     convert_ll_utm(input, narr_lat, narr_lon, num_points, narr_utm);
-
-    /* Free allocated memory */
-    status = free_2d_array((void **)narr_lat);
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing memory: narr_lat\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
-    }
-
-    status = free_2d_array((void **)narr_lon);
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing memory: narr_lon\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);              
-    }
 
     /* Dynamic allocate the 2d memory */
     east_grid = (float **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(float)); 
@@ -814,12 +787,12 @@ int third_pixels_post
                         }
                     }
 
-                    min_inlat = inlat[closest[below[0]]];
-                    min_inlon = inlon[closest[below[0]]];
+                    min_inlat = narr_lat[closest[below[0]]];
+                    min_inlon = narr_lon[closest[below[0]]];
                     for (g = 1; g < n; g++)
                     {
-                        min_inlat = min(min_inlat, inlat[closest[below[g]]]);
-                        min_inlon = min(min_inlon, inlon[closest[below[g]]]);
+                        min_inlat = min(min_inlat, narr_lat[closest[below[g]]]);
+                        min_inlon = min(min_inlon, narr_lon[closest[below[g]]]);
                     }
 
                     /* extract UTM coordinates of four points to be interpolated 
@@ -985,9 +958,9 @@ int third_pixels_post
         }
     }
 
-    /* free allocated memory */
-    free(inlat);
-    free(inlon);
+    /* Free allocated memory */
+    free(narr_lat);
+    free(narr_lon);
     free(distances);
     free(distance_copy);
     status = free_2d_array((void **)at_height);
