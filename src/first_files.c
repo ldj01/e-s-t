@@ -75,12 +75,12 @@ int convert_geopotential_geometric
         /* define variable based on latitude */
         radius[i] = 1000.0 * (sqrt(1.0/((cos(radlat[i])*cos(radlat[i]))/(r_max*r_max)+
                     ((sin(radlat[i])*sin(radlat[i]))/(r_min*r_min)))));
-        gravity_ratio[i] = (9.80616*(1-0.002637*cos(2*radlat[i])+0.0000059*(cos(2*radlat[i])*
-               cos(2*radlat[i]))))/g_0;
+        gravity_ratio[i] = (9.80616*(1-0.002637*cos(2*radlat[i])+0.0000059*
+               (cos(2*radlat[i])*cos(2*radlat[i]))))/g_0;
     }
 
     /* Dynamic allocate the geo_metric memory */
-    geo_metric = (float **)allocate_2d_array(NARR_ROW * NARR_COL, num_pressures, 
+    geo_metric = (float **)allocate_2d_array(num_pressures, NARR_ROW * NARR_COL,  
                  sizeof(float)); 
     if (geo_metric == NULL)
     {
@@ -88,12 +88,12 @@ int convert_geopotential_geometric
         LST_ERROR (errstr, "convert_geopotential_geometric");
     }
 
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
-        for ( j = 0; j < P_LAYER; j++)
+        for ( j = 0; j < num_points; j++)
         {
-            geo_metric[i][j] = (geo_potential[i][j] * radius[i]) / (1000.0 * 
-                  (gravity_ratio[i] *radius[i] - geo_potential[i][j]));
+            geo_metric[i][j] = (geo_potential[i][j] * radius[j]) / (1000.0 * 
+                  (gravity_ratio[j] *radius[j] - geo_potential[i][j]));
         }
     }
 
@@ -148,35 +148,35 @@ int convert_sh_rh
     int status;
 
     /* Allocate memory */
-    temp_c = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    temp_c = (float **)allocate_2d_array(P_LAYER, num_points, sizeof(float)); 
     if (temp_c == NULL)
     {
         sprintf (errstr, "Allocating temp_c memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    ewater = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    ewater = (float **)allocate_2d_array(P_LAYER, num_points, sizeof(float)); 
     if (ewater == NULL)
     {
         sprintf (errstr, "Allocating ewater memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    e2 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    e2 = (float **)allocate_2d_array(P_LAYER, num_points, sizeof(float)); 
     if (e2 == NULL)
     {
         sprintf (errstr, "Allocating e2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    goff = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    goff = (float **)allocate_2d_array(P_LAYER, num_points, sizeof(float)); 
     if (goff == NULL)
     {
         sprintf (errstr, "Allocating goff memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    ph20 = (float **)allocate_2d_array(num_points, P_LAYER, sizeof(float)); 
+    ph20 = (float **)allocate_2d_array(P_LAYER, num_points, sizeof(float)); 
     if (ph20 == NULL)
     {
         sprintf (errstr, "Allocating  memory");
@@ -184,9 +184,9 @@ int convert_sh_rh
     }
 
 
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
-        for ( j = 0; j < P_LAYER; j++)
+        for ( j = 0; j < num_points; j++)
         {
             /* Convert temperature to C */
             temp_c[i][j] = temp_k[i][j] - 273.15;
@@ -352,7 +352,7 @@ int first_files
     char *path = NULL; 
     struct stat s;
     int status;
-    int temp_int1, temp_int2;    
+    int temp_int1, temp_int2; 
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -667,14 +667,14 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_hgt1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_hgt1 = (float **)allocate_2d_array(P_LAYER, *num_points,sizeof(float)); 
     if (narr_hgt1 == NULL)
     {
         sprintf (errstr, "Allocating narr_hgt1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_hgt2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_hgt2 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_hgt2 == NULL)
     {
         sprintf (errstr, "Allocating narr_hgt2 memory");
@@ -682,14 +682,14 @@ int first_files
     }
 
     /* Allocate memory for humidity of NARR points within the rectangular */
-    narr_shum1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_shum1 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_shum1 == NULL)
     {
         sprintf (errstr, "Allocating narr_shum1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_shum2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_shum2 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_shum2 == NULL)
     {
         sprintf (errstr, "Allocating narr_shum2 memory");
@@ -697,14 +697,14 @@ int first_files
     }
 
     /* Allocate memory for temperature of NARR points within the rectangular */
-    narr_tmp1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_tmp1 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_tmp1 == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_tmp2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_tmp2 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_tmp2 == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp2 memory");
@@ -716,16 +716,28 @@ int first_files
     {
         for (j = min_jay; j <= max_jay; j++)
         {
-            for (k = 0; k < P_LAYER; k++)
+            narr_lat[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
+            narr_lon[(i-min_eye) * num_jays + (j-min_jay)] = lon[i][j]; 
+        }
+    }
+    for (k = 0; k < P_LAYER; k++)
+    {
+        for (i = min_eye; i <= max_eye; i++)
+        {
+            for (j = min_jay; j <= max_jay; j++)
             {
-                narr_lat[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
-                narr_lon[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
-                narr_hgt1[(i-min_eye) * num_jays + (j-min_jay)][k] = hgt1[i][j]; 
-                narr_shum1[(i-min_eye) * num_jays + (j-min_jay)][k] = shum1[i][j]; 
-                narr_tmp1[(i-min_eye) * num_jays + (j-min_jay)][k] = tmp1[i][j]; 
-                narr_hgt2[(i-min_eye) * num_jays + (j-min_jay)][k] = hgt2[i][j]; 
-                narr_shum2[(i-min_eye) * num_jays + (j-min_jay)][k] = shum2[i][j]; 
-                narr_tmp2[(i-min_eye) * num_jays + (j-min_jay)][k] = tmp2[i][j]; 
+                narr_hgt1[k][(i-min_eye) * num_jays + (j-min_jay)] 
+                      = hgt1[k][i * num_jays + j]; 
+                narr_shum1[k][(i-min_eye) * num_jays + (j-min_jay)]  
+                      = shum1[k][i * num_jays + j]; 
+                narr_tmp1[k][(i-min_eye) * num_jays + (j-min_jay)]  
+                      = tmp1[k][i * num_jays + j]; 
+                narr_hgt2[k][(i-min_eye) * num_jays + (j-min_jay)]  
+                      = hgt2[k][i * num_jays + j]; 
+                narr_shum2[k][(i-min_eye) * num_jays + (j-min_jay)]  
+                      = shum2[k][i * num_jays + j]; 
+                narr_tmp2[k][(i-min_eye) * num_jays + (j-min_jay)] 
+                      = tmp2[k][i * num_jays + j]; 
             }
         }
     }
@@ -802,46 +814,46 @@ int first_files
     }
 
     /* Allocate memory */
-    pressure = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    pressure = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (pressure == NULL)
     {
         sprintf (errstr, "Allocating pressure memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_height1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_height1 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_height1 == NULL)
     {
         sprintf (errstr, "Allocating narr_height1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_height2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_height2 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_height2 == NULL)
     {
         sprintf (errstr, "Allocating narr_height2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_rh1 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_rh1 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_rh1 == NULL)
     {
         sprintf (errstr, "Allocating narr_rh1 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    narr_rh2 = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_rh2 = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_rh2 == NULL)
     {
         sprintf (errstr, "Allocating narr_rh2 memory");
         LST_ERROR (errstr, "first_files");
     }
 
-    for (i = 0; i < *num_points; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
-        for ( j = 0; j < P_LAYER; j++)
+        for ( j = 0; j < *num_points; j++)
         {
-            pressure[i][j] = p[j];
+            pressure[i][j] = p[i];
         }
     }
 
@@ -914,7 +926,7 @@ int first_files
     hour2 = (float) (input->meta.acq_date.hour + rem2);
 
     /* Round to the nearest minute */
-    if ((input->meta.acq_date.second -30) >= MINSIGMA)
+    if ((input->meta.acq_date.second -30.0) >= MINSIGMA)
         input->meta.acq_date.minute++; 
  
     /* convert hour-min acquisition time to decimal time */
@@ -922,7 +934,7 @@ int first_files
            / 60.0;
 
     /* Allocate memory */
-    narr_height = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_height = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_height == NULL)
     {
         sprintf (errstr, "Allocating narr_height memory");
@@ -930,7 +942,7 @@ int first_files
     }
 
     /* Allocate memory */
-    narr_rh = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_rh = (float **)allocate_2d_array(P_LAYER,*num_points, sizeof(float)); 
     if (narr_rh == NULL)
     {
         sprintf (errstr, "Allocating narr_rh memory");
@@ -938,7 +950,7 @@ int first_files
     }
 
     /* Allocate memory */
-    narr_tmp = (float **)allocate_2d_array(*num_points, P_LAYER, sizeof(float)); 
+    narr_tmp = (float **)allocate_2d_array(P_LAYER, *num_points, sizeof(float)); 
     if (narr_tmp == NULL)
     {
         sprintf (errstr, "Allocating narr_tmp memory");
@@ -949,9 +961,9 @@ int first_files
        for NARR points within Landsat scene this is the NARR data corresponding 
        to the acquisition time of the Landsat image converted to appropriated
        variable for MODTRAN input */
-    for (i = 0; i < *num_points; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
-        for ( j = 0; j < P_LAYER; j++)
+        for ( j = 0; j < *num_points; j++)
         {
             narr_height[i][j] = narr_height1[i][j] + (time - hour1) * 
                 ((narr_height2[i][j] - narr_height1[i][j]) / (hour2 - hour1)); 
@@ -1042,7 +1054,7 @@ int first_files
     if (fd == NULL)
     {
         sprintf (errstr, "Opening file: stanAtm.txt\n");
-        LST_ERROR (errstr, "scene_based_lst");
+        LST_ERROR (errstr, "first_files");
     }
 
     for (i = 0; i < STAN_LAYER; i++)
@@ -1051,7 +1063,7 @@ int first_files
                 &stan_rh[i]) == EOF)
         {
             sprintf (errstr, "End of file (EOF) is met before STAN_LAYER lines");
-            LST_ERROR(errstr, "firstfile");
+            LST_ERROR(errstr, "first_files");
         }
     }
 
@@ -1059,7 +1071,7 @@ int first_files
     if ( status )
     {
         sprintf (errstr, "Closing file: stanAtm.txt\n");
-        LST_ERROR (errstr, "firstfiles");
+        LST_ERROR (errstr, "first_files");
     }
 
     /* determine number of MODTRAN runs */
@@ -1094,9 +1106,11 @@ int first_files
             narr_lon[i] = -narr_lon[i];
         else
             narr_lon[i] = 360.0 - narr_lon[i];
-        sprintf(current_point,"%f_%f", narr_lat[i], narr_lon[i]); 
 
-        printf("i,current_point=%d,%s\n", i, current_point);
+        if ((narr_lon[i] - 100.0) < MINSIGMA)
+            sprintf(current_point,"%6.3f_%6.3f", narr_lat[i], narr_lon[i]);
+        else
+            sprintf(current_point,"%6.3f_%6.2f", narr_lat[i], narr_lon[i]); 
 
         if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
         {
@@ -1110,10 +1124,10 @@ int first_files
 
         /* set lowest altitude is the first geometric height at that NARR point 
            (if positive) and (if negative set to zero) */
-        if (narr_height[i][0] < 0)
+        if (narr_height[0][i] < 0)
             gndalt[0] = 0.0;   
         else
-            gndalt[0] = narr_height[i][0];
+            gndalt[0] = narr_height[0][i];
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
@@ -1205,7 +1219,7 @@ int first_files
                above and below */
             for (k = 0; k < NUM_ELEVATIONS; k++)
             {
-                if (narr_height[i][k] >= gndalt[j])
+                if (narr_height[k][i] >= gndalt[j])
                 {
                     index_below = k - 1;
                     index_above = k;

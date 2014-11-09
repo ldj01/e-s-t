@@ -553,7 +553,7 @@ int third_pixels_post
         for (j = min_jay; j <= max_jay; j++)
         {
             narr_lat[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
-            narr_lon[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
+            narr_lon[(i-min_eye) * num_jays + (j-min_jay)] = lon[i][j]; 
         }
     }
 
