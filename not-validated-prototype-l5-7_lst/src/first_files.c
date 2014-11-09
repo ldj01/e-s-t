@@ -1118,7 +1118,7 @@ int first_files
             if (status != SUCCESS)
             {
                 sprintf (errstr, "system call 1");
-                LST_ERROR (errstr, "scene_based_lst");
+                LST_ERROR (errstr, "first_files");
             }
         }
 
@@ -1131,8 +1131,9 @@ int first_files
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
-        sprintf(temp_out, "%f", narr_lat[i]); /* is this needed? */
-        sprintf(command,"cat tail.txt | sed 's/latitu/%s/' > newTail.txt", temp_out); 
+        sprintf(temp_out, "%f", narr_lat[i]);
+        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%s/' > newTail.txt", 
+                path, temp_out); 
         status = system("command");
         if (status != SUCCESS)
         {
@@ -1140,18 +1141,9 @@ int first_files
             LST_ERROR (errstr, "first_file");
         }
 
-        if (narr_lon[i] < 0)
-        {
-            sprintf(temp_out, "%f", -narr_lon[i]); /* is this needed? */
-            sprintf(command,"cat newTail.txt | sed 's/longit/%s/' > newTail2.txt",
+        sprintf(temp_out, "%f", narr_lon[i]);
+        sprintf(command,"cat newTail.txt | sed 's/longit/%s/' > newTail2.txt",
                     temp_out);
-        }
-        else
-        {
-            sprintf(temp_out, "%f", 360.0 - narr_lon[i]); /* is this needed? */
-            sprintf(command,"cat newTail.txt | sed 's/longit/%s/' > newTail2.txt",
-                    temp_out);
-        }
         status = system("command");
         if (status != SUCCESS)
         {
@@ -1203,7 +1195,7 @@ int first_files
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
             /* create a directory for the current height */
-            sprintf(current_gdalt, "%s/%f", current_point, gndalt[j]);
+            sprintf(current_gdalt, "%s/%5.3f", current_point, gndalt[j]);
 
             if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
             {
@@ -1223,35 +1215,36 @@ int first_files
                 {
                     index_below = k - 1;
                     index_above = k;
+                    break;
                 }
             }
                 
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
-            new_pressure = pressure[i][index_below] + (gndalt[j] -
-                narr_height[i][index_below]) * ((pressure[i][index_above] - 
-                pressure[i][index_below]) / (narr_height[i][index_above] - 
-                narr_height[i][index_below]));
-            new_temp = narr_tmp[i][index_below] + (gndalt[j] -
-                narr_height[i][index_below]) * ((narr_tmp[i][index_above] - 
-                narr_tmp[i][index_below]) / (narr_height[i][index_above] - 
-                narr_height[i][index_below]));
-            new_rh = narr_rh[i][index_below] + (gndalt[j] -
-                narr_height[i][index_below]) * ((narr_rh[i][index_above] - 
-                narr_rh[i][index_below]) / (narr_height[i][index_above] - 
-                narr_height[i][index_below]));           
+            new_pressure = pressure[index_below][i] + (gndalt[j] -
+                narr_height[index_below][i]) * ((pressure[index_above][i] - 
+                pressure[index_below][i]) / (narr_height[index_above][i] - 
+                narr_height[index_below][i]));
+            new_temp = narr_tmp[index_below][i] + (gndalt[j] -
+                narr_height[index_below][i]) * ((narr_tmp[index_above][i] - 
+                narr_tmp[index_below][i]) / (narr_height[index_above][i] - 
+                narr_height[index_below][i]));
+            new_rh = narr_rh[index_below][i] + (gndalt[j] -
+                narr_height[index_below][i]) * ((narr_rh[index_above][i] - 
+                narr_rh[index_below][i]) / (narr_height[index_above][i] - 
+                narr_height[index_below][i]));           
 
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
-            if ((gndalt[j] - narr_height[i][index_above] - 0.001) < MINSIGMA)
+            if ((gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
             {
                 for (k = index_above; k < NUM_ELEVATIONS; k++)
                 {
-                    temp_height[index] = narr_height[i][k];
-                    temp_pressure[index] = pressure[i][k];
-                    temp_temp[index] = narr_tmp[i][k];
-                    temp_rh[index] = narr_rh[i][k];
+                    temp_height[index] = narr_height[k][i];
+                    temp_pressure[index] = pressure[k][i];
+                    temp_temp[index] = narr_tmp[k][i];
+                    temp_rh[index] = narr_rh[k][i];
                     index++;
                 }
             }
@@ -1265,10 +1258,10 @@ int first_files
 
                 for (k = index_above; k < NUM_ELEVATIONS; k++)
                 {
-                    temp_height[index] = narr_height[i][k];
-                    temp_pressure[index] = pressure[i][k];
-                    temp_temp[index] = narr_tmp[i][k];
-                    temp_rh[index] = narr_rh[i][k];
+                    temp_height[index] = narr_height[k][i];
+                    temp_pressure[index] = pressure[k][i];
+                    temp_temp[index] = narr_tmp[k][i];
+                    temp_rh[index] = narr_rh[k][i];
                     index++;
                 }
             }
@@ -1278,7 +1271,7 @@ int first_files
             index2 = 0;
             for (k = 0; k < STAN_LAYER; k++)
             {
-                if (stan_height[k] > narr_height[i][P_LAYER])
+                if (stan_height[k] > narr_height[P_LAYER-1][i])
                 {
                     counter[index2] = k;
                     index2++;
