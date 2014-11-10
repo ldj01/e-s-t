@@ -1131,20 +1131,18 @@ int first_files
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
-        sprintf(temp_out, "%f", narr_lat[i]);
-        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%s/' > newTail.txt", 
-                path, temp_out); 
-        status = system("command");
+        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%f/' > newTail.txt", 
+                path, narr_lat[i]); 
+        status = system(command);
         if (status != SUCCESS)
         {
             sprintf (errstr, "system call 2");
             LST_ERROR (errstr, "first_file");
         }
 
-        sprintf(temp_out, "%f", narr_lon[i]);
-        sprintf(command,"cat newTail.txt | sed 's/longit/%s/' > newTail2.txt",
-                    temp_out);
-        status = system("command");
+        sprintf(command,"cat newTail.txt | sed 's/longit/%f/' > newTail2.txt",
+                    narr_lon[i]);
+        status = system(command);
         if (status != SUCCESS)
         {
             sprintf (errstr, "system call 3");
@@ -1152,10 +1150,9 @@ int first_files
         }
  
         /* insert current julian day into tail file */
-        sprintf(temp_out, "%d", input->meta.acq_date.doy); /* is this needed? */
         sprintf(command,"cat newTail2.txt | sed 's/jay/%d/' > newTail3.txt",
                 input->meta.acq_date.doy);
-        status = system("command");
+        status = system(command);
         if (status != SUCCESS)
         {
             sprintf (errstr, "system call 4");
@@ -1321,12 +1318,11 @@ int first_files
             }
 
             /* Write out the intermediate file */
-            sprintf(temp_out, "%s\n", "AAH             ");
             for (k = 0; k < index; k++)
             {
                 fprintf(fd, "%10.3f,%10.3e,%10.3e,%10.3e,%10.3e,%10.3e,%16s\n", 
                         temp_height[k], temp_pressure[k], temp_temp[k],
-                        temp_rh[k], 0.0, 0.0, temp_out);
+                        temp_rh[k], 0.0, 0.0, "AAH             ");
             }
 
             /* Close the intermediate file */
@@ -1341,7 +1337,7 @@ int first_files
                into head file */
             memcpy(temp_out, &index, sizeof(index)); 
             sprintf(command,"cat head.txt | sed 's/nml/%s/' > newHead.txt", temp_out); 
-            status = system("command");
+            status = system(command);
             if (status != SUCCESS)
             {
                 sprintf (errstr, "system call 5");
@@ -1351,7 +1347,7 @@ int first_files
             /* insert current ground altitude into head file */
             memcpy(temp_out, &gndalt[j], sizeof(gndalt[j])); 
             sprintf(command,"cat newHead.txt | sed 's/gdalt/%s/' > newHead2.txt", temp_out); 
-            status = system("command");
+            status = system(command);
             if (status != SUCCESS)
             {
                 sprintf (errstr, "system call 6");
@@ -1380,7 +1376,7 @@ int first_files
 
                 /* insert current temperature into head file */
                 sprintf(command,"cat newHead2.txt | sed 's/tmp/%s/' > newHead3.txt", temp_out); 
-                status = system("command");
+                status = system(command);
                 if (status != SUCCESS)
                 {
                     sprintf (errstr, "system call 8");
@@ -1401,7 +1397,7 @@ int first_files
 
                 /* insert current albedo into head file */
                 sprintf(command,"cat newHead3.txt | sed 's/alb/%f/' > newHead4.txt", alb[k]); 
-                status = system("command");
+                status = system(command);
                 if (status != SUCCESS)
                 {
                     sprintf (errstr, "system call 10");
@@ -1413,7 +1409,7 @@ int first_files
                    with variables for temperature and albedo */
                 sprintf(command, "cat newHead4.txt newTail3.txt tempLayers.txt > %s_/tape5", 
                         current_alb); 
-                status = system("command");
+                status = system(command);
                 if (status != SUCCESS)
                 {
                     sprintf (errstr, "system call 11");

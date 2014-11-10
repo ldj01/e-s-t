@@ -44,7 +44,6 @@ int main (int argc, char *argv[])
     //    Output_t *output = NULL; /* output structure and metadata */
     bool verbose;            /* verbose flag for printing messages */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
-    FILE *fd1;
     float alb = 0.1;
     int entry;
     int i;
@@ -264,7 +263,7 @@ int main (int argc, char *argv[])
     /* perform modtran runs by calling command_list */
     for (i = 0; i < entry; i++)
     {
-        status = system("command_list[i]");
+        status = system(command_list[i]);
         if (status != SUCCESS)
         {
             sprintf (errstr, "executing command_list[i]");
@@ -278,7 +277,7 @@ int main (int argc, char *argv[])
     {
         sprintf(command,"ln $BIN/elim2.sed %s || while [ ! -e %s/elim2.sed", case_list[i], 
                 case_list[i]);
-        status = system("command");
+        status = system(command);
         if (status != SUCCESS)
         {
             sprintf (errstr, "link elim2.sed\n");
@@ -293,7 +292,7 @@ int main (int argc, char *argv[])
         }
 
         sprintf(command,"ln $BIN/elim2.sed %s", case_list[i]);
-        status = system("command");
+        status = system(command);
         if (status != SUCCESS)
         {
             sprintf (errstr, "link elim2.sed again\n");
