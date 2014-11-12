@@ -339,8 +339,8 @@ int first_files
     char current_alb[MAX_STR_LEN];
     char current_point[MAX_STR_LEN];
     char temp_out[MAX_STR_LEN];
-    int index_below;
-    int index_above;
+    int index_below = 0;
+    int index_above = NUM_ELEVATIONS;
     float new_height;
     float new_pressure;
     float new_temp;
@@ -350,6 +350,7 @@ int first_files
     float tmp[3] = {273.0, 310.0, 0.0};
     float alb[3] = {0.0, 0.0, 0.1};
     char *path = NULL; 
+    char *modtran_path = NULL; 
     struct stat s;
     int status;
     int temp_int1, temp_int2; 
@@ -1099,6 +1100,13 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
 
+    modtran_path = getenv("MODTRAN_PATH");
+    if (modtran_path == NULL)
+    {
+        sprintf (errstr, "MODTRAN_PATH environment variable is not set");
+        LST_ERROR(errstr, "first_files");
+    }
+
     for (i = 0; i < *num_points; i++)
     {
         /* create a directory for the current NARR point */
@@ -1112,7 +1120,7 @@ int first_files
         else
             sprintf(current_point,"%6.3f_%6.2f", narr_lat[i], narr_lon[i]); 
 
-        if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
+        if (stat(current_point, &s)== -1)
         {
             status = mkdir(current_point, 0755);
             if (status != SUCCESS)
@@ -1194,7 +1202,7 @@ int first_files
             /* create a directory for the current height */
             sprintf(current_gdalt, "%s/%5.3f", current_point, gndalt[j]);
 
-            if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
+            if (stat(current_gdalt, &s)== -1)
             {
                 status = mkdir(current_gdalt, 0755);
                 if (status != SUCCESS)
@@ -1208,7 +1216,7 @@ int first_files
                above and below */
             for (k = 0; k < NUM_ELEVATIONS; k++)
             {
-                if (narr_height[k][i] >= gndalt[j])
+                if ((narr_height[k][i] - gndalt[j]) >= MINSIGMA)
                 {
                     index_below = k - 1;
                     index_above = k;
@@ -1336,7 +1344,8 @@ int first_files
             /* determine number of layers for current ground altitude and insert 
                into head file */
             memcpy(temp_out, &index, sizeof(index)); 
-            sprintf(command,"cat head.txt | sed 's/nml/%s/' > newHead.txt", temp_out); 
+            sprintf(command,"cat %s/head.txt | sed 's/nml/%s/' > newHead.txt", 
+                    path, temp_out); 
             status = system(command);
             if (status != SUCCESS)
             {
@@ -1355,17 +1364,18 @@ int first_files
             }
 
             /* iterate through [temperature,albedo]  pairs at which to run modtran */
-            for (k = 0; k < 2; k++)
+            for (k = 0; k <= 2; k++)
             {
                 if (k == 2)
                     sprintf(temp_out, "%s", "000");
                 else
-                    sprintf(temp_out, "%f", tmp[k]);
+                    sprintf(temp_out, "%d", (int) tmp[k]);
 
                 /* create directory for the current temperature */
-                if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
+                sprintf(current_temp, "%s/%s", current_gdalt, temp_out);
+
+                if (stat(current_temp, &s)== -1)
                 {
-                    sprintf(current_temp, "%s/%s", current_gdalt, temp_out);
                     status = mkdir(current_temp, 0755);
                     if (status != SUCCESS)
                     {
@@ -1384,8 +1394,8 @@ int first_files
                 }
 
                 /* create directory for the current albedo */
-                sprintf(current_alb, "%s/%f", current_temp, alb[k]);
-                if (stat(current_point, &s)== -1 && !(S_ISDIR(s.st_mode)))
+                sprintf(current_alb, "%s/%3.1f", current_temp, alb[k]);
+                if (stat(current_alb, &s)== -1)
                 {
                     status = mkdir(current_alb, 0755);
                     if (status != SUCCESS)
@@ -1407,7 +1417,7 @@ int first_files
                 /* concatenate head file, atmospheric layers, and tail file to create a 
                    tape5 file for modtran specific to this location and ground altitude 
                    with variables for temperature and albedo */
-                sprintf(command, "cat newHead4.txt newTail3.txt tempLayers.txt > %s_/tape5", 
+                sprintf(command, "cat newHead4.txt newTail3.txt tempLayers.txt > %s/tape5", 
                         current_alb); 
                 status = system(command);
                 if (status != SUCCESS)
@@ -1421,7 +1431,8 @@ int first_files
                    iterate entry count*/
                 *entry = 0;
                 sprintf(case_list[*entry], "%s", current_alb);
-                sprintf(command_list[*entry], "pushd %s ; ln -s /home/sguo/MODTRAN/DATA; /home/sguo/MODTRAN/Mod90_5.2.2.exe; popd'", current_alb); 
+                sprintf(command_list[*entry], "pushd %s ; ln -s %s/DATA; %s/Mod90_5.2.2.exe; popd'", 
+                        modtran_path, modtran_path, current_alb); 
                 entry++;
             }
         }
