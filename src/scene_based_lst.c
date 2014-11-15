@@ -45,7 +45,6 @@ int main (int argc, char *argv[])
     bool verbose;            /* verbose flag for printing messages */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
-    int entry;
     int i;
     int num_points;
     char **case_list = NULL;
@@ -253,7 +252,7 @@ int main (int argc, char *argv[])
     }
 #endif
     /* call first_files to generate tape5 file and commandList */
-    status = first_files(input, case_list, command_list, &entry, &num_points, verbose);
+    status = first_files(input, case_list, command_list, &num_points, verbose);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Calling first_files\n");
@@ -261,7 +260,7 @@ int main (int argc, char *argv[])
     }
 
     /* perform modtran runs by calling command_list */
-    for (i = 0; i < entry; i++)
+    for (i = 0; i < num_points * NUM_ELEVATIONS * 3; i++)
     {
         status = system(command_list[i]);
         if (status != SUCCESS)
@@ -273,7 +272,7 @@ int main (int argc, char *argv[])
 
     /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), copy program 
        to delete headers and parse wavelength and total radiance from tape6 file*/
-    for (i = 0; i < entry; i++)
+    for (i = 0; i < num_points * NUM_ELEVATIONS * 3; i++)
     {
         sprintf(command,"ln $BIN/elim2.sed %s || while [ ! -e %s/elim2.sed", case_list[i], 
                 case_list[i]);

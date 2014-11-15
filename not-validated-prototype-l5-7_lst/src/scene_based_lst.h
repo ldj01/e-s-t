@@ -14,7 +14,6 @@ int first_files
     Input_t *input,             /*I: input structure */
     char **case_list,           /*O: modtran run list */
     char **command_list,        /*O: modtran run command list */
-    int *entry,                 /*O: number of cases/commands */
     int *num_points,            /*O: number of NARR points */
     bool verbose                /*I: value to indicate if intermediate messages 
                                      be printed */

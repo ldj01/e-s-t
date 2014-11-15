@@ -200,14 +200,14 @@ int convert_sh_rh
                  pow(temp_k[i][j], 3) + 0.65459673 * log(temp_k[i][j])); /* Pa */
 
             goff[i][j] = -7.90298 * (373.16/temp_k[i][j]-1) + 5.02808 * log10(373.16 / 
-                temp_k[i][j]) - 1.3816e-7 * pow(10, (11.344 * (1 - (temp_k[i][j] / 373.16)))
-                - 1) + 8.1328e-3 * pow(10, (-3.49149 * (373.16 / temp_k[i][j] - 1)) - 1)
+                temp_k[i][j]) - 1.3816e-7 * pow(10.0, (11.344 * (1 - (temp_k[i][j] / 373.16)))
+                - 1) + 8.1328e-3 * pow(10.0, (-3.49149 * (373.16 / temp_k[i][j] - 1)) - 1)
                 + log10(1013.246); /* hPa */
 
              ph20[i][j] = (spec_hum[i][j] * pressure[i][j] * mdry) / (mh20 - 
                  spec_hum[i][j] * mh20 + spec_hum[i][j] * mdry); 
 
-             rh[i][j] = (ph20[i][j] / pow(10, goff[i][j])) * 100.0;
+             rh[i][j] = (ph20[i][j] / pow(10.0, goff[i][j])) * 100.0;
         }
     } 
 
@@ -268,7 +268,6 @@ int first_files
     Input_t *input,             /*I: input structure */
     char **case_list,           /*O: modtran run list */
     char **command_list,        /*O: modtran run command list */
-    int *entry,                 /*O: number of cases/commands */
     int *num_points,            /*O: number of NARR points */
     bool verbose                /*I: value to indicate if intermediate messages 
                                      be printed */
@@ -339,6 +338,7 @@ int first_files
     char current_alb[MAX_STR_LEN];
     char current_point[MAX_STR_LEN];
     char temp_out[MAX_STR_LEN];
+    char curr_path[MAX_STR_LEN];
     int index_below = 0;
     int index_above = NUM_ELEVATIONS;
     float new_height;
@@ -354,6 +354,7 @@ int first_files
     struct stat s;
     int status;
     int temp_int1, temp_int2; 
+    int case_counter;
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -1107,6 +1108,8 @@ int first_files
         LST_ERROR(errstr, "first_files");
     }
 
+    getcwd(curr_path, MAX_STR_LEN);
+
     for (i = 0; i < *num_points; i++)
     {
         /* create a directory for the current NARR point */
@@ -1216,12 +1219,18 @@ int first_files
                above and below */
             for (k = 0; k < NUM_ELEVATIONS; k++)
             {
-                if ((narr_height[k][i] - gndalt[j]) >= MINSIGMA)
+                if ((narr_height[k][i] - gndalt[j]) < MINSIGMA)
                 {
-                    index_below = k - 1;
-                    index_above = k;
+                    index_below = k;
+                    index_above = k + 1;
                     break;
                 }
+            }
+
+            if (index_below < 0)
+            {
+                index_below = 0;
+                index_above = 1;
             }
                 
             /* linearly interpolate pressure, temperature, and relative 
@@ -1242,7 +1251,7 @@ int first_files
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
-            if ((gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
+            if (abs(gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
             {
                 for (k = index_above; k < NUM_ELEVATIONS; k++)
                 {
@@ -1290,11 +1299,11 @@ int first_files
             if (index2 >= 3)
             {
                 new_height = (stan_height[counter[2]]+temp_height[index-1]) / 2.0; 
-                new_pressure = temp_pressure[index-1]+(new_height-temp_height[index -1]) *
-                    ((stan_pre[counter[2]]-temp_pressure[index - 1]) / 
+                new_pressure = temp_pressure[index-1]+(new_height-temp_height[index-1]) *
+                    ((stan_pre[counter[2]]-temp_pressure[index-1]) / 
                      (stan_height[counter[2]] - temp_height[index-1]));
                 new_temp = temp_temp[index-1]+(new_height-temp_height[index-1]) * 
-                    ((stan_temp[counter[2]]-temp_temp[index - 1]) / 
+                    ((stan_temp[counter[2]]-temp_temp[index-1]) / 
                     (stan_height[counter[2]] - temp_height[index-1]));            
                 new_rh = temp_rh[counter[2]]+(new_height-temp_height[index-1]) * 
                     ((stan_rh[counter[2]]-temp_rh[index-1]) / 
@@ -1328,7 +1337,7 @@ int first_files
             /* Write out the intermediate file */
             for (k = 0; k < index; k++)
             {
-                fprintf(fd, "%10.3f,%10.3e,%10.3e,%10.3e,%10.3e,%10.3e,%16s\n", 
+                fprintf(fd, "%10.3f%10.3e%10.3e%10.3e%10.3e%10.3e%16s\n", 
                         temp_height[k], temp_pressure[k], temp_temp[k],
                         temp_rh[k], 0.0, 0.0, "AAH             ");
             }
@@ -1343,9 +1352,9 @@ int first_files
 
             /* determine number of layers for current ground altitude and insert 
                into head file */
-            memcpy(temp_out, &index, sizeof(index)); 
-            sprintf(command,"cat %s/head.txt | sed 's/nml/%s/' > newHead.txt", 
-                    path, temp_out); 
+            sprintf(command,"cat %s/head.txt | sed 's/nml/%d/' > newHead.txt", 
+                    path, index); 
+
             status = system(command);
             if (status != SUCCESS)
             {
@@ -1354,8 +1363,7 @@ int first_files
             }
 
             /* insert current ground altitude into head file */
-            memcpy(temp_out, &gndalt[j], sizeof(gndalt[j])); 
-            sprintf(command,"cat newHead.txt | sed 's/gdalt/%s/' > newHead2.txt", temp_out); 
+            sprintf(command,"cat newHead.txt | sed 's/gdalt/%5.3f/' > newHead2.txt", gndalt[j]); 
             status = system(command);
             if (status != SUCCESS)
             {
@@ -1406,7 +1414,7 @@ int first_files
                 }
 
                 /* insert current albedo into head file */
-                sprintf(command,"cat newHead3.txt | sed 's/alb/%f/' > newHead4.txt", alb[k]); 
+                sprintf(command,"cat newHead3.txt | sed 's/alb/%4.2f/' > newHead4.txt", alb[k]); 
                 status = system(command);
                 if (status != SUCCESS)
                 {
@@ -1429,11 +1437,11 @@ int first_files
                 /* create string for case list containing location of current tape5 file
                    create string for command list containing commands for modtran run
                    iterate entry count*/
-                *entry = 0;
-                sprintf(case_list[*entry], "%s", current_alb);
-                sprintf(command_list[*entry], "pushd %s ; ln -s %s/DATA; %s/Mod90_5.2.2.exe; popd'", 
-                        modtran_path, modtran_path, current_alb); 
-                entry++;
+                case_counter = i * NUM_ELEVATIONS *3 + j * 3 + k;
+                sprintf(case_list[case_counter], "%s/%s", curr_path, current_alb);
+                sprintf(command_list[case_counter], "pushd %s; ln -s %s/DATA; "
+                        "%s/Mod90_5.2.2.exe; popd", 
+                        case_list[case_counter], modtran_path, modtran_path); 
             }
         }
     }
@@ -1476,7 +1484,7 @@ int first_files
     }
 
     /* Write out the caseList file */
-    for (k = 0; k < *entry; k++)
+    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
     {
         fprintf(fd, "%s\n", case_list[k]);
     }
@@ -1498,7 +1506,7 @@ int first_files
     }
 
     /* Write out the commandList file */
-    for (k = 0; k < *entry; k++)
+    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
     {
         fprintf(fd, "%s\n", command_list[k]);
     }
