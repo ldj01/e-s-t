@@ -30,6 +30,7 @@ scene_based_lst: $(OBJ) $(INC)
 install:
 	cp $(EXE) $(BIN)
 	cp ../scripts/narr_retrieval.bash $(BIN)
+	cp ../scripts/tape6parser.bash $(BIN)
 	cp ../scripts/script_HGT_generic $(BIN)
 	cp ../scripts/script_SHUM_generic $(BIN)
 	cp ../scripts/script_TMP_generic $(BIN)

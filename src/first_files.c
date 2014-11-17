@@ -266,8 +266,6 @@ Date        Programmer       Reason
 int first_files
 (
     Input_t *input,             /*I: input structure */
-    char **case_list,           /*O: modtran run list */
-    char **command_list,        /*O: modtran run command list */
     int *num_points,            /*O: number of NARR points */
     bool verbose                /*I: value to indicate if intermediate messages 
                                      be printed */
@@ -355,6 +353,8 @@ int first_files
     int status;
     int temp_int1, temp_int2; 
     int case_counter;
+    char **case_list;
+    char **command_list;
 
     /* Dynamic allocate the 2d memory */
     eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int)); 
@@ -409,7 +409,7 @@ int first_files
             {
                 sprintf (errstr, "End of file (EOF) is met before NARR_ROW * "
                       "NARR_COL lines");
-                LST_ERROR(errstr, "firstfile");
+                LST_ERROR(errstr, "first_file");
             }
             if ((lon[i][j] - 180.0) > MINSIGMA)
                 lon[i][j] = 360.0 - lon[i][j];
@@ -1519,5 +1519,22 @@ int first_files
         LST_ERROR (errstr, "first_files");
     }
 
+    /* Free memory allocation */
+    status = free_2d_array((void **)case_list);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: command_list\n");
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
+    }
+
+    status = free_2d_array((void **)command_list);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: command_list\n");
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
+    }
+
     return SUCCESS;
+
+
 }

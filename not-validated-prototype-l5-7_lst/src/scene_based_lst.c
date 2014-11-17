@@ -45,11 +45,13 @@ int main (int argc, char *argv[])
     bool verbose;            /* verbose flag for printing messages */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
-    int i;
+    int i, k;
     int num_points;
     char **case_list = NULL;
     char **command_list = NULL;
     float **results = NULL;
+    FILE *fd;
+    int num_cases;
   
     time_t now;
     time(&now);
@@ -252,15 +254,74 @@ int main (int argc, char *argv[])
     }
 #endif
     /* call first_files to generate tape5 file and commandList */
-    status = first_files(input, case_list, command_list, &num_points, verbose);
+    status = first_files(input, &num_points, verbose);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Calling first_files\n");
         LST_ERROR (errstr, "scene_based_lst");
     }
 
+    num_cases = num_points * NUM_ELEVATIONS * 3;
+    case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (case_list == NULL)
+    {
+        sprintf (errstr, "Allocating case_list memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    command_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
+    if (command_list == NULL)
+    {
+        sprintf (errstr, "Allocating command_list memory");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Read case_list from caseList file */ 
+    fd = fopen("caseList", "r"); 
+    if (fd == NULL)
+    {
+        sprintf (errstr, "Opening file: caseList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Read in the caseList file */
+    for (k = 0; k < num_cases; k++)
+    {
+        fscanf(fd, "%s", case_list[k]);
+    }
+
+    /* Close the caseList file */
+    status = fclose(fd);
+    if ( status )
+    {
+        sprintf (errstr, "Closing file: caseList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Read command_list from commandList file */
+    fd = fopen("commandList", "r"); 
+    if (fd == NULL)
+    {
+        sprintf (errstr, "Opening file: commandList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Read in the commandList file */
+    for (k = 0; k < num_cases; k++)
+    {
+        fgets(command_list[k], MAX_STR_LEN, fd);
+    }
+
+    /* Close the commandList file */
+    status = fclose(fd);
+    if ( status )
+    {
+        sprintf (errstr, "Closing file: commandList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
     /* perform modtran runs by calling command_list */
-    for (i = 0; i < num_points * NUM_ELEVATIONS * 3; i++)
+    for (i = 0; i < num_cases; i++)
     {
         status = system(command_list[i]);
         if (status != SUCCESS)
@@ -270,34 +331,33 @@ int main (int argc, char *argv[])
         }
     } 
 
-    /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), copy program 
-       to delete headers and parse wavelength and total radiance from tape6 file*/
-    for (i = 0; i < num_points * NUM_ELEVATIONS * 3; i++)
+    /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), 
+       copy program to delete headers and parse wavelength and total radiance 
+       from tape6 file*/
+    status = system("cp $BIN/tape6parser.bash .");
+    if (status != SUCCESS)
     {
-        sprintf(command,"ln $BIN/elim2.sed %s || while [ ! -e %s/elim2.sed", case_list[i], 
-                case_list[i]);
-        status = system(command);
-        if (status != SUCCESS)
+        sprintf (errstr, "cp $BIN/tape6parser.bash\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+    
+
+    for (i = 0; i < num_cases; i++)
+    {
+        sprintf(command, "%s/elim2.sed", case_list[i]);
+        if (access(command, F_OK) != 0)
         {
-            sprintf (errstr, "link elim2.sed\n");
-            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+            sprintf(command,"ln $LST_DATA/elim2.sed %s", case_list[i]);
+            status = system(command);
+            if (status != SUCCESS)
+            {
+                sprintf (errstr, "link elim2.sed\n");
+                RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+            }
         }
 
-        status = system("sleep 5");
-        if (status != SUCCESS)
-        {
-            sprintf (errstr, "sleep 5 seconds\n");
-            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-        }
-
-        sprintf(command,"ln $BIN/elim2.sed %s", case_list[i]);
+        sprintf(command, "tape6parser.bash %s", case_list[i]);
         status = system(command);
-        if (status != SUCCESS)
-        {
-            sprintf (errstr, "link elim2.sed again\n");
-            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-        }
-        status = system("tape6parser.bash");
         if (status != SUCCESS)
         {
             sprintf (errstr, "tape6parser.bash\n");
