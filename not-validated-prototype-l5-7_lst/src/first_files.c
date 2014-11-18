@@ -442,7 +442,7 @@ int first_files
     }
 
     /* Read in NARR height for time before landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","HGT_1/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -453,7 +453,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &hgt1[i][j]) == EOF)
             {
@@ -466,7 +466,7 @@ int first_files
     }
 
     /* Read in NARR specific humidity for time before landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","SHUM_1/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -477,7 +477,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &shum1[i][j]) == EOF)
             {
@@ -490,7 +490,7 @@ int first_files
     }
 
     /* Read in NARR temperature for time before landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","TMP_1/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -501,7 +501,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &tmp1[i][j]) == EOF)
             {
@@ -536,7 +536,7 @@ int first_files
     }
 
     /* Read in NARR height for time after landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","HGT_2/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -547,7 +547,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &hgt2[i][j]) == EOF)
             {
@@ -560,7 +560,7 @@ int first_files
     }
  
     /* Read in NARR specific humidity for time after landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","SHUM_2/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -571,7 +571,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &shum2[i][j]) == EOF)
             {
@@ -584,7 +584,7 @@ int first_files
     }
 
     /* Read in NARR temperature for time after landsat acqusition */ 
-    for (i = 0; i < P_LAYER - 1; i++)
+    for (i = 0; i < P_LAYER; i++)
     {
         sprintf(full_path,"%s/%d%s","TMP_2/", p[i], ".txt");
         fd = fopen(full_path, "r");
@@ -595,7 +595,7 @@ int first_files
         }
 
         fscanf(fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL - 1; j++)
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
         {
             if (fscanf(fd, "%f", &tmp2[i][j]) == EOF)
             {
@@ -861,7 +861,7 @@ int first_files
 
     /* convert grib data to variables to be input to MODTRAN */
     status = convert_geopotential_geometric(*num_points, narr_lat, narr_hgt1, 
-                                            narr_hgt1);
+                                            narr_height1);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Calling convert_geopotential_geometric1");
@@ -869,7 +869,7 @@ int first_files
     }
  
     status = convert_geopotential_geometric(*num_points, narr_lat, narr_hgt2, 
-                                            narr_hgt2);
+                                            narr_height2);
     if (status != SUCCESS)
     {
         sprintf (errstr, "Calling convert_geopotential_geometric2");
