@@ -75,8 +75,8 @@ int convert_geopotential_geometric
         /* define variable based on latitude */
         radius[i] = 1000.0 * (sqrt(1.0/((cos(radlat[i])*cos(radlat[i]))/(r_max*r_max)+
                     ((sin(radlat[i])*sin(radlat[i]))/(r_min*r_min)))));
-        gravity_ratio[i] = (9.80616*(1-0.002637*cos(2*radlat[i])+0.0000059*
-               (cos(2*radlat[i])*cos(2*radlat[i]))))/g_0;
+        gravity_ratio[i] = (9.80616*(1-0.002637*cos(2.0*radlat[i])+0.0000059*
+               (cos(2.0*radlat[i])*cos(2.0*radlat[i]))))/g_0;
     }
 
     /* Dynamic allocate the geo_metric memory */
@@ -196,12 +196,12 @@ int convert_sh_rh
                 (a5w + temp_c[i][j] * (a6w * temp_c[i][j])))))); /* hpa */
 
             e2[i][j] = exp(-0.58002206e4/temp_k[i][j] + 0.13914993 - 0.48640239e-1 * 
-                 temp_k[i][j]+0.41764768e-4 * pow(temp_k[i][j], 2) - 0.14452093e-7 * 
-                 pow(temp_k[i][j], 3) + 0.65459673 * log(temp_k[i][j])); /* Pa */
+                 temp_k[i][j]+0.41764768e-4 * pow(temp_k[i][j], 2.0) - 0.14452093e-7 * 
+                 pow(temp_k[i][j], 3.0) + 0.65459673 * log(temp_k[i][j])); /* Pa */
 
             goff[i][j] = -7.90298 * (373.16/temp_k[i][j]-1) + 5.02808 * log10(373.16 / 
-                temp_k[i][j]) - 1.3816e-7 * pow(10.0, (11.344 * (1 - (temp_k[i][j] / 373.16)))
-                - 1) + 8.1328e-3 * pow(10.0, (-3.49149 * (373.16 / temp_k[i][j] - 1)) - 1)
+                temp_k[i][j]) - 1.3816e-7 * pow(10.0, (11.344 * (1.0 - (temp_k[i][j] / 373.16)))
+                - 1) + 8.1328e-3 * pow(10.0, (-3.49149 * (373.16 / temp_k[i][j] - 1.0)) - 1.0)
                 + log10(1013.246); /* hPa */
 
              ph20[i][j] = (spec_hum[i][j] * pressure[i][j] * mdry) / (mh20 - 
@@ -645,7 +645,7 @@ int first_files
                 in_counter++;
             }
         }
-    }    
+    } 
     max_eye--;
     min_eye--;
     max_jay--;
@@ -714,32 +714,33 @@ int first_files
     }
 
     /* extract coordinates within the NARR rectangle */
-    for (i = min_eye; i <= max_eye; i++)
+    for (j = min_jay; j <= max_jay; j++)
     {
-        for (j = min_jay; j <= max_jay; j++)
+        for (i = min_eye; i <= max_eye; i++)
         {
-            narr_lat[(i-min_eye) * num_jays + (j-min_jay)] = lat[i][j]; 
-            narr_lon[(i-min_eye) * num_jays + (j-min_jay)] = lon[i][j]; 
+            narr_lat[(j-min_jay) * num_eyes + (i-min_eye)] = lat[i][j]; 
+            narr_lon[(j-min_jay) * num_eyes + (i-min_eye)] = lon[i][j];
+            if (i == 237 && j== 126)
         }
     }
     for (k = 0; k < P_LAYER; k++)
     {
-        for (i = min_eye; i <= max_eye; i++)
+        for (j = min_jay; j <= max_jay; j++)
         {
-            for (j = min_jay; j <= max_jay; j++)
+            for (i = min_eye; i <= max_eye; i++)
             {
-                narr_hgt1[k][(i-min_eye) * num_jays + (j-min_jay)] 
-                      = hgt1[k][i * num_jays + j]; 
-                narr_shum1[k][(i-min_eye) * num_jays + (j-min_jay)]  
-                      = shum1[k][i * num_jays + j]; 
-                narr_tmp1[k][(i-min_eye) * num_jays + (j-min_jay)]  
-                      = tmp1[k][i * num_jays + j]; 
-                narr_hgt2[k][(i-min_eye) * num_jays + (j-min_jay)]  
-                      = hgt2[k][i * num_jays + j]; 
-                narr_shum2[k][(i-min_eye) * num_jays + (j-min_jay)]  
-                      = shum2[k][i * num_jays + j]; 
-                narr_tmp2[k][(i-min_eye) * num_jays + (j-min_jay)] 
-                      = tmp2[k][i * num_jays + j]; 
+                narr_hgt1[k][(j-min_jay) * num_eyes + (i-min_eye)] 
+                      = hgt1[k][j * NARR_ROW + i]; 
+                narr_shum1[k][(j-min_jay) * num_eyes + (i-min_eye)]  
+                      = shum1[k][j * NARR_ROW + i]; 
+                narr_tmp1[k][(j-min_jay) * num_eyes + (i-min_eye)]  
+                      = tmp1[k][j * NARR_ROW + i]; 
+                narr_hgt2[k][(j-min_jay) * num_eyes + (i-min_eye)]  
+                      = hgt2[k][j * NARR_ROW + i]; 
+                narr_shum2[k][(j-min_jay) * num_eyes + (i-min_eye)]  
+                      = shum2[k][j * NARR_ROW + i]; 
+                narr_tmp2[k][(j-min_jay) * num_eyes + (i-min_eye)] 
+                      = tmp2[k][j * NARR_ROW + i];
             }
         }
     }

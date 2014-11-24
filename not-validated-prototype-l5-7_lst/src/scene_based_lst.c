@@ -183,10 +183,10 @@ int main (int argc, char *argv[])
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
     
-    status = system("narr_retrieval.bash");
+    status = system("./narr_retrieval.bash");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "narr_retrieval.bash\n");
+        sprintf (errstr, "./narr_retrieval.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }    
     
@@ -344,6 +344,7 @@ int main (int argc, char *argv[])
 
     for (i = 0; i < num_cases; i++)
     {
+#if 0
         sprintf(command, "%s/elim2.sed", case_list[i]);
         if (access(command, F_OK) != 0)
         {
@@ -355,14 +356,23 @@ int main (int argc, char *argv[])
                 RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
             }
         }
+#endif
 
-        sprintf(command, "tape6parser.bash %s", case_list[i]);
+        /* Just use $LST_DATA/elim2.sed directly instead of linking it */
+        sprintf(command, "./tape6parser.bash %s", case_list[i]);
         status = system(command);
         if (status != SUCCESS)
         {
-            sprintf (errstr, "tape6parser.bash\n");
+            sprintf (errstr, "./tape6parser.bash\n");
             RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
         }
+    }
+
+    status = system("rm tape6parser.bash");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "rm tape6parser.bash\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     /* Free memory allocation */

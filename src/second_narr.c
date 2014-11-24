@@ -110,7 +110,7 @@ void spline
         LST_ERROR(errstr, "second_narr");
     }
 
-    if (yp1 > 0.99e30)
+    if ((yp1 - 0.99e30) > MINSIGMA)
         y2[0]=u[0]=0.0;
     else 
     {
@@ -125,7 +125,7 @@ void spline
         u[i]=(y[i+1]-y[i])/(x[i+1]-x[i]) - (y[i]-y[i-1])/(x[i]-x[i-1]);
         u[i]=(6.0*u[i]/(x[i+1]-x[i-1])-sig*u[i-1])/p;
     }
-    if (ypn > 0.99e30)
+    if ((ypn - 0.99e30) > MINSIGMA)
         qn=un=0.0;
     else 
     {
@@ -178,7 +178,7 @@ void splint
     while (khi-klo > 1) 
     {
         k=(khi+klo) >> 1;
-        if (xa[k] > x) khi=k;
+        if ((xa[k] - x) > MINSIGMA) khi=k;
         else klo=k;
     }
     h=xa[khi]-xa[klo];
