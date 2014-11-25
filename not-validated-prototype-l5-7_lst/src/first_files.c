@@ -38,7 +38,6 @@ int convert_geopotential_geometric
 {
     float *radlat;
     int i, j;
-    int num_pressures = P_LAYER;
     float g_0 = 9.80665;
     float r_max = 6378.137;
     float r_min = 6356.752;
@@ -79,20 +78,11 @@ int convert_geopotential_geometric
                (cos(2.0*radlat[i])*cos(2.0*radlat[i]))))/g_0;
     }
 
-    /* Dynamic allocate the geo_metric memory */
-    geo_metric = (float **)allocate_2d_array(num_pressures, NARR_ROW * NARR_COL,  
-                 sizeof(float)); 
-    if (geo_metric == NULL)
-    {
-        sprintf (errstr, "Allocating geo_metric memory");
-        LST_ERROR (errstr, "convert_geopotential_geometric");
-    }
-
     for (i = 0; i < P_LAYER; i++)
     {
         for ( j = 0; j < num_points; j++)
         {
-            geo_metric[i][j] = (geo_potential[i][j] * radius[j]) / (1000.0 * 
+            geo_metric[i][j] = (geo_potential[i][j] * radius[j]) / (1000.0 *
                   (gravity_ratio[j] *radius[j] - geo_potential[i][j]));
         }
     }
@@ -182,7 +172,6 @@ int convert_sh_rh
         sprintf (errstr, "Allocating  memory");
         LST_ERROR (errstr, "first_files");
     }
-
 
     for (i = 0; i < P_LAYER; i++)
     {
@@ -720,7 +709,6 @@ int first_files
         {
             narr_lat[(j-min_jay) * num_eyes + (i-min_eye)] = lat[i][j]; 
             narr_lon[(j-min_jay) * num_eyes + (i-min_eye)] = lon[i][j];
-            if (i == 237 && j== 126)
         }
     }
     for (k = 0; k < P_LAYER; k++)
@@ -868,7 +856,7 @@ int first_files
         sprintf (errstr, "Calling convert_geopotential_geometric1");
         LST_ERROR (errstr, "first_files");
     }
- 
+
     status = convert_geopotential_geometric(*num_points, narr_lat, narr_hgt2, 
                                             narr_height2);
     if (status != SUCCESS)
