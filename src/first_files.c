@@ -1050,7 +1050,7 @@ int first_files
 
     for (i = 0; i < STAN_LAYER; i++)
     {
-        if (fscanf(fd, "%f,%f,%f,%f", &stan_height[i], &stan_pre[i], &stan_temp[i], 
+        if (fscanf(fd, "%f %f %f %f", &stan_height[i], &stan_pre[i], &stan_temp[i], 
                 &stan_rh[i]) == EOF)
         {
             sprintf (errstr, "End of file (EOF) is met before STAN_LAYER lines");
@@ -1221,7 +1221,7 @@ int first_files
                 index_below = 0;
                 index_above = 1;
             }
-                
+
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
             new_pressure = pressure[index_below][i] + (gndalt[j] -
