@@ -1240,25 +1240,22 @@ int first_files
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
+            temp_pressure[index] = new_pressure;
+            temp_temp[index] = new_temp;
+            temp_rh[index] = new_rh;
+            index++;
+
+            for (k = index_above; k < NUM_ELEVATIONS; k++)
+            {
+                temp_height[index] = narr_height[k][i];
+                temp_pressure[index] = pressure[k][i];
+                temp_temp[index] = narr_tmp[k][i];
+                temp_rh[index] = narr_rh[k][i];
+                index++;
+            }
             if (abs(gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
             {
-                for (k = index_above; k < NUM_ELEVATIONS; k++)
-                {
-                    temp_height[index] = narr_height[k][i];
-                    temp_pressure[index] = pressure[k][i];
-                    temp_temp[index] = narr_tmp[k][i];
-                    temp_rh[index] = narr_rh[k][i];
-                    index++;
-                }
-            }
-            else
-            {
-                temp_height[index] = gndalt[j];
-                temp_pressure[index] = new_pressure;
-                temp_temp[index] = new_temp;
-                temp_rh[index] = new_rh;
-                index++;
-
+                index = 0;
                 for (k = index_above; k < NUM_ELEVATIONS; k++)
                 {
                     temp_height[index] = narr_height[k][i];
