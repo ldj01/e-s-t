@@ -1131,7 +1131,7 @@ int first_files
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
-        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%f/' > newTail.txt", 
+        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%7.3f/' > newTail.txt", 
                 path, narr_lat[i]); 
         status = system(command);
         if (status != SUCCESS)
@@ -1140,7 +1140,7 @@ int first_files
             LST_ERROR (errstr, "first_file");
         }
 
-        sprintf(command,"cat newTail.txt | sed 's/longit/%f/' > newTail2.txt",
+        sprintf(command,"cat newTail.txt | sed 's/longit/%7.3f/' > newTail2.txt",
                     narr_lon[i]);
         status = system(command);
         if (status != SUCCESS)
@@ -1411,7 +1411,7 @@ int first_files
                 /* concatenate head file, atmospheric layers, and tail file to create a 
                    tape5 file for modtran specific to this location and ground altitude 
                    with variables for temperature and albedo */
-                sprintf(command, "cat newHead4.txt newTail3.txt tempLayers.txt > %s/tape5", 
+                sprintf(command, "cat newHead4.txt tempLayers.txt newTail3.txt > %s/tape5", 
                         current_alb); 
                 status = system(command);
                 if (status != SUCCESS)
