@@ -1107,7 +1107,7 @@ int first_files
         else
             narr_lon[i] = 360.0 - narr_lon[i];
 
-        if ((narr_lon[i] - 100.0) < MINSIGMA)
+        if ((abs(narr_lon[i]) - 100.0) < MINSIGMA)
             sprintf(current_point,"%6.3f_%6.3f", narr_lat[i], narr_lon[i]);
         else
             sprintf(current_point,"%6.3f_%6.2f", narr_lat[i], narr_lon[i]); 
@@ -1131,8 +1131,12 @@ int first_files
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
-        sprintf(command,"cat %s/tail.txt | sed 's/latitu/%7.3f/' > newTail.txt", 
-                path, narr_lat[i]); 
+        if (abs(narr_lat[i] - 100.0) < MINSIGMA)
+            sprintf(command,"cat %s/tail.txt | sed 's/latitu/%6.3f/' > newTail.txt", 
+                    path, narr_lat[i]); 
+        else
+            sprintf(command,"cat %s/tail.txt | sed 's/latitu/%6.2f/' > newTail.txt", 
+                    path, narr_lat[i]); 
         status = system(command);
         if (status != SUCCESS)
         {
@@ -1140,7 +1144,11 @@ int first_files
             LST_ERROR (errstr, "first_file");
         }
 
-        sprintf(command,"cat newTail.txt | sed 's/longit/%7.3f/' > newTail2.txt",
+        if (abs(narr_lon[i] - 100.0) < MINSIGMA)
+            sprintf(command,"cat newTail.txt | sed 's/longit/%6.3f/' > newTail2.txt",
+                    narr_lon[i]);
+        else
+            sprintf(command,"cat newTail.txt | sed 's/longit/%6.2f/' > newTail2.txt",
                     narr_lon[i]);
         status = system(command);
         if (status != SUCCESS)

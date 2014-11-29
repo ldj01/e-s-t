@@ -248,7 +248,7 @@ int int_tabulated
     /* Call splint for interpolations. one-based arrays are considered */
     for (i = 0; i < nums; i++) 
     {
-        splint(x - 1, f - 1, temp - 1, nums, i, z);
+        splint(x - 1, f - 1, temp - 1, nums, i, &z[i]);
     }
 
     xmin = x[0];
