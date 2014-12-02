@@ -141,8 +141,8 @@ void spline
 /******************************************************************************
 MODULE:  splint
 
-PURPOSE: spline constructs a cubic spline given a set of x and y values, 
-         through these values.
+PURPOSE: splint uses the cubic spline generated with spline to interpolate 
+         values in the XY  table
 
 RETURN: SUCCESS
         FAILURE
@@ -221,7 +221,7 @@ int int_tabulated
     float xmin;
     float xmax;
     int i;
-    int ii;
+    int *ii;
     float h;
     char errstr[MAX_STR_LEN];
 
@@ -240,6 +240,13 @@ int int_tabulated
         LST_ERROR (errstr, "second_narr");
     }
 
+    ii = (int *)malloc(nums * sizeof(int));  
+    if (ii == NULL)
+    {
+        sprintf (errstr, "Allocating ii memory");
+        LST_ERROR (errstr, "second_narr");
+    }
+
     /* integrate spectral response over wavelength */
     /* Call spline to get second derivatives, since the Numerical Recipes function 
        assumesthat arrays are 1-based, adjust the pointer values accordingly */
@@ -252,16 +259,16 @@ int int_tabulated
     }
 
     xmin = x[0];
-    xmax = x[nums];  
+    xmax = x[nums-1];  
     h = (xmax - xmin) / (float) nums;
-    ii = (int)(((nums - 1) / 4) + 1) * 4;
 
     *result = 0.0;
     /* Compute the integral using the 5-point Newton-Cotes formula */
     for (i = 0; i < nums; i++) 
     {
-        *result += 2.0 * h * (7.0 * (z[ii-4] + z[ii]) + 
-                 32.0 * (z[ii-3] + z[ii-1]) + 12.0 * z[ii-2]) / 45.0;
+        ii[i] = 4 * (int)(((nums - 1) / 4) + 1);
+        *result += 2.0 * h * (7.0 * (z[ii[i]-4] + z[ii[i]]) + 
+                 32.0 * (z[ii[i]-3] + z[ii[i]-1]) + 12.0 * z[ii[i]-2]) / 45.0;
     }
 
     return SUCCESS;
@@ -722,7 +729,7 @@ int second_narr
     }
 
     /* iterate through all points in the scene and all heights in one point */
-    for (i = 0; i < num_points; i ++)
+    for (i = 0; i < num_points; i++)
     {
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
@@ -962,12 +969,12 @@ int second_narr
             ld = (((obs_radiance_0-lu) / tau) - (temp_radiance_0 * ems)) / (1 - ems); 
 
             /* put results into results array */
-            results[0][i * NUM_ELEVATIONS + j] = lat;
-            results[0][i * NUM_ELEVATIONS + j] = lon; 
-            results[0][i * NUM_ELEVATIONS + j] = height;
-            results[0][i * NUM_ELEVATIONS + j] = tau;
-            results[0][i * NUM_ELEVATIONS + j] = lu;
-            results[0][i * NUM_ELEVATIONS + j] = ld;
+            results[i * NUM_ELEVATIONS + j][0] = lat;
+            results[i * NUM_ELEVATIONS + j][1] = lon; 
+            results[i * NUM_ELEVATIONS + j][2] = height;
+            results[i * NUM_ELEVATIONS + j][3] = tau;
+            results[i * NUM_ELEVATIONS + j][4] = lu;
+            results[i * NUM_ELEVATIONS + j][5] = ld;
             place++;       
         }
     }
@@ -988,7 +995,7 @@ int second_narr
         sprintf (errstr, "Can't open atmosphericParameters.txt file");
         LST_ERROR(error_string, "second_narr");
     }
-    for (k = 0; k < num+points * NUM_ELEVATIONS; k++)
+    for (k = 0; k < num_points * NUM_ELEVATIONS; k++)
     {
         fprintf(fd, "%f,%f,%f,%f,%f,%f\n", 
                 results[0][k], results[1][k], results[2][k], 

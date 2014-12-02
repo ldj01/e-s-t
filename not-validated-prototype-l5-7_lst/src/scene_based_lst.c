@@ -384,7 +384,7 @@ int main (int argc, char *argv[])
     }
 
     /* Allocate memory for results */
-    results = (float **)allocate_2d_array(6, num_points * NUM_ELEVATIONS, 
+    results = (float **)allocate_2d_array(num_points * NUM_ELEVATIONS, 6,  
               sizeof(float)); 
     if (results == NULL)
     {
@@ -415,14 +415,6 @@ int main (int argc, char *argv[])
     {
         sprintf (errstr, "Calling scene_based_list\n");
         LST_ERROR (errstr, "scene_based_lst");
-    }
-
-    /* Free memory allocation */
-    status = free_2d_array((void **)results);
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Freeing memory: results\n");
-        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
 
 #if 0
@@ -503,6 +495,15 @@ int main (int argc, char *argv[])
     free(xml_name);
     printf ("Processing complete.\n");
 #endif
+
+    /* Free memory allocation */
+    status = free_2d_array((void **)results);
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Freeing memory: results\n");
+        RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
+    }
+
     time(&now);
     printf("scene_based_lst end_time=%s\n",ctime(&now));
     return (SUCCESS);
