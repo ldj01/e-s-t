@@ -847,14 +847,14 @@ int second_narr
                 /* put arrays into data array for current point at current height */
                 if (index == 0) 
                 {
-                    for (m = 0; i < num_entries ; i++)
+                    for (m = 0; m < num_entries ; m++)
                     {
                         current_data[m][0] = temp1[m][0];
                     }
                     index++;
                 }
 
-                for (m = 0; i < num_entries ; i++)
+                for (m = 0; m < num_entries ; m++)
                 {
                     current_data[m][index] = temp1[m][1];
                 }
