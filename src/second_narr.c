@@ -248,14 +248,13 @@ int int_tabulated
     }
 
     /* integrate spectral response over wavelength */
-    /* Call spline to get second derivatives, since the Numerical Recipes function 
-       assumesthat arrays are 1-based, adjust the pointer values accordingly */
-    spline(x - 1, f - 1, nums, 2.0, 2.0, temp - 1);
+    /* Call spline to get second derivatives, */
+    spline(x, f, nums, 2.0, 2.0, temp);
     
     /* Call splint for interpolations. one-based arrays are considered */
     for (i = 0; i < nums; i++) 
     {
-        splint(x - 1, f - 1, temp - 1, nums, i, &z[i]);
+        splint(x, f, temp, nums, i, &z[i]);
     }
 
     xmin = x[0];
@@ -270,6 +269,10 @@ int int_tabulated
         *result += 2.0 * h * (7.0 * (z[ii[i]-4] + z[ii[i]]) + 
                  32.0 * (z[ii[i]-3] + z[ii[i]-1]) + 12.0 * z[ii[i]-2]) / 45.0;
     }
+
+    free(temp);
+    free(z);
+    free(ii);
 
     return SUCCESS;
 }
