@@ -492,6 +492,68 @@ int calculate_lobs
 
 }
 
+void get_lat_lon_height 
+(
+    char *full_path,       /* I: Full path in case_list */
+    float *lat,            /* O: latitude */
+    float *lon,            /* O: longitude */
+    float *height          /* O: height */
+)
+{
+    char directory[MAX_STR_LEN];           
+    char temp_value[MAX_STR_LEN];          
+    char directory2[MAX_STR_LEN];            
+    char full_path_copy[MAX_STR_LEN];  
+    char *ptr;                  /* String pointer */
+
+    /* Make a local copy of filename so it is not destroyed */
+    strcpy(full_path_copy, full_path);
+
+    /* Find ending '_' */
+    ptr = (char *) strrchr(full_path_copy, '_');
+    if (ptr != NULL)
+    {
+        strcpy (directory, full_path_copy);
+        ptr = (char *) strrchr(directory, '_');
+        ptr++;
+        strcpy (full_path_copy, ptr);
+        *ptr = '\0';
+    }
+    else
+        strcpy (directory, "");
+
+    /* Get latitude */
+    ptr = (char *) strrchr(directory, '/');
+    if (ptr != NULL)
+    {
+        ptr++;
+        strncpy (temp_value, ptr, strlen(ptr)-1);
+        *ptr = '\0';
+    }
+    *lat = atof(temp_value);
+
+    /* Get longitude */
+    ptr = (char *) strchr(full_path_copy, '/');
+    if (ptr != NULL)
+    {
+        *(ptr++) = '\0';
+        strcpy (temp_value, full_path_copy);
+        strcpy (directory2, ptr);
+    }
+    *lon = atof(temp_value);
+
+    /* Get height */
+    ptr = (char *) strchr(directory2, '/');
+    if (ptr != NULL)
+    {
+        *(ptr++) = '\0';
+        strcpy (temp_value, directory2);
+    }
+    *height = atof(temp_value);
+
+    return;
+}
+
 /******************************************************************************
 MODULE:  second_narr
 
@@ -527,8 +589,6 @@ int second_narr
     int counter = 0;
     int place = 0;
     char command[MAX_STR_LEN];
-    char spec[10][MAX_STR_LEN];
-    char coordinates[2][MAX_STR_LEN];
     int index;
     float lat, lon;
     float height;
@@ -738,6 +798,9 @@ int second_narr
         {
             /* determine current latlon and height depends on number of steps 
                in path */
+            get_lat_lon_height(case_list[counter], &lat, &lon, &height);
+
+#if 0
             sprintf(command, "echo %s|tr '/' '\\n'",case_list[counter]);
             printf("command=%s\n",command);
 
@@ -757,8 +820,10 @@ int second_narr
             /* close the command file */
             pclose(fd);
 
+            /* Find the right location for lat_lon in the spec */
+
             /* Split lat and lon */
-            sprintf(command, "echo %s|tr '_' '\\n'",spec[7]);
+            sprintf(command, "echo %s|tr '_' '\\n'",spec[4]);
 
             /* Open the command for reading. */
             fd = popen(command, "r");
@@ -780,10 +845,10 @@ int second_narr
             /* get lat, lon and height */
             sscanf(coordinates[0], "%f", &lat);          
             sscanf(coordinates[1], "%f", &lon);          
-            sscanf(spec[8], "%f", &height);          
-
+            sscanf(spec[5], "%f", &height);          
+#endif
             /* determine number of entries in current file */
-            sprintf(command, "wc %s/parsed | awk '{print $1}'", case_list[i]);
+            sprintf(command, "wc %s/parsed | awk '{print $1}'", case_list[counter]);
 
             /* Open the command for reading. */
             fd = popen(command, "r");
