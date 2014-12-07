@@ -376,8 +376,7 @@ Date        Programmer       Reason
 ******************************************************************************/
 void interpol
 (
-    float *v,         
-    float *x,           
+    float **v_x,         
     float *u, 
     int nums,               
     float *r            
@@ -391,29 +390,30 @@ void interpol
 
     m = nums - 2;
 
-    if ((x[1] - x[0]) >= MINSIGMA)
+    if ((v_x[1][0] - v_x[0][0]) >= MINSIGMA)
         s1 = 1;
     else
         s1 = -1;
 
     for (i = 0; i < nums; i++)
     {
-        d = (int) (s1 * (u[i] - x[ix]));
+        d = (int) (s1 * (u[i] - v_x[ix][0]));
         if (d == 0)
-            r[i] = v[ix];
+            r[i] = v_x[ix][1];
         else
         {
             if (d > 0) 
             {
-                while ((s1*(u[i]-x[ix+1]) > MINSIGMA) && (ix < m -2))
+                while ((s1*(u[i]-v_x[ix+1][0]) > MINSIGMA) && (ix < m -2))
                     ix++;    
             }
             else
             {
-                while ((s1*(u[i]-x[ix]) < MINSIGMA) && (ix > 0))
+                while ((s1*(u[i]-v_x[ix][0]) < MINSIGMA) && (ix > 0))
                     ix--;
             }
-            r[i] = v[ix] + (u[i]-x[ix])*(v[ix+1]-v[ix])/(x[ix+1]-x[ix]);
+            r[i] = v_x[ix][1] + (u[i]-v_x[ix][0])*(v_x[ix+1][1]-v_x[ix][1]) / 
+                   (v_x[ix+1][0]-v_x[ix][0]);
         }
     }
 
@@ -435,8 +435,7 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_lobs
 (
-    float *wavelengths,          /*I: wavelength */
-    float *modtran,             /*I: modtran results */
+    float **modtran,             /*I: modtran results with wavelengths */
     float **spectral_response,  /*I: spectral response function */
     int num_srs,                /*I: number of spectral response points */
     float *radiance             /*O: LOB outputs */  
@@ -469,8 +468,7 @@ int calculate_lobs
 
     /* using planck's equaiton to calculate radiance at each wavelength for 
        current temp*/
-    interpol(modtran, wavelengths, spectral_response[0], num_srs, 
-                      temp_rad);
+    interpol(modtran, spectral_response[0], num_srs, temp_rad);
 
     /* multiply the caluclated radiance by the spectral reponse and integrate 
        over wavelength to get one number for current temp*/
@@ -492,6 +490,18 @@ int calculate_lobs
 
 }
 
+/******************************************************************************
+MODULE:  get_lat_lon_height 
+
+PURPOSE: Get latitude, longitude, and height from directory name
+
+RETURN: None
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+12/3/2014   Song Guo         Original Development
+******************************************************************************/
 void get_lat_lon_height 
 (
     char *full_path,       /* I: Full path in case_list */
@@ -867,6 +877,9 @@ int second_narr
             /* get number of entries */
             sscanf(num_entry, "%d", &num_entries);  
 
+            printf("i,j,num_entry,num_entries=%d,%d,%s,%d\n",
+                    i,j,num_entry,num_entries);
+
             /* for each height, read in radiance inforomation for three modtran 
                runs, columns of array are organized:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
@@ -957,14 +970,14 @@ int second_narr
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
             x[0] = temp_radiance_273;
             x[1] = temp_radiance_300;
-            status = calculate_lobs(current_data[0], current_data[1], spectral_response, 
+            status = calculate_lobs(current_data, spectral_response, 
                      num_entries, &y[0]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 1");
                 LST_ERROR (errstr, "second_narr");
             }
-            status = calculate_lobs(current_data[0], current_data[2], spectral_response, 
+            status = calculate_lobs(current_data, spectral_response, 
                      num_entries, &y[1]);
             if (status != SUCCESS)
             {  
@@ -1025,7 +1038,7 @@ int second_narr
                 sprintf (errstr, "invalid instrument type");
                 LST_ERROR(errstr, "second_narr");
             }
-            status = calculate_lobs(current_data[0], current_data[2], spectral_response, 
+            status = calculate_lobs(current_data, spectral_response, 
                      num_entries, &obs_radiance_0);
             if (status != SUCCESS)
             {  
