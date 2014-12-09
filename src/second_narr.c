@@ -376,10 +376,11 @@ Date        Programmer       Reason
 ******************************************************************************/
 void interpol
 (
-    float **v_x,         
-    float *u, 
-    int nums,               
-    float *r            
+    float **v_x,         /*I: The input vector data */     
+    float *u,            /*I: The output grid points */   
+    int nums,            /*I: number of input data */   
+    int index,           /*I: Which index column data be used */                 
+    float *r             /*O: Interpolated results */            
 )
 { 
     int i;
@@ -399,7 +400,7 @@ void interpol
     {
         d = (int) (s1 * (u[i] - v_x[ix][0]));
         if (d == 0)
-            r[i] = v_x[ix][1];
+            r[i] = v_x[ix][index];
         else
         {
             if (d > 0) 
@@ -412,7 +413,7 @@ void interpol
                 while ((s1*(u[i]-v_x[ix][0]) < MINSIGMA) && (ix > 0))
                     ix--;
             }
-            r[i] = v_x[ix][1] + (u[i]-v_x[ix][0])*(v_x[ix+1][1]-v_x[ix][1]) / 
+            r[i] = v_x[ix][index] + (u[i]-v_x[ix][0])*(v_x[ix+1][index]-v_x[ix][index]) / 
                    (v_x[ix+1][0]-v_x[ix][0]);
         }
     }
@@ -435,9 +436,10 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_lobs
 (
-    float **modtran,             /*I: modtran results with wavelengths */
+    float **modtran,            /*I: modtran results with wavelengths */
     float **spectral_response,  /*I: spectral response function */
     int num_srs,                /*I: number of spectral response points */
+    int index,                  /*I: column index for data be used */
     float *radiance             /*O: LOB outputs */  
 )
 { 
@@ -468,7 +470,7 @@ int calculate_lobs
 
     /* using planck's equaiton to calculate radiance at each wavelength for 
        current temp*/
-    interpol(modtran, spectral_response[0], num_srs, temp_rad);
+    interpol(modtran, spectral_response[0], num_srs, index, temp_rad);
 
     /* multiply the caluclated radiance by the spectral reponse and integrate 
        over wavelength to get one number for current temp*/
@@ -864,7 +866,7 @@ int second_narr
             fd = popen(command, "r");
             if (fd == NULL) 
             {
-                sprintf (errstr, "Allocating results memory");
+                sprintf (errstr, "Getting number of entries");
                 LST_ERROR (errstr, "second_narr");
             }
 
@@ -893,7 +895,7 @@ int second_narr
             temp1 = (float **)allocate_2d_array(num_entries, 2, sizeof(float)); 
             if (temp1 == NULL)
             {
-                sprintf (errstr, "Allocating current_data memory");
+                sprintf (errstr, "Allocating temp1 memory");
                 LST_ERROR (errstr, "second_narr");
             }
 
@@ -971,14 +973,14 @@ int second_narr
             x[0] = temp_radiance_273;
             x[1] = temp_radiance_300;
             status = calculate_lobs(current_data, spectral_response, 
-                     num_entries, &y[0]);
+                                    num_entries, 1, &y[0]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 1");
                 LST_ERROR (errstr, "second_narr");
             }
             status = calculate_lobs(current_data, spectral_response, 
-                     num_entries, &y[1]);
+                                    num_entries, 2, &y[1]);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 2");
@@ -1039,7 +1041,7 @@ int second_narr
                 LST_ERROR(errstr, "second_narr");
             }
             status = calculate_lobs(current_data, spectral_response, 
-                     num_entries, &obs_radiance_0);
+                                    num_entries, 3, &obs_radiance_0);
             if (status != SUCCESS)
             {  
                 sprintf (errstr, "Calling calculate_lob 2");

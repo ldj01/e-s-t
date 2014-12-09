@@ -102,6 +102,8 @@ int main (int argc, char *argv[])
     if (verbose)
     {
         /* Print some info to show how the input metadata works */
+        printf ("DEBUG: Instrument: %d\n", input->meta.inst);
+        printf ("DEBUG: Satellite: %d\n", input->meta.sat);
         printf ("DEBUG: Number of input thermal bands: %d\n", input->nband_th);
         printf ("DEBUG: Number of input lines: %d\n", input->size_th.l);
         printf ("DEBUG: Number of input samples: %d\n", input->size_th.s);
