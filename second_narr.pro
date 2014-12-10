@@ -127,8 +127,6 @@ PRO SECOND_NARR, home, $
          command = "wc "+extract+"/parsed | awk '{print $1}'"
          SPAWN, command, numEntries
          numEntries = FIX(numEntries[0])
-
-print,"i,j,numEntries =",i,j,numEntries
                
          ;for each height, read in radiance inforomation for three modtran runs
          ;columns of array are organized:

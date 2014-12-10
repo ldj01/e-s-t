@@ -285,13 +285,10 @@ PRO THIRD_PIXELS_POST, home, $
             distances = MAKE_ARRAY(numPoints, /FLOAT)
             FOR g = 0, numPoints - 1 DO BEGIN
                distances[g] = DISTANCE_IN_UTM(eastvector[g], northvector[g], currentEasting, currentNorthing)
-print,"k,h,g,distances[g] = ",k,h,g,distances[g] 
             ENDFOR
             
             ;find indices of 6 closest points
             closest = SORT(distances)
-help, closest
-print,"closest=",closest
             closest = closest[0:6]
             
             ;extract closest points and determine if they are above or below
@@ -311,11 +308,8 @@ print,"closest=",closest
             UTMc = [eastGrid[upperleftIndices[0],upperLeftIndices[1]+1],northGrid[upperleftIndices[0],upperLeftIndices[1]+1]]
             UTMd = [eastGrid[upperleftIndices[0]+1,upperLeftIndices[1]+1],northGrid[upperleftIndices[0]+1,upperLeftIndices[1]+1]]
 
-help, UTMa
-print, "UTMa=",UTMa
             coordinates = [[UTMa],[UTMb],[UTMc],[UTMd]]
 help, coordinates
-print, "coordinates =", coordinates 
             
             ;determine index of four points in order to pull from atmospheric parameter file
             indexA = WHERE(eastGrid EQ UTMa[0] AND northGrid EQ UTMa[1])
@@ -323,10 +317,6 @@ print, "coordinates =", coordinates
             indexC = WHERE(eastGrid EQ UTMc[0] AND northGrid EQ UTMc[1])
             indexD = WHERE(eastGrid EQ UTMd[0] AND northGrid EQ UTMd[1])
             indices = [indexA, indexB, indexC, indexD]
-help, indexA
-print, indexA
-help, indices
-print, "indices = ", indices
 
             ;set firstInLine variable to false
             firstInLine = 0
@@ -387,8 +377,6 @@ print, "indices = ", indices
             
          ENDELSE        
         
-         PRINT, "h, k =", h, k 
-
          upperLeftArray[0,h,k]=upperLeftIndices[0]
          upperLeftArray[1,h,k]=upperLeftIndices[1]
                                         
@@ -405,7 +393,6 @@ print, "indices = ", indices
                
             ;extract atmospheric parameters for all heights at current location
             currentIndex = indices[g]*numHeights
-print,"g,indices[g],numHeights,currentIndex=",g,indices[g],numHeights,currentIndex
             currentLocation = atm[*,currentIndex:currentIndex+numHeights-1]
 help, currentLocation               
             ;separate height and atmospheric data
