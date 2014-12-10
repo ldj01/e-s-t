@@ -1,0 +1,32 @@
+#!/bin/sh
+./a.out SHUM.grb -d 1 -text -o SHUM/100.txt
+./a.out SHUM.grb -d 2 -text -o SHUM/125.txt
+./a.out SHUM.grb -d 3 -text -o SHUM/150.txt
+./a.out SHUM.grb -d 4 -text -o SHUM/175.txt
+./a.out SHUM.grb -d 5 -text -o SHUM/200.txt
+./a.out SHUM.grb -d 6 -text -o SHUM/225.txt
+./a.out SHUM.grb -d 7 -text -o SHUM/250.txt
+./a.out SHUM.grb -d 8 -text -o SHUM/275.txt
+./a.out SHUM.grb -d 9 -text -o SHUM/300.txt
+./a.out SHUM.grb -d 10 -text -o SHUM/350.txt
+./a.out SHUM.grb -d 11 -text -o SHUM/400.txt
+./a.out SHUM.grb -d 12 -text -o SHUM/450.txt
+./a.out SHUM.grb -d 13 -text -o SHUM/500.txt
+./a.out SHUM.grb -d 14 -text -o SHUM/550.txt
+./a.out SHUM.grb -d 15 -text -o SHUM/600.txt
+./a.out SHUM.grb -d 16 -text -o SHUM/650.txt
+./a.out SHUM.grb -d 17 -text -o SHUM/700.txt
+./a.out SHUM.grb -d 18 -text -o SHUM/725.txt
+./a.out SHUM.grb -d 19 -text -o SHUM/750.txt
+./a.out SHUM.grb -d 20 -text -o SHUM/775.txt
+./a.out SHUM.grb -d 21 -text -o SHUM/800.txt
+./a.out SHUM.grb -d 22 -text -o SHUM/825.txt
+./a.out SHUM.grb -d 23 -text -o SHUM/850.txt
+./a.out SHUM.grb -d 24 -text -o SHUM/875.txt
+./a.out SHUM.grb -d 25 -text -o SHUM/900.txt
+./a.out SHUM.grb -d 26 -text -o SHUM/925.txt
+./a.out SHUM.grb -d 27 -text -o SHUM/950.txt
+./a.out SHUM.grb -d 28 -text -o SHUM/975.txt
+./a.out SHUM.grb -d 29 -text -o SHUM/1000.txt
+mv SHUM.grb  SHUM/SHUM.grb
+
