@@ -901,7 +901,7 @@ int second_narr
 
             index = 0;
             /* iterate through three pairs of parameters */
-            for (k = 0; k < 2; k++)
+            for (k = 0; k <= 2; k++)
             {
                 /* define current file */
                 sprintf(current_file, "%s/parsed", case_list[counter]);
