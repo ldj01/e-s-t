@@ -814,7 +814,6 @@ int second_narr
 
 #if 0
             sprintf(command, "echo %s|tr '/' '\\n'",case_list[counter]);
-            printf("command=%s\n",command);
 
             /* Open the command for reading. */
             fd = popen(command, "r");
@@ -878,9 +877,6 @@ int second_narr
 
             /* get number of entries */
             sscanf(num_entry, "%d", &num_entries);  
-
-            printf("i,j,num_entry,num_entries=%d,%d,%s,%d\n",
-                    i,j,num_entry,num_entries);
 
             /* for each height, read in radiance inforomation for three modtran 
                runs, columns of array are organized:

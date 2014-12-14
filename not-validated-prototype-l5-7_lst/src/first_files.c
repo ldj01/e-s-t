@@ -1134,7 +1134,7 @@ int first_files
         if (abs(narr_lat[i] - 100.0) < MINSIGMA)
             sprintf(command,"cat %s/tail.txt | sed 's/latitu/%6.3f/' > newTail.txt", 
                     path, narr_lat[i]); 
-        else
+        else 
             sprintf(command,"cat %s/tail.txt | sed 's/latitu/%6.2f/' > newTail.txt", 
                     path, narr_lat[i]); 
         status = system(command);
@@ -1248,6 +1248,7 @@ int first_files
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
+            temp_height[index] = gndalt[j];
             temp_pressure[index] = new_pressure;
             temp_temp[index] = new_temp;
             temp_rh[index] = new_rh;
@@ -1261,7 +1262,11 @@ int first_files
                 temp_rh[index] = narr_rh[k][i];
                 index++;
             }
-            if (abs(gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
+
+            /* modtran throws as error when there are two identical layers in the 
+               tape5 file, if the current ground altitude and the next highest layer 
+               are close enough, eliminate interpolated layer*/
+            if (abs(gndalt[j] - narr_height[index_above][i]) < 0.001)
             {
                 index = 0;
                 for (k = index_above; k < NUM_ELEVATIONS; k++)
@@ -1318,6 +1323,18 @@ int first_files
                 temp_temp[index] = stan_temp[counter[k]];
                 temp_rh[index] = stan_rh[counter[k]];
                 index++;
+            }
+
+            /* Final check to remove the incorrect layer */
+            if (temp_height[0] >= temp_height[1])
+            {
+                for (k = 0; k < index -1; k++)
+                {
+                    temp_height[k] = temp_height[k+1];
+                    temp_pressure[k] = temp_pressure[k+1];
+                    temp_temp[k] = temp_temp[k+1];
+                    temp_rh[k] = temp_rh[k+1];
+                }
             }
 
             /* write atmospheric layers to a text file in format proper for tape5 file */
