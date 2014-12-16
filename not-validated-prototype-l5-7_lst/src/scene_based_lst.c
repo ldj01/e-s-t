@@ -234,26 +234,6 @@ int main (int argc, char *argv[])
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
-    status = system("rmdir HGT");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "rmdir HGT\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
-
-    status = system("rmdir SHUM");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "rmdir SHUM\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
-
-    status = system("rmdir TMP");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "rmdir TMP\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
 #endif
     /* call first_files to generate tape5 file and commandList */
     status = first_files(input, &num_points, verbose);
@@ -332,6 +312,28 @@ int main (int argc, char *argv[])
             RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
         }
     } 
+
+    /* Delete temporary directories */
+    status = system("\rm -r HGT*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting HGT* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("\rm -r SHUM*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting SHUM* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("\rm -r TMP*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting TMP* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
 
     /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), 
        copy program to delete headers and parse wavelength and total radiance 
@@ -505,7 +507,15 @@ int main (int argc, char *argv[])
         sprintf (errstr, "Freeing memory: results\n");
         RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
-
+#if 0
+    /* Delete temporary directories */
+    status = system("\rm -r 4?.*_*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting temporary directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+#endif
     time(&now);
     printf("scene_based_lst end_time=%s\n",ctime(&now));
     return (SUCCESS);

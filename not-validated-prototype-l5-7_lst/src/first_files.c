@@ -1107,7 +1107,7 @@ int first_files
         else
             narr_lon[i] = 360.0 - narr_lon[i];
 
-        if ((abs(narr_lon[i]) - 100.0) < MINSIGMA)
+        if ((fabs(narr_lon[i]) - 100.0) < MINSIGMA)
             sprintf(current_point,"%6.3f_%6.3f", narr_lat[i], narr_lon[i]);
         else
             sprintf(current_point,"%6.3f_%6.2f", narr_lat[i], narr_lon[i]); 
@@ -1131,7 +1131,7 @@ int first_files
 
         /* determine latitude and longitude of current NARR point and insert into 
            tail file */
-        if (abs(narr_lat[i] - 100.0) < MINSIGMA)
+        if (fabs(narr_lat[i] - 100.0) < MINSIGMA)
             sprintf(command,"cat %s/tail.txt | sed 's/latitu/%6.3f/' > newTail.txt", 
                     path, narr_lat[i]); 
         else 
@@ -1144,7 +1144,7 @@ int first_files
             LST_ERROR (errstr, "first_file");
         }
 
-        if (abs(narr_lon[i] - 100.0) < MINSIGMA)
+        if (fabs(narr_lon[i] - 100.0) < MINSIGMA)
             sprintf(command,"cat newTail.txt | sed 's/longit/%6.3f/' > newTail2.txt",
                     narr_lon[i]);
         else
@@ -1214,12 +1214,12 @@ int first_files
 
             /* determine layers below current gndalt and closest index 
                above and below */
-            for (k = 0; k < NUM_ELEVATIONS; k++)
+            for (k = 0; k < P_LAYER; k++)
             {
-                if ((narr_height[k][i] - gndalt[j]) < MINSIGMA)
+                if ((narr_height[k][i] - gndalt[j]) >= MINSIGMA)
                 {
-                    index_below = k;
-                    index_above = k + 1;
+                    index_below = k - 1;
+                    index_above = k;
                     break;
                 }
             }
@@ -1245,6 +1245,12 @@ int first_files
                 narr_rh[index_below][i]) / (narr_height[index_above][i] - 
                 narr_height[index_below][i]));           
 
+            printf("current_point=%s\n",current_point);
+            printf("j,gndalt[j],new_pressure,new_temp,new_rh=%d,%f,%f,%f,%f\n",
+                   j,gndalt[j],new_pressure,new_temp,new_rh);
+
+            printf("index_below,index_above=%d,%d\n",index_below,index_above);
+
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
@@ -1254,7 +1260,7 @@ int first_files
             temp_rh[index] = new_rh;
             index++;
 
-            for (k = index_above; k < NUM_ELEVATIONS; k++)
+            for (k = index_above; k < P_LAYER; k++)
             {
                 temp_height[index] = narr_height[k][i];
                 temp_pressure[index] = pressure[k][i];
@@ -1263,13 +1269,14 @@ int first_files
                 index++;
             }
 
+
             /* modtran throws as error when there are two identical layers in the 
                tape5 file, if the current ground altitude and the next highest layer 
                are close enough, eliminate interpolated layer*/
-            if (abs(gndalt[j] - narr_height[index_above][i]) < 0.001)
+            if (fabs(gndalt[j] - narr_height[index_above][i] - 0.001) < MINSIGMA)
             {
                 index = 0;
-                for (k = index_above; k < NUM_ELEVATIONS; k++)
+                for (k = index_above; k < P_LAYER; k++)
                 {
                     temp_height[index] = narr_height[k][i];
                     temp_pressure[index] = pressure[k][i];
@@ -1316,25 +1323,13 @@ int first_files
             temp_temp[index] = new_temp;
             temp_rh[index] = new_rh;
             index++;
-            for (k = 0; k < index2; k++)
+            for (k = 2; k < index2; k++)
             {
                 temp_height[index] = stan_height[counter[k]];
                 temp_pressure[index] = stan_pre[counter[k]];
                 temp_temp[index] = stan_temp[counter[k]];
                 temp_rh[index] = stan_rh[counter[k]];
                 index++;
-            }
-
-            /* Final check to remove the incorrect layer */
-            if (temp_height[0] >= temp_height[1])
-            {
-                for (k = 0; k < index -1; k++)
-                {
-                    temp_height[k] = temp_height[k+1];
-                    temp_pressure[k] = temp_pressure[k+1];
-                    temp_temp[k] = temp_temp[k+1];
-                    temp_rh[k] = temp_rh[k+1];
-                }
             }
 
             /* write atmospheric layers to a text file in format proper for tape5 file */
