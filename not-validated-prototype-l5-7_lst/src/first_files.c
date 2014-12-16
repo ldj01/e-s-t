@@ -1446,6 +1446,50 @@ int first_files
         }
     }
 
+    /* write caseList to a file */ 
+    fd = fopen("caseList", "w"); 
+    if (fd == NULL)
+    {
+        sprintf (errstr, "Opening file: caseList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Write out the caseList file */
+    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
+    {
+        fprintf(fd, "%s\n", case_list[k]);
+    }
+
+    /* Close the caseList file */
+    status = fclose(fd);
+    if ( status )
+    {
+        sprintf (errstr, "Closing file: caseList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* write commandList to a file */
+    fd = fopen("commandList", "w"); 
+    if (fd == NULL)
+    {
+        sprintf (errstr, "Opening file: commandList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
+    /* Write out the commandList file */
+    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
+    {
+        fprintf(fd, "%s\n", command_list[k]);
+    }
+
+    /* Close the commandList file */
+    status = fclose(fd);
+    if ( status )
+    {
+        sprintf (errstr, "Closing file: commandList\n");
+        LST_ERROR (errstr, "first_files");
+    }
+
     /* Free memory allocation */
     status = free_2d_array((void **)pressure);
     if (status != SUCCESS)
