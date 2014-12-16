@@ -1245,12 +1245,6 @@ int first_files
                 narr_rh[index_below][i]) / (narr_height[index_above][i] - 
                 narr_height[index_below][i]));           
 
-            printf("current_point=%s\n",current_point);
-            printf("j,gndalt[j],new_pressure,new_temp,new_rh=%d,%f,%f,%f,%f\n",
-                   j,gndalt[j],new_pressure,new_temp,new_rh);
-
-            printf("index_below,index_above=%d,%d\n",index_below,index_above);
-
             /* create arrays containing only layers to be included in current 
                tape5 file */
             index = 0;
@@ -1479,50 +1473,6 @@ int first_files
     {
         sprintf (errstr, "Freeing memory: narr_tmp\n");
         LST_ERROR (errstr, "first_files");              
-    }
-
-    /* write caseList to a file */ 
-    fd = fopen("caseList", "w"); 
-    if (fd == NULL)
-    {
-        sprintf (errstr, "Opening file: caseList\n");
-        LST_ERROR (errstr, "first_files");
-    }
-
-    /* Write out the caseList file */
-    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
-    {
-        fprintf(fd, "%s\n", case_list[k]);
-    }
-
-    /* Close the caseList file */
-    status = fclose(fd);
-    if ( status )
-    {
-        sprintf (errstr, "Closing file: caseList\n");
-        LST_ERROR (errstr, "first_files");
-    }
-
-    /* write commandList to a file */
-    fd = fopen("commandList", "w"); 
-    if (fd == NULL)
-    {
-        sprintf (errstr, "Opening file: commandList\n");
-        LST_ERROR (errstr, "first_files");
-    }
-
-    /* Write out the commandList file */
-    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
-    {
-        fprintf(fd, "%s\n", command_list[k]);
-    }
-
-    /* Close the commandList file */
-    status = fclose(fd);
-    if ( status )
-    {
-        sprintf (errstr, "Closing file: commandList\n");
-        LST_ERROR (errstr, "first_files");
     }
 
     /* Free memory allocation */

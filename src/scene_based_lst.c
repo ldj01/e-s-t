@@ -155,23 +155,23 @@ int main (int argc, char *argv[])
                 "180 degrees.\n  New value: %f degrees\n", input->meta.sun_az);
     }
 #endif
-#if 0
+
     /* Write out the intermediate values */
-    fd1 = fopen("datetime.txt", "w"); 
-    if (fd1 == NULL)
+    fd = fopen("datetime.txt", "w"); 
+    if (fd == NULL)
     {
         sprintf (errstr, "Opening file: datetime.txt\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
     /* Write out the intermediate file */
-    fprintf(fd1, "%d,%d,%d,%d,%d,%f\n", input->meta.acq_date.year, 
+    fprintf(fd, "%d,%d,%d,%d,%d,%f\n", input->meta.acq_date.year, 
             input->meta.acq_date.month, input->meta.acq_date.day, 
             input->meta.acq_date.hour, input->meta.acq_date.minute, 
             input->meta.acq_date.second);
 
     /* Close the intermediate file */
-    status = fclose(fd1);
+    status = fclose(fd);
     if ( status )
     {
         sprintf (errstr, "Closing file: datetime.txt\n");
@@ -234,7 +234,6 @@ int main (int argc, char *argv[])
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
 
-#endif
     /* call first_files to generate tape5 file and commandList */
     status = first_files(input, &num_points, verbose);
     if (status != SUCCESS)
@@ -312,28 +311,6 @@ int main (int argc, char *argv[])
             RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
         }
     } 
-
-    /* Delete temporary directories */
-    status = system("\rm -r HGT*");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Deleting HGT* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
-
-    status = system("\rm -r SHUM*");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Deleting SHUM* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
-
-    status = system("\rm -r TMP*");
-    if (status != SUCCESS)
-    {
-        sprintf (errstr, "Deleting TMP* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-    }
 
     /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run), 
        copy program to delete headers and parse wavelength and total radiance 
@@ -508,7 +485,50 @@ int main (int argc, char *argv[])
         RETURN_ERROR (errstr, "scene_based_list", FAILURE);              
     }
 #if 0
+    /* Delete temporary file */
+    status = system("rm newHead*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting newHead* files\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rm newTail*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting newTail* files\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("rm tempLayers.txt");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting tempLayers file\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
     /* Delete temporary directories */
+    status = system("\rm -r HGT*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting HGT* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("\rm -r SHUM*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting SHUM* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
+    status = system("\rm -r TMP*");
+    if (status != SUCCESS)
+    {
+        sprintf (errstr, "Deleting TMP* directories\n");
+        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+    }
+
     status = system("\rm -r 4?.*_*");
     if (status != SUCCESS)
     {

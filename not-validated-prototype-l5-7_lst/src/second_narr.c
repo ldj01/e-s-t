@@ -720,37 +720,7 @@ int second_narr
         sprintf (errstr, "invalid instrument type");;
         LST_ERROR(errstr, "second_narr");
     }
-#if 0
-    /* Allocate memory */
-    case_list = (char **)allocate_2d_array(MAX_STR_LEN, num_cases, sizeof(char));  
-    if (case_list == NULL)
-    {
-        sprintf (errstr, "Allocating case_list memory");
-        LST_ERROR (errstr, "second_narr");
-    }
 
-    /* Read caseList into 2d char array */
-    fd = fopen("caseList", "r"); 
-    if (fd == NULL)
-    {
-        sprintf (errstr, "Opening file: caseList\n");
-        LST_ERROR (errstr, "second_narr");
-    }
-
-    /* Write out the caseList file */
-    for (k = 0; k < num_poimts; k++)
-    {
-        fscnff(fd, "%s\n", case_list[k]);
-    }
-
-    /* Close the caseList file */
-    status = fclose(fd);
-    if ( status )
-    {
-        sprintf (errstr, "Closing file: caseList\n");
-        LST_ERROR (errstr, "second_narr");
-    }
-#endif
     /* calculate Lt for each temperature */
     if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
     {
