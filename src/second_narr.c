@@ -224,6 +224,7 @@ int int_tabulated
     int *ii;
     float h;
     char errstr[MAX_STR_LEN];
+    int segments;
 
     /* Allocate memory */
     temp = (float *)malloc(nums * sizeof(float));  
@@ -247,6 +248,14 @@ int int_tabulated
         LST_ERROR (errstr, "second_narr");
     }
 
+    segments = nums - 1;
+    if (nums % 4 != 0)
+        segments++;
+
+    xmin = x[0];
+    xmax = x[nums-1];  
+    h = (xmax - xmin) / (float) segments;
+
     /* integrate spectral response over wavelength */
     /* Call spline to get second derivatives, */
     spline(x, f, nums, 2.0, 2.0, temp);
@@ -257,15 +266,16 @@ int int_tabulated
         splint(x, f, temp, nums, i, &z[i]);
     }
 
-    xmin = x[0];
-    xmax = x[nums-1];  
-    h = (xmax - xmin) / (float) nums;
-
     *result = 0.0;
+    /* Get the 5-points needed for Newton-Cotes formula */
+    for (i = 0; i < (int)((nums-1)/4); i++)
+    {
+        ii[i] = (i + 1) * 4;
+    }
+
     /* Compute the integral using the 5-point Newton-Cotes formula */
     for (i = 0; i < nums; i++) 
     {
-        ii[i] = 4 * (int)(((nums - 1) / 4) + 1);
         *result += 2.0 * h * (7.0 * (z[ii[i]-4] + z[ii[i]]) + 
                  32.0 * (z[ii[i]-3] + z[ii[i]-1]) + 12.0 * z[ii[i]-2]) / 45.0;
     }
