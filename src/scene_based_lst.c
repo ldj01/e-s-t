@@ -155,7 +155,6 @@ int main (int argc, char *argv[])
                 "180 degrees.\n  New value: %f degrees\n", input->meta.sun_az);
     }
 #endif
-#if 0
     /* Write out the intermediate values */
     fd = fopen("datetime.txt", "w"); 
     if (fd == NULL)
@@ -241,8 +240,6 @@ int main (int argc, char *argv[])
         sprintf (errstr, "Calling first_files\n");
         LST_ERROR (errstr, "scene_based_lst");
     }
-#endif
-    num_points = 169;
 
     num_cases = num_points * NUM_ELEVATIONS * 3;
     case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
@@ -280,7 +277,7 @@ int main (int argc, char *argv[])
         sprintf (errstr, "Closing file: caseList\n");
         LST_ERROR (errstr, "first_files");
     }
-#if 0
+
     /* Read command_list from commandList file */
     fd = fopen("commandList", "r"); 
     if (fd == NULL)
@@ -343,7 +340,7 @@ int main (int argc, char *argv[])
         sprintf (errstr, "rm tape6parser.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
-#endif
+
     /* Free memory allocation */
     status = free_2d_array((void **)command_list);
     if (status != SUCCESS)
