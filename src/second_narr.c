@@ -267,15 +267,17 @@ int int_tabulated
     }
 
     *result = 0.0;
+#if 0
     /* Get the 5-points needed for Newton-Cotes formula */
     for (i = 0; i < (int)((nums-1)/4); i++)
     {
         ii[i] = (i + 1) * 4;
     }
-
+#endif
     /* Compute the integral using the 5-point Newton-Cotes formula */
     for (i = 0; i < nums; i++) 
     {
+        ii[i] = (i + 1) * 4;
         *result += 2.0 * h * (7.0 * (z[ii[i]-4] + z[ii[i]]) + 
                  32.0 * (z[ii[i]-3] + z[ii[i]-1]) + 12.0 * z[ii[i]-2]) / 45.0;
     }
@@ -460,6 +462,8 @@ int calculate_lobs
     float *product;
     char errstr[MAX_STR_LEN];
 
+    printf("num_srs=%d\n",num_srs);
+    printf("sizeof(float)=%ld\n",sizeof(float));
     /* Allocate memory */
     temp_rad = (float *)malloc(num_srs * sizeof(float));  
     if (temp_rad == NULL)
@@ -944,6 +948,9 @@ int second_narr
                 index++;
             }
 
+            printf("num_entry,num_entries=%s,%d\n",num_entry,num_entries);
+            printf("temp_radiance_273,temp_radiance_300=%f,%f\n",
+                    temp_radiance_273,temp_radiance_300);
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
             x[0] = temp_radiance_273;

@@ -155,7 +155,7 @@ int main (int argc, char *argv[])
                 "180 degrees.\n  New value: %f degrees\n", input->meta.sun_az);
     }
 #endif
-
+#if 0
     /* Write out the intermediate values */
     fd = fopen("datetime.txt", "w"); 
     if (fd == NULL)
@@ -241,6 +241,8 @@ int main (int argc, char *argv[])
         sprintf (errstr, "Calling first_files\n");
         LST_ERROR (errstr, "scene_based_lst");
     }
+#endif
+    num_points = 169;
 
     num_cases = num_points * NUM_ELEVATIONS * 3;
     case_list = (char **)allocate_2d_array(num_cases, MAX_STR_LEN, sizeof(char));  
@@ -278,7 +280,7 @@ int main (int argc, char *argv[])
         sprintf (errstr, "Closing file: caseList\n");
         LST_ERROR (errstr, "first_files");
     }
-
+#if 0
     /* Read command_list from commandList file */
     fd = fopen("commandList", "r"); 
     if (fd == NULL)
@@ -325,20 +327,6 @@ int main (int argc, char *argv[])
 
     for (i = 0; i < num_cases; i++)
     {
-#if 0
-        sprintf(command, "%s/elim2.sed", case_list[i]);
-        if (access(command, F_OK) != 0)
-        {
-            sprintf(command,"ln $LST_DATA/elim2.sed %s", case_list[i]);
-            status = system(command);
-            if (status != SUCCESS)
-            {
-                sprintf (errstr, "link elim2.sed\n");
-                RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
-            }
-        }
-#endif
-
         /* Just use $LST_DATA/elim2.sed directly instead of linking it */
         sprintf(command, "./tape6parser.bash %s", case_list[i]);
         status = system(command);
@@ -355,7 +343,7 @@ int main (int argc, char *argv[])
         sprintf (errstr, "rm tape6parser.bash\n");
         RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
     }
-
+#endif
     /* Free memory allocation */
     status = free_2d_array((void **)command_list);
     if (status != SUCCESS)
