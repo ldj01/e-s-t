@@ -1,9 +1,9 @@
 
-cmake_minimum_required ( VERSION 2.8.12 )
+cmake_minimum_required ( VERSION 2.6.0 )
 
 find_package ( PythonInterp 2.7.0 REQUIRED )
 find_package ( PythonLibs 2.7.0 REQUIRED )
 
-install_files ( /static_data FILES modtran_head.txt modtran_tail.txt
-                narr_coordinates.txt )
+install ( FILES modtran_head.txt modtran_tail.txt narr_coordinates.txt
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/static_data )
 
