@@ -16,6 +16,7 @@ endif (BUILD_STATIC)
 
 add_subdirectory ( scripts )
 #add_subdirectory ( src )
+add_subdirectory ( static_data )
 
 ########################### Un-Installing software ###########################
 # For a complex uninstall do something like the distclean target
