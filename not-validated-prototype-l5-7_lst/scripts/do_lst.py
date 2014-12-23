@@ -193,27 +193,31 @@ def extract_grib_data(grb_file, pressure_numbers):
 
 
 # ============================================================================
-def retrieve_narr_grib_data(year, month, day, hour):
+def retrieve_aux_data(year, month, day, hour):
     '''
     Description:
-        Builds the strings required to retrieve the NARR data and then
+        We are coding to use NARR data, which is provided in 3hr increments.
+
+        Builds the strings required to retrieve the auxillary data and then
         downloads them to the current directory with specified names.
 
-    Returns: (str, str, str, str)
-        inv_hour_1 - The inv file for hour 1
-        grb_hour_1 - The grb file for hour 1
-        inv_hour_2 - The inv file for hour 2
-        grb_hour_2 - The grb file for hour 2
+    Note:
+        We use the "Range" option in the http headers to retrieve only the
+        portions of the auxillary data files that we need.
     '''
 
     logger = logging.getLogger(__name__)
 
     valid_parms = ['HGT', 'SPFH', 'TMP']
-    NARR_HOSTNAME = 'http://nomads.ncdc.noaa.gov'
-    NARR_NAME_TEMPLATE = 'narr-a_221_{0}_{1}00_000.{2}'
-    NARR_PATH_TEMPLATE = '/data/narr/{0}/{1}/'
+    # Host where the auxillary data resides
+# TODO TODO TODO - Maybe make this an environment variable
+    AUX_HOSTNAME = 'http://nomads.ncdc.noaa.gov'
+    # Path on the host where the specifieds auxillary data is located
+    AUX_PATH_TEMPLATE = '/data/narr/{0}/{1}/'
+    # Filename of the specified auxillary data we require
+    AUX_NAME_TEMPLATE = 'narr-a_221_{0}_{1}00_000.{2}'
 
-    # Determine the 3hour increment hours to use from the NARR data
+    # Determine the 3hr increments to use from the auxillary data
     # We want the one before and after the scene acquisition time
     # and convert back to formatted strings
     hour_1 = '{0:0>2}'.format(hour - (hour % 3))
@@ -226,41 +230,47 @@ def retrieve_narr_grib_data(year, month, day, hour):
     yyyymmdd = '{0}{1}'.format(yyyymm, day)
 
     # Build the destination filenames
-    inv_1_name = NARR_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'inv')
-    grb_1_name = NARR_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'grb')
-    inv_2_name = NARR_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'inv')
-    grb_2_name = NARR_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'grb')
+    inv_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'inv')
+    grb_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'grb')
+    inv_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'inv')
+    grb_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'grb')
 
     # Build the source filenames
-    data_path = NARR_PATH_TEMPLATE.format(yyyymm, yyyymmdd)
-    inv_1_src = '{0}{1}{2}'.format(NARR_HOSTNAME, data_path, inv_1_name)
-    grb_1_src = '{0}{1}{2}'.format(NARR_HOSTNAME, data_path, grb_1_name)
-    inv_2_src = '{0}{1}{2}'.format(NARR_HOSTNAME, data_path, inv_2_name)
-    grb_2_src = '{0}{1}{2}'.format(NARR_HOSTNAME, data_path, grb_2_name)
+    data_path = AUX_PATH_TEMPLATE.format(yyyymm, yyyymmdd)
+    inv_1_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, inv_1_name)
+    grb_1_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, grb_1_name)
+    inv_2_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, inv_2_name)
+    grb_2_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, grb_2_name)
     logger.debug("INV 1 = {0}".format(inv_1_src))
     logger.debug("GRB 1 = {0}".format(grb_1_src))
     logger.debug("INV 2 = {0}".format(inv_2_src))
     logger.debug("GRB 2 = {0}".format(grb_2_src))
 
-    # Retrieve the inv files
+    # Download the inv files
     http_transfer_file(inv_1_src, inv_1_name)
     http_transfer_file(inv_2_src, inv_2_name)
 
     for parm in valid_parms:
         logger.info("Retrieving = {0} parameters for time 1".format(parm))
+        # Determine the specific sections of the grib file to download
         (bytes, pressure_numbers) = determine_grib_bytes(inv_1_name, parm)
         headers = {'Range': 'bytes=%s' % bytes}
         grb_file = '{0}_1.grb'.format(parm)
+        # Download the specific sections
         http_transfer_file(grb_1_src, grb_file, headers=headers)
+        # Extract the sections to text files
         extract_grib_data(grb_file, pressure_numbers)
         if os.path.exists(grb_file):
             os.unlink(grb_file)
 
         logger.info("Retrieving = {0} parameters for time 2".format(parm))
+        # Determine the specific sections of the grib file to download
         (bytes, pressure_numbers) = determine_grib_bytes(inv_2_name, parm)
         headers = {'Range': 'bytes=%s' % bytes}
         grb_file = '{0}_2.grb'.format(parm)
+        # Download the specific sections
         http_transfer_file(grb_2_src, grb_file, headers=headers)
+        # Extract the sections to text files
         extract_grib_data(grb_file, pressure_numbers)
         if os.path.exists(grb_file):
             os.unlink(grb_file)
@@ -273,7 +283,7 @@ def retrieve_narr_grib_data(year, month, day, hour):
 
 
 # ============================================================================
-def process_lst(xml_filename):
+def process_lst(args):
     '''
     Description:
         TODO TODO TODO
@@ -282,7 +292,7 @@ def process_lst(xml_filename):
     # get the logger
     logger = logging.getLogger(__name__)
 
-    xml = metadata_api.parse(xml_filename, silence=True)
+    xml = metadata_api.parse(args.xml_filename, silence=True)
     global_metadata = xml.get_global_metadata()
     acq_date = str(global_metadata.get_acquisition_date())
     scene_center_time = str(global_metadata.get_scene_center_time())
@@ -294,25 +304,34 @@ def process_lst(xml_filename):
 
     # Extract the hour parts from the time and convert to an int
     hour = int(scene_center_time[:2])
-    logger.debug("ACQ_DATE = {0} {1} {2}".format(year, month, day))
-    logger.debug("SCENE CENTER HOUR = {0:0>2}".format(hour))
+    logger.debug("Using Acq. Date = {0} {1} {2}".format(year, month, day))
+    logger.debug("Using Scene Center Hour = {0:0>2}".format(hour))
+
+    del (global_metadata)
+    del (xml)
 
     # Retrieve the auxillary data
-    retrieve_narr_grib_data(year, month, day, hour)
+    retrieve_aux_data(year, month, day, hour)
 
-    # Extract the retrieved grib data to text '*.txt' files
-    # extract_grib_data
+    # Check for stop flag
+    if args.stop_at_narr:
+        logger.info("User requested to stop after narr processing.")
+        return
 
-    # Parse the auxillary data
-    # TODO TODO TODO
-
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
+    # Tape 5 generation
     # TODO TODO TODO
 
-    pass
+    # Check for stop flag
+    if args.stop_at_tape5:
+        logger.info("User requested to stop after tape5 generation.")
+        return
+
+
+    # TODO TODO TODO
+    # TODO TODO TODO
+    # TODO TODO TODO
+    # TODO TODO TODO
+    # TODO TODO TODO
 
 
 # ============================================================================
@@ -332,6 +351,17 @@ if __name__ == '__main__':
     parser.add_argument('--xml',
                         action='store', dest='xml_filename', required=True,
                         help="The XML metadata file to use")
+
+    # Optional parameters
+    parser.add_argument('--stop-at-narr',
+                        action='store_true', dest='stop_at_narr',
+                        required=False, default=False,
+                        help="Stop after NARR retrieval and processing")
+
+    parser.add_argument('--stop-at-tape5',
+                        action='store_true', dest='stop_at_tape5',
+                        required=False, default=False,
+                        help="Stop after tape5 generation")
 
     # Parse the command line parameters
     args = parser.parse_args()
@@ -355,7 +385,7 @@ if __name__ == '__main__':
         sys.exit(EXIT_FAILURE)
 
     try:
-        process_lst(args.xml_filename)
+        process_lst(args)
 
     except Exception, e:
         logger.fatal(str(e))
