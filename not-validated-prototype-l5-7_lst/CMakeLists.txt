@@ -15,7 +15,7 @@ else (BUILD_STATIC)
 endif (BUILD_STATIC)
 
 add_subdirectory ( scripts )
-#add_subdirectory ( src )
+add_subdirectory ( src )
 add_subdirectory ( static_data )
 
 ########################### Un-Installing software ###########################
