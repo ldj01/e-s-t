@@ -1,10 +1,11 @@
-#include "input.h"
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
 #include <getopt.h>
-#include <const.h>
-#include <error.h>
+
+#include "const.h"
+#include "error.h"
+#include "input.h"
 
 /******************************************************************************
 MODULE:  get_args

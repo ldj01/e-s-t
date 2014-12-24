@@ -1,12 +1,14 @@
-#ifndef CFMASK_H
-#define CFMASK_H
+#ifndef SCENE_BASED_LST_H
+#define SCENE_BASED_LST_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <input.h>
+
+#include "input.h"
 #include "error.h"
 
 int first_files
@@ -39,4 +41,4 @@ int third_pixels_post
                                      be printed */
 );
 
-#endif
+#endif /* SCENE_BASED_LST_H */
