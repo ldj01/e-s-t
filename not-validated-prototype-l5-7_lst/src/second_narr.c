@@ -607,7 +607,7 @@ int second_narr
 { 
     FILE *fd;
     int i, j, k, m;
-    float **spectral_response;
+    float **spectral_response = NULL;
     float temp_radiance_0;
     float obs_radiance_0;
     float temp_radiance_273;

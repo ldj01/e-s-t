@@ -206,7 +206,7 @@ bool GetXMLInput(Input_t *this, Espa_internal_meta_t *metadata)
 {
     char *error_string = NULL;
     char acq_date[DATE_STRING_LEN + 1];
-    char prod_date[DATE_STRING_LEN + 1];
+//    char prod_date[DATE_STRING_LEN + 1];
     char acq_time[TIME_STRING_LEN + 1];
     char temp[MAX_STR_LEN + 1];
     int th_indx;       /* band index in XML file for the thermal band */
@@ -236,7 +236,7 @@ bool GetXMLInput(Input_t *this, Espa_internal_meta_t *metadata)
 
     /* Pull the appropriate data from the XML file */
     acq_date[0] = acq_time[0] = '\0';
-    prod_date[0] = '\0';
+//    prod_date[0] = '\0';
     if (!strcmp (gmeta->satellite, "LANDSAT_1"))
         this->meta.sat = SAT_LANDSAT_1;
     else if (!strcmp (gmeta->satellite, "LANDSAT_2"))

@@ -290,7 +290,7 @@ int first_files
     int p[P_LAYER] = {1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 
         650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100};
     char full_path[MAX_STR_LEN];
-    int landsat_hemi;
+//    int landsat_hemi;
     float narr_ul_lat;
     float narr_ul_lon;
     float narr_lr_lat;
@@ -598,10 +598,10 @@ int first_files
 
     /* determine if landsat is in the northern or southern hemisphere. 
        '6' = northern hemisphere, '7' = southern hermisphere. */
-    if (input->meta.ul_geo_corner.lat > MINSIGMA)
-        landsat_hemi = 6;
-    else
-        landsat_hemi = 7; 
+//    if (input->meta.ul_geo_corner.lat > MINSIGMA)
+//        landsat_hemi = 6;
+//    else
+//        landsat_hemi = 7; 
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
@@ -1296,6 +1296,8 @@ int first_files
                add standard atmosphere layers and linearly interpolate height, 
                pressure, temp, and rel hum to create a smooth transition between
                the NARR layers and the standard upper atmosphere */
+// RDD - Did this to remove a compiler warning, but something else may need to be done.
+new_height = 0;
             if (index2 >= 3)
             {
                 new_height = (stan_height[counter[2]]+temp_height[index-1]) / 2.0; 

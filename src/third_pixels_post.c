@@ -108,18 +108,33 @@ void convert_ll_utm
     float b = 6356752.3;    /* polar radius */
     float k0 = 0.9996;      /* scale factor */
     float e;                /* eccentricity */
-    float eprimesqrd, n, rho, nu;
-    float a0, b0, c0, d0, e0;
-    float ki, kii, kiii, kiv, kv;
-    float zone_cm, zone_cm_rad;
+    float eprimesqrd;
+    float n;
+//    float rho;
+    float nu;
+    float a0;
+    float b0;
+    float c0;
+    float d0;
+    float e0;
+    float ki;
+    float kii;
+    float kiii;
+    float kiv;
+    float kv;
+    float zone_cm;
+//    float zone_cm_rad;
     float delta_lon;
-    float p, lat_rad, lon_rad;
+    float p;
+    float lat_rad;
+//    float lon_rad;
     float s;
-    float northing, easting;
+    float northing;
+    float easting;
 
     /* calculate zone central meridian in degrees and radians */
     zone_cm = (float) (6 * input->meta.zone - 183);
-    zone_cm_rad =  zone_cm * PI / 180.0;
+//    zone_cm_rad =  zone_cm * PI / 180.0;
 
     e = sqrt(1.0-pow(b/a, 2));
     eprimesqrd = e*e/(1.0-e*e);
@@ -138,10 +153,10 @@ void convert_ll_utm
         p = delta_lon * PI/ 180.0;
         /* convert lat and lon points from decimal degrees to radians */
         lat_rad = lat[i]*PI/180.0;
-        lon_rad = lon[i]*PI/180.0;
+//        lon_rad = lon[i]*PI/180.0;
 
-        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
-              (3.0/2.0)));
+//        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
+//              (3.0/2.0)));
         nu = a/pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),(1.0/2.0));
 
 
@@ -388,14 +403,14 @@ int third_pixels_post
     int first_line;
     float current_easting;
     float current_northing;
-    float *distances;
-    float *distance_copy;
+    float *distances = NULL;
+    float *distance_copy = NULL;
     int i, j, g, k, n;
     int closest[6];
-    float easting_near[6];
+//    float easting_near[6];
     float northing_near[6];
     int below[6];
-    int min_ineye, min_injay;
+    int min_ineye = 0, min_injay = 0;
     float **coordinates;
     int indices[4];
     float stay_up, stay_down, stay_right;
@@ -795,7 +810,7 @@ int third_pixels_post
                         {
                             {
                                 closest[g] = k;
-                                easting_near[g] = narr_utm[g][0];
+//                                easting_near[g] = narr_utm[g][0];
                                 northing_near[g] = narr_utm[g][1];
                                 if ((northing_near[g] - current_northing) <=
                                     MINSIGMA)
