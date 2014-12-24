@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 
 '''
-    FILE: do_lst.py
+    FILE: lst_download_extract_aux_data.py
 
-    PURPOSE: Performs retrieval and setup of required auxillary inputs.
-             Calls the MODTRAN and other C-executables required to generate
-             the LST products.
+    PURPOSE: Read the metadata XML file to determine the NARR data to be
+             downloaded.  After download the required parameters are extracted
+             to specific sub-directories for follow-on processing.
 
     PROJECT: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -92,8 +92,10 @@ def create_directory(directory):
 def http_transfer_file(download_url, destination_file, headers=None):
     '''
     Description:
-      Using http transfer a file from a source location to a destination
-      file on the localhost.
+        Using http transfer a file from a source location to a destination
+        file on the localhost.
+
+        HTTP headers can be specified to modify how the download happens.
     '''
 
     logger = logging.getLogger(__name__)
@@ -122,7 +124,7 @@ def determine_grib_bytes(inv_file, parm):
     '''
     Description:
         Reads the specified inv file and extracts the requested information
-        to product a bytes string which is compatable for using http RANGE
+        to produce a bytes string which is compatable for using http RANGE
         for extraction of certain bytes from the source file.
 
     Returns: (str, list)
@@ -162,7 +164,10 @@ def determine_grib_bytes(inv_file, parm):
 def extract_grib_data(grb_file, pressure_numbers):
     '''
     Description:
-        TODO TODO TODO
+        Configures a command line for calling the wgrib executable and then
+        calls it to extract the required information from the grib file.
+
+        The output is placed into a specified directory based on the input.
     '''
 
     logger = logging.getLogger(__name__)
@@ -193,13 +198,15 @@ def extract_grib_data(grb_file, pressure_numbers):
 
 
 # ============================================================================
-def retrieve_aux_data(year, month, day, hour):
+def retrieve_and_extract_aux_data(year, month, day, hour):
     '''
     Description:
         We are coding to use NARR data, which is provided in 3hr increments.
 
         Builds the strings required to retrieve the auxillary data and then
         downloads them to the current directory with specified names.
+
+        The parameters are then extracted from the downloaded grib files.
 
     Note:
         We use the "Range" option in the http headers to retrieve only the
@@ -208,9 +215,8 @@ def retrieve_aux_data(year, month, day, hour):
 
     logger = logging.getLogger(__name__)
 
-    valid_parms = ['HGT', 'SPFH', 'TMP']
+    parms_to_extract = ['HGT', 'SPFH', 'TMP']
     # Host where the auxillary data resides
-# TODO TODO TODO - Maybe make this an environment variable
     AUX_HOSTNAME = 'http://nomads.ncdc.noaa.gov'
     # Path on the host where the specifieds auxillary data is located
     AUX_PATH_TEMPLATE = '/data/narr/{0}/{1}/'
@@ -250,7 +256,7 @@ def retrieve_aux_data(year, month, day, hour):
     http_transfer_file(inv_1_src, inv_1_name)
     http_transfer_file(inv_2_src, inv_2_name)
 
-    for parm in valid_parms:
+    for parm in parms_to_extract:
         logger.info("Retrieving = {0} parameters for time 1".format(parm))
         # Determine the specific sections of the grib file to download
         (bytes, pressure_numbers) = determine_grib_bytes(inv_1_name, parm)
@@ -310,28 +316,8 @@ def process_lst(args):
     del (global_metadata)
     del (xml)
 
-    # Retrieve the auxillary data
-    retrieve_aux_data(year, month, day, hour)
-
-    # Check for stop flag
-    if args.stop_at_narr:
-        logger.info("User requested to stop after narr processing.")
-        return
-
-    # Tape 5 generation
-    # TODO TODO TODO
-
-    # Check for stop flag
-    if args.stop_at_tape5:
-        logger.info("User requested to stop after tape5 generation.")
-        return
-
-
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
+    # Retrieve the auxillary data and extract it
+    retrieve_and_extract_aux_data(year, month, day, hour)
 
 
 # ============================================================================
@@ -351,17 +337,6 @@ if __name__ == '__main__':
     parser.add_argument('--xml',
                         action='store', dest='xml_filename', required=True,
                         help="The XML metadata file to use")
-
-    # Optional parameters
-    parser.add_argument('--stop-at-narr',
-                        action='store_true', dest='stop_at_narr',
-                        required=False, default=False,
-                        help="Stop after NARR retrieval and processing")
-
-    parser.add_argument('--stop-at-tape5',
-                        action='store_true', dest='stop_at_tape5',
-                        required=False, default=False,
-                        help="Stop after tape5 generation")
 
     # Parse the command line parameters
     args = parser.parse_args()
@@ -388,8 +363,7 @@ if __name__ == '__main__':
         process_lst(args)
 
     except Exception, e:
-        logger.fatal(str(e))
-        logger.fatal("Error processing LST.  Processing will terminate.")
+        logger.exception("Error processing LST.  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
     logger.info("Completion of LST")
