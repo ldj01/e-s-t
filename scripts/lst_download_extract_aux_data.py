@@ -289,10 +289,11 @@ def retrieve_and_extract_aux_data(year, month, day, hour):
 
 
 # ============================================================================
-def process_lst(args):
+def process_aux_data(args):
     '''
     Description:
-        TODO TODO TODO
+        Parses the XML and calls the routine to retrieve and extract the LST
+        AUX data.
     '''
 
     # get the logger
@@ -352,19 +353,19 @@ if __name__ == '__main__':
     # get the logger
     logger = logging.getLogger(__name__)
 
-    logger.info("Generating LST products")
-
     if args.xml_filename == '':
         logger.fatal("No XML metadata filename provided.")
         logger.fatal("Error processing LST.  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
     try:
-        process_lst(args)
+        logger.info("Downloading and extracting LST AUX data")
+
+        process_aux_data(args)
 
     except Exception, e:
         logger.exception("Error processing LST.  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
-    logger.info("Completion of LST")
+    logger.info("LST AUX data downloaded")
     sys.exit(EXIT_SUCCESS)
