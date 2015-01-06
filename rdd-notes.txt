@@ -1,0 +1,60 @@
+
+Phase 1:
+    Retrieve and convert the L1T LPGS product to our internal format.
+
+    How:  Just like we do for processing today.
+
+Phase 2:
+    Download and extract the NARR data.
+
+    How:  lst_download_extract_aux_data.py --xml LT40460281992231XXX02.xml
+
+Phase 3:
+    Retrieve emissivity data.
+
+    How:  ??
+
+Phase 4:
+    Generate the tape5 files.
+
+    How:  ??
+
+Phase 5:
+    Run MODTRAN on the tape5 to generate tape6 results.
+
+    HOW:  ??
+
+Phase 6:
+    Generate radiative transfer parameters.
+
+    HOW:  ??
+
+Phase 7:
+    Generate the emissivity parameters.
+
+    HOW:  ??
+
+Phase 8:
+    Generate the LST product.
+
+    HOW:  ??
+
+Phase 9:
+    Generate the uncertainty product.
+
+    HOW:  ??
+
+Phase 10:
+    Generate and deliver the product.
+
+
+==============================================================================
+Phase ??
+Phase ??
+Phase ??
+Phase ??
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+
