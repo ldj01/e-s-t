@@ -291,7 +291,6 @@ class AUX_Processor(object):
 
         return bytes
 
-
     # ------------------------------------------------------------------------
     def retrieve_aux_data(self, year, month, day, hour):
         '''
@@ -438,7 +437,7 @@ class AUX_Processor(object):
             shutil.copyfile(hdr_file, dest_file)
 
     # ------------------------------------------------------------------------
-    def process_aux_data(self):
+    def download_and_archive_aux_data(self):
         '''
         Description:
             Parses the XML and calls the routine to retrieve and extract the
@@ -480,7 +479,6 @@ class AUX_Processor(object):
                         if os.path.exists(hdr_info[parm]):
                             os.unlink(hdr_info[parm])
 
-
                 start_date += self._time_inc
         finally:
             # Change back to the previous directory
@@ -497,18 +495,9 @@ if __name__ == '__main__':
         Performs gathers input parameters and performs the LST processing.
     '''
 
-    # Verify environment variable exists along with the directory that is
-    # specified
-    base_aux_dir = os.environ.get('LST_AUX_DIR')
-    if base_aux_dir is None:
-        raise Exception("Missing environment variable LST_AUX_DIR")
-
-    if not os.path.isdir(base_aux_dir):
-        raise Exception("LST_AUX_DIR directory does not exist")
-
     # Create a command line arugment parser
-    description = ("Retrieves and generates auxillary LST inputs, then"
-                   " processes and calls other executables for LST generation")
+    description = ("Downloads LST auxillary inputs, then archives them for"
+                   "future use.")
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -516,13 +505,14 @@ if __name__ == '__main__':
                         action='store',
                         dest='start_date',
                         required=False,
-                        help="The starting date")
+                        help=("(Optional) The starting date 'YYYYDDD'."
+                              "  Required if --end-date supplied."))
 
     parser.add_argument('--end-date',
                         action='store',
                         dest='end_date',
                         required=False,
-                        help="The ending date")
+                        help="(Optional) The ending date 'YYYYDDD'")
 
     # Parse the command line parameters
     args = parser.parse_args()
@@ -539,52 +529,76 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
+    # Verify environment variable exists along with the directory that is
+    # specified
+    base_aux_dir = os.environ.get('LST_AUX_DIR')
+    if base_aux_dir is None:
+        logger.info("Missing environment variable LST_AUX_DIR")
+        sys.exit(EXIT_FAILURE)
+
+    if not os.path.isdir(base_aux_dir):
+        logger.info("LST_AUX_DIR directory does not exist")
+        sys.exit(EXIT_FAILURE)
+
+    # Validate the start date is present if the end date was supplied
+    if ((args.end_date is not None) and (args.start_date is None)):
+        logger.error("--start-date must be specified"
+                     " if --end-date is specified")
+        sys.exit(EXIT_FAILURE)
+
     # If the start date was not specified, default to the current UTC time
     if args.start_date is None:
-        args.start_date = datetime.utcnow()
+        start_date = datetime.utcnow()
+    else:
+        start_date = args.start_date
+
     # If the end date was not specified, default to the start_date time
     if args.end_date is None:
-        args.end_date = args.start_date
+        end_date = start_date
+    else:
+        end_date = args.end_date
 
     # If they are strings convert them to datetime objects
-    if type(args.start_date) == str:
-        length = len(args.start_date)
+    if type(start_date) == str:
+        length = len(start_date)
         if length < 7 or length > 10:
             logger.error("Invalid --start-date")
             sys.exit(EXIT_FAILURE)
 
         if length == 7:
-            args.start_date = ''.join([args.start_date, 'UTC'])
+            start_date = ''.join([start_date, 'UTC'])
 
         try:
-            args.start_date = datetime.strptime(args.start_date, '%Y%j%Z')
+            start_date = datetime.strptime(start_date, '%Y%j%Z')
         except Exception:
             logger.exception("Invalid --start-date")
             sys.exit(EXIT_FAILURE)
 
-    if type(args.end_date) == str:
-        length = len(args.end_date)
+    if type(end_date) == str:
+        length = len(end_date)
         if length < 7 or length > 10:
             logger.error("Invalid --end-date")
             sys.exit(EXIT_FAILURE)
 
         if length == 7:
-            args.end_date = ''.join([args.end_date, 'UTC'])
+            end_date = ''.join([end_date, 'UTC'])
 
         try:
-            args.end_date = datetime.strptime(args.end_date, '%Y%j%Z')
+            end_date = datetime.strptime(end_date, '%Y%j%Z')
         except Exception:
             logger.exception("Invalid --end-date")
             sys.exit(EXIT_FAILURE)
 
+    if end_date < start_date:
+        logger.error("--end-date must be after --start-date")
+        sys.exit(EXIT_FAILURE)
 
     try:
         logger.info("Downloading and extracting LST AUX data")
 
-        aux_processor = AUX_Processor(base_aux_dir, args.start_date,
-                                      args.end_date)
+        aux_processor = AUX_Processor(base_aux_dir, start_date, end_date)
 
-        aux_processor.process_aux_data()
+        aux_processor.download_and_archive_aux_data()
 
     except Exception:
         logger.exception("Error processing LST AUX data."
