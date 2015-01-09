@@ -124,22 +124,82 @@ def process_lst(args):
         Provides the glue code for generating LST products.
     '''
 
-    # get the logger
+    # Get the logger
     logger = logging.getLogger(__name__)
 
-    # retrieve and initial processing of the required AUX data
-    cmd = ['lst_download_extract_aux_data.py', '--xml', args.xml_filename]
+    # ------------------------------------------------------------------------
+    # Retrieve and initial processing of the required AUX data
+    cmd = ['retrieve_extract_aux_data.py', '--xml', args.xml_filename]
     cmd = ' '.join(cmd)
     output = ''
     try:
+        logger.info("Calling [{0}]".format(cmd))
         output = execute_cmd(cmd)
     except Exception, e:
-        logger.error("Failed to unpack data")
+        logger.error("Failed processing lst_download_extract_aux_data.py")
         raise e
     finally:
         if len(output) > 0:
             logger.info(output)
 
+    # Extract the product id from the xml filename and build some other
+    # filenames
+    product_id = os.path.splitext(args.xml_filename)[0]
+    mtl_filename = '{0}_MTL.txt'.format(product_id)
+    dem_filename = '{0}_dem.img'.format(product_id)
+    emi_filename = '{0}_emissivity.img'.format(product_id)
+
+    # ------------------------------------------------------------------------
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
+    cmd = ['do_create_dem.py',
+           '--mtl', mtl_filename,
+           '--dem', dem_filename]
+    cmd = ' '.join(cmd)
+    output = ''
+    try:
+        logger.info("Calling [{0}]".format(cmd))
+        output = execute_cmd(cmd)
+    except Exception, e:
+        logger.error("Failed creating DEM")
+        raise e
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+    # ------------------------------------------------------------------------
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+
+    # ------------------------------------------------------------------------
+    # Call the scene based lst
+    cmd = ['scene_based_lst',
+           '--xml', args.xml_filename,
+           '--dem', dem_filename,
+           '--emi', emi_filename,
+           '--verbose']
+    cmd = ' '.join(cmd)
+    output = ''
+    try:
+        logger.info("Calling [{0}]".format(cmd))
+        output = execute_cmd(cmd)
+    except Exception, e:
+        logger.error("Failed processing scene_based_lst")
+        raise e
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+    # ------------------------------------------------------------------------
     # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
@@ -170,15 +230,16 @@ if __name__ == '__main__':
     # Parse the command line parameters
     args = parser.parse_args()
 
-    # setup the default logger format and level. log to STDOUT.
+    # Setup the default logger format and level.  Log to STDOUT.
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
                                 ' %(levelname)-8s'
                                 ' %(filename)s:%(lineno)d:'
                                 '%(funcName)s -- %(message)s'),
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.INFO,
+                        stream=sys.stdout)
 
-    # get the logger
+    # Get the logger
     logger = logging.getLogger(__name__)
 
     if args.xml_filename == '':
