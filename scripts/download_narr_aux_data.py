@@ -303,7 +303,7 @@ class AUX_Processor(object):
 
             The parameters are then extracted from the downloaded grib files.
 
-        Returns: (dict)
+        Returns: (dict) or None
             grb_info - A dictionary containing the filenames for each
                        parameter downloaded along with the mb numbers.
                        {
@@ -335,6 +335,13 @@ class AUX_Processor(object):
         logger.debug("INV = {0}".format(inv_src))
         logger.debug("GRB = {0}".format(grb_src))
 
+        # Determine is the grib data exists on the server before continuing
+        req = requests.head(inv_src)
+
+        # Return to the calling code without a dict
+        if not req.ok:
+            return None
+
         # Download the inv file
         http_transfer_file(inv_src, inv_name)
 
@@ -345,7 +352,10 @@ class AUX_Processor(object):
             # Determine the specific sections of the grib file to download
             bytes = self.determine_grib_bytes(inv_name, parm)
 
+            # Setup the headers
             headers = {'Range': 'bytes=%s' % bytes}
+
+            # Figure out the local filename to create
             grb_file = grb_name.replace('.grb', '_{0}.grb'.format(parm))
 
             # Download the specific sections for the current parameter
@@ -468,6 +478,12 @@ class AUX_Processor(object):
                     # Retrieve the auxillary data and extract it
                     grb_info = self.retrieve_aux_data(year, month, day, hour)
 
+                    if grb_info is None:
+                        date = start_date.replace(hour=hour)
+                        logger.warning("NARR data unavailable for"
+                                       " {0}".format(str(date)))
+                        continue
+
                     hdr_info = self.build_header_files(grb_info)
 
                     self.archive_files(year, month, day, grb_info, hdr_info)
@@ -548,7 +564,8 @@ if __name__ == '__main__':
 
     # If the start date was not specified, default to the current UTC time
     if args.start_date is None:
-        start_date = datetime.utcnow()
+        start_date = datetime.utcnow().replace(hour=0, minute=0,
+                                               second=0, microsecond=0)
     else:
         start_date = args.start_date
 
