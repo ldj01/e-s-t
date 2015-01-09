@@ -26,7 +26,11 @@ import re
 import commands
 import logging
 import requests
+from requests.exceptions import ConnectionError as Requests_ConnectionError
+from requests.exceptions import Timeout as Requests_Timeout
 from argparse import ArgumentParser
+from time import sleep
+
 
 # espa-common objects and methods
 from espa_constants import EXIT_FAILURE
@@ -102,20 +106,42 @@ def http_transfer_file(download_url, destination_file, headers=None):
 
     logger.info("Transfering {0}".format(download_url))
 
-    req = requests.get(download_url, headers=headers)
+    session = requests.Session()
 
-    if not req.ok:
-        logger.error("Transfer Failed - HTTP")
-        req.raise_for_status()
+    session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
+    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
 
-    try:
-        with open(destination_file, 'wb') as local_fd:
-            local_fd.write(req.content)
-    except:
-        logger.error("Transfer Failed - HTTP")
-        raise
-    finally:
-        req.close()
+    sleep_count = 0
+    done = False
+    while not done:
+        if sleep_count > 3:
+            raise Exception("Transfer Failed - HTTP"
+                            " - exceeded retry limit")
+
+        req = None
+        try:
+            req = session.get(url=download_url, headers=headers)
+
+            if not req.ok:
+                logger.error("Transfer Failed - HTTP")
+                req.raise_for_status()
+
+            with open(destination_file, 'wb') as local_fd:
+                local_fd.write(req.content)
+
+            done = True
+
+        except:
+            logger.exception("Transfer Issue - HTTP")
+            sleep(int(1.5 * sleep_count))
+            sleep_count = sleep_count + 1
+            if sleep_count > 3:
+                raise
+
+        finally:
+            if req is not None:
+                req.close()
+
     logger.info("Transfer Complete - HTTP")
 
 
@@ -296,7 +322,6 @@ def process_aux_data(args):
         AUX data.
     '''
 
-    # get the logger
     logger = logging.getLogger(__name__)
 
     xml = metadata_api.parse(args.xml_filename, silence=True)
@@ -342,20 +367,22 @@ if __name__ == '__main__':
     # Parse the command line parameters
     args = parser.parse_args()
 
-    # setup the default logger format and level. log to STDOUT.
+    # Setup the default logger format and level. log to STDOUT.
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
                                 ' %(levelname)-8s'
                                 ' %(filename)s:%(lineno)d:'
                                 '%(funcName)s -- %(message)s'),
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO)
+                        level=logging.INFO,
+                        stream=sys.stdout)
 
-    # get the logger
+    # Get the logger
     logger = logging.getLogger(__name__)
 
     if args.xml_filename == '':
         logger.fatal("No XML metadata filename provided.")
-        logger.fatal("Error processing LST.  Processing will terminate.")
+        logger.fatal("Error processing LST AUX data."
+                     "  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
     try:
@@ -364,8 +391,9 @@ if __name__ == '__main__':
         process_aux_data(args)
 
     except Exception, e:
-        logger.exception("Error processing LST.  Processing will terminate.")
+        logger.exception("Error processing LST AUX data."
+                         "  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
-    logger.info("LST AUX data downloaded")
+    logger.info("LST AUX data downloaded and extracted")
     sys.exit(EXIT_SUCCESS)
