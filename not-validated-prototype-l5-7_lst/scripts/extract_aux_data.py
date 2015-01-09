@@ -27,6 +27,7 @@ import commands
 import logging
 from argparse import ArgumentParser
 from time import sleep
+from datetime import datetime, timedelta
 
 
 # espa-common objects and methods
@@ -90,7 +91,7 @@ def create_directory(directory):
 
 
 # ============================================================================
-def extract_grib_data(grb_file, pressure_numbers):
+def extract_grib_data(hdr_path, grb_path, output_dir):
     '''
     Description:
         Configures a command line for calling the wgrib executable and then
@@ -101,33 +102,38 @@ def extract_grib_data(grb_file, pressure_numbers):
 
     logger = logging.getLogger(__name__)
 
-    dir_name = '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0])
+    create_directory(output_dir)
 
-    create_directory(dir_name)
+    with open(hdr_path, 'r') as hdr_fd:
+        for line in hdr_fd.readlines():
+            logger.debug(line.strip())
+            parts = line.strip().split(':')
+            record = parts[0]
+            pressure = parts[6].split('=')[1]
+            logger.debug("{0} {1}".format(record, pressure))
 
-    index = 1
-    for pressure in pressure_numbers:
-        filename = '.'.join([pressure, 'txt'])
-        path = os.path.join(dir_name, filename)
-        cmd = ['wgrib', grb_file, '-d', str(index), '-text', '-o', path]
-        cmd = ' '.join(cmd)
+            filename = '.'.join([pressure, 'txt'])
+            path = os.path.join(output_dir, filename)
+            cmd = ['wgrib', grb_path,
+                   '-d', record,
+                   '-text', '-o', path]
+            cmd = ' '.join(cmd)
+            logger.info("wgrib command = [{0}]".format(cmd))
 
-        # Extract the pressure data and raise any errors
-        output = ''
-        try:
-            output = execute_cmd(cmd)
-        except Exception, e:
-            logger.error("Failed to unpack data")
-            raise e
-        finally:
-            if len(output) > 0:
-                logger.info(output)
-
-        index = index + 1
+            # Extract the pressure data and raise any errors
+            output = ''
+            try:
+                output = execute_cmd(cmd)
+            except Exception, e:
+                logger.error("Failed to unpack data")
+                raise e
+            finally:
+                if len(output) > 0:
+                    logger.info(output)
 
 
 # ============================================================================
-def retrieve_and_extract_aux_data(year, month, day, hour):
+def extract_aux_data(args, base_aux_dir):
     '''
     Description:
         We are coding to use NARR data, which is provided in 3hr increments.
@@ -144,98 +150,15 @@ def retrieve_and_extract_aux_data(year, month, day, hour):
 
     logger = logging.getLogger(__name__)
 
-    parms_to_extract = ['HGT', 'SPFH', 'TMP']
-    # Host where the auxillary data resides
-    AUX_HOSTNAME = 'http://nomads.ncdc.noaa.gov'
-    # Path on the host where the specifieds auxillary data is located
-    AUX_PATH_TEMPLATE = '/data/narr/{0}/{1}/'
-    # Filename of the specified auxillary data we require
-    AUX_NAME_TEMPLATE = 'narr-a_221_{0}_{1}00_000.{2}'
-
-    # Determine the 3hr increments to use from the auxillary data
-    # We want the one before and after the scene acquisition time
-    # and convert back to formatted strings
-    hour_1 = '{0:0>2}'.format(hour - (hour % 3))
-    hour_2 = '{0:0>2}'.format(hour + (3-(hour % 3)))
-
-    logger.debug("HOUR 1 = {0}".format(hour_1))
-    logger.debug("HOUR 2 = {0}".format(hour_2))
-
-    yyyymm = '{0}{1}'.format(year, month)
-    yyyymmdd = '{0}{1}'.format(yyyymm, day)
-
-    # Build the destination filenames
-    inv_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'inv')
-    grb_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_1, 'grb')
-    inv_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'inv')
-    grb_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, hour_2, 'grb')
-
-    # Build the source filenames
-    data_path = AUX_PATH_TEMPLATE.format(yyyymm, yyyymmdd)
-    inv_1_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, inv_1_name)
-    grb_1_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, grb_1_name)
-    inv_2_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, inv_2_name)
-    grb_2_src = '{0}{1}{2}'.format(AUX_HOSTNAME, data_path, grb_2_name)
-    logger.debug("INV 1 = {0}".format(inv_1_src))
-    logger.debug("GRB 1 = {0}".format(grb_1_src))
-    logger.debug("INV 2 = {0}".format(inv_2_src))
-    logger.debug("GRB 2 = {0}".format(grb_2_src))
-
-    # Download the inv files
-    http_transfer_file(inv_1_src, inv_1_name)
-    http_transfer_file(inv_2_src, inv_2_name)
-
-    for parm in parms_to_extract:
-        logger.info("Retrieving = {0} parameters for time 1".format(parm))
-        # Determine the specific sections of the grib file to download
-        (bytes, pressure_numbers) = determine_grib_bytes(inv_1_name, parm)
-        headers = {'Range': 'bytes=%s' % bytes}
-        grb_file = '{0}_1.grb'.format(parm)
-        # Download the specific sections
-        http_transfer_file(grb_1_src, grb_file, headers=headers)
-        # Extract the sections to text files
-        extract_grib_data(grb_file, pressure_numbers)
-        if os.path.exists(grb_file):
-            os.unlink(grb_file)
-
-        logger.info("Retrieving = {0} parameters for time 2".format(parm))
-        # Determine the specific sections of the grib file to download
-        (bytes, pressure_numbers) = determine_grib_bytes(inv_2_name, parm)
-        headers = {'Range': 'bytes=%s' % bytes}
-        grb_file = '{0}_2.grb'.format(parm)
-        # Download the specific sections
-        http_transfer_file(grb_2_src, grb_file, headers=headers)
-        # Extract the sections to text files
-        extract_grib_data(grb_file, pressure_numbers)
-        if os.path.exists(grb_file):
-            os.unlink(grb_file)
-
-    # Remove the inv files
-    if os.path.exists(inv_1_name):
-        os.unlink(inv_1_name)
-    if os.path.exists(inv_2_name):
-        os.unlink(inv_2_name)
-
-
-# ============================================================================
-def process_aux_data(args):
-    '''
-    Description:
-        Parses the XML and calls the routine to retrieve and extract the LST
-        AUX data.
-    '''
-
-    logger = logging.getLogger(__name__)
-
     xml = metadata_api.parse(args.xml_filename, silence=True)
     global_metadata = xml.get_global_metadata()
     acq_date = str(global_metadata.get_acquisition_date())
     scene_center_time = str(global_metadata.get_scene_center_time())
 
     # Extract the individual parts from the date
-    year = acq_date[:4]
-    month = acq_date[5:7]
-    day = acq_date[8:]
+    year = int(acq_date[:4])
+    month = int(acq_date[5:7])
+    day = int(acq_date[8:])
 
     # Extract the hour parts from the time and convert to an int
     hour = int(scene_center_time[:2])
@@ -245,8 +168,71 @@ def process_aux_data(args):
     del (global_metadata)
     del (xml)
 
-    # Retrieve the auxillary data and extract it
-    retrieve_and_extract_aux_data(year, month, day, hour)
+    # Determine the 3hr increments to use from the auxillary data
+    # We want the one before and after the scene acquisition time
+    # and convert back to formatted strings
+    hour_1 = hour - (hour % 3)
+    td = timedelta(hours=3)  # allows us to easily advance to the next day
+
+    date_1 = datetime(year, month, day, hour_1)
+    date_2 = date_1 + td
+    logger.debug("Date 1 = {0}".format(str(date_1)))
+    logger.debug("Date 2 = {0}".format(str(date_2)))
+
+    parms_to_extract = ['HGT', 'SPFH', 'TMP']
+    AUX_PATH_TEMPLATE = '{0:0>4}/{1:0>2}/{2:0>2}'
+    AUX_NAME_TEMPLATE = 'narr-a_221_{0}_{1:0>2}00_000_{2}.{3}'
+
+    for parm in parms_to_extract:
+        # Build the source filenames for date 1
+        yyyymmdd = '{0:0>4}{1:0>2}{2:0>2}'.format(date_1.year,
+                                                  date_1.month,
+                                                  date_1.day)
+        logger.debug("Date 1 yyyymmdd = {0}".format(yyyymmdd))
+
+        hdr_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, date_1.hour,
+                                              parm, 'hdr')
+        grb_1_name = AUX_NAME_TEMPLATE.format(yyyymmdd, date_1.hour,
+                                              parm, 'grb')
+        logger.debug("hdr 1 = {0}".format(hdr_1_name))
+        logger.debug("grb 1 = {0}".format(grb_1_name))
+
+        tmp = AUX_PATH_TEMPLATE.format(date_1.year, date_1.month, date_1.day)
+        hdr_1_path = '{0}/{1}/{2}'.format(base_aux_dir, tmp, hdr_1_name)
+        grb_1_path = '{0}/{1}/{2}'.format(base_aux_dir, tmp, grb_1_name)
+        logger.info("Using {0}".format(hdr_1_path))
+        logger.info("Using {0}".format(grb_1_path))
+
+        # Build the source filenames for date 2
+        yyyymmdd = '{0:0>4}{1:0>2}{2:0>2}'.format(date_1.year,
+                                                  date_1.month,
+                                                  date_1.day)
+        logger.debug("Date 2 yyyymmdd = {0}".format(yyyymmdd))
+
+        hdr_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, date_2.hour,
+                                              parm, 'hdr')
+        grb_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, date_2.hour,
+                                              parm, 'grb')
+        logger.debug("hdr 2 = {0}".format(hdr_2_name))
+        logger.debug("grb 2 = {0}".format(grb_2_name))
+
+        tmp = AUX_PATH_TEMPLATE.format(date_2.year, date_2.month, date_2.day)
+        hdr_2_path = '{0}/{1}/{2}'.format(base_aux_dir, tmp, hdr_2_name)
+        grb_2_path = '{0}/{1}/{2}'.format(base_aux_dir, tmp, grb_2_name)
+        logger.info("Using {0}".format(hdr_2_path))
+        logger.info("Using {0}".format(grb_2_path))
+
+        # Verify that the files we need exist
+        if (not os.path.exists(hdr_1_path)
+                or not os.path.exists(hdr_2_path)
+                or not os.path.exists(grb_1_path)
+                or not os.path.exists(grb_2_path)):
+            raise Exception("Required LST AUX files are missing")
+
+        output_dir = '{0}_1'.format(parm)
+        extract_grib_data(hdr_1_path, grb_1_path, output_dir)
+        output_dir = '{0}_2'.format(parm)
+        extract_grib_data(hdr_2_path, grb_2_path, output_dir)
 
 
 # ============================================================================
@@ -257,8 +243,8 @@ if __name__ == '__main__':
     '''
 
     # Create a command line arugment parser
-    description = ("Retrieves and generates auxillary LST inputs, then"
-                   " processes and calls other executables for LST generation")
+    description = ("Extracts auxillary LST inputs from the auxillary archive"
+                   "for the specified data.")
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -282,6 +268,17 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
+    # Verify environment variable exists along with the directory that is
+    # specified
+    base_aux_dir = os.environ.get('LST_AUX_DIR')
+    if base_aux_dir is None:
+        logger.info("Missing environment variable LST_AUX_DIR")
+        sys.exit(EXIT_FAILURE)
+
+    if not os.path.isdir(base_aux_dir):
+        logger.info("LST_AUX_DIR directory does not exist")
+        sys.exit(EXIT_FAILURE)
+
     if args.xml_filename == '':
         logger.fatal("No XML metadata filename provided.")
         logger.fatal("Error processing LST AUX data."
@@ -289,14 +286,14 @@ if __name__ == '__main__':
         sys.exit(EXIT_FAILURE)
 
     try:
-        logger.info("Downloading and extracting LST AUX data")
+        logger.info("Extracting LST AUX data")
 
-        process_aux_data(args)
+        extract_aux_data(args, base_aux_dir)
 
     except Exception, e:
         logger.exception("Error processing LST AUX data."
                          "  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
-    logger.info("LST AUX data downloaded and extracted")
+    logger.info("LST AUX data extracted")
     sys.exit(EXIT_SUCCESS)
