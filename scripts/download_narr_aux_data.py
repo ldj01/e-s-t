@@ -125,7 +125,8 @@ def http_transfer_file(download_url, destination_file, headers=None):
 
         req = None
         try:
-            req = session.get(url=download_url, headers=headers)
+            req = session.get(url=download_url, headers=headers,
+                              timeout=3.0)
 
             if not req.ok:
                 logger.error("Transfer Failed - HTTP")
@@ -257,13 +258,10 @@ class AUX_Processor(object):
 
         Returns: (str, list)
             bytes      - A string containing the byte range information.
-            mb_numbers - A list of the pressure (mb) numbers in the order
-                         found.
         '''
 
         start_bytes = list()
         end_bytes = list()
-        mb_numbers = list()
         start = False
         with open(inv_file, 'r') as inv_fd:
             for line in inv_fd.readlines():
@@ -281,7 +279,6 @@ class AUX_Processor(object):
                 if (line_parm == parm and re.search('\d+ mb', marker)):
                     mb_number = re.match('(\d+) mb', marker)
                     if mb_number is not None:
-                        mb_numbers.append(str(mb_number.groups()[0]))
                         start_bytes.append(current_byte)
                         start = True
 
@@ -292,7 +289,7 @@ class AUX_Processor(object):
         # into the Range http header parameter
         bytes = ','.join(['{0}-{1}'.format(s, e) for s, e in grib_ranges])
 
-        return (bytes, mb_numbers)
+        return bytes
 
 
     # ------------------------------------------------------------------------
@@ -311,22 +308,11 @@ class AUX_Processor(object):
             grb_info - A dictionary containing the filenames for each
                        parameter downloaded along with the mb numbers.
                        {
-                          'PARM_NAME_1':
-                          {
-                              'filename': 'NAME_OF_THE_FILE_1',
-                              'mb_numbers': (n1, n2, ..., nn)
-                          },
-                          'PARM_NAME_2':
-                          {
-                              'filename': 'NAME_OF_THE_FILE_2',
-                              'mb_numbers': (n1, n2, ..., nn)
-                          },
+                          'PARM_NAME_1': 'NAME_OF_THE_FILE_1',
+                          'PARM_NAME_2': 'NAME_OF_THE_FILE_2',
                           ...
                           'PARM_NAME_N':
-                          {
-                              'filename': 'NAME_OF_THE_FILE_N',
-                              'mb_numbers': (n1, n2, ..., nn)
-                          }
+                          'PARM_NAME_N': 'NAME_OF_THE_FILE_N'
                        }
 
         Note:
@@ -358,7 +344,7 @@ class AUX_Processor(object):
             logger.info("Retrieving = {0} parameter values".format(parm))
 
             # Determine the specific sections of the grib file to download
-            (bytes, mb_numbers) = self.determine_grib_bytes(inv_name, parm)
+            bytes = self.determine_grib_bytes(inv_name, parm)
 
             headers = {'Range': 'bytes=%s' % bytes}
             grb_file = grb_name.replace('.grb', '_{0}.grb'.format(parm))
@@ -367,15 +353,89 @@ class AUX_Processor(object):
             logger.info("Destination Filename = {0}".format(grb_file))
             http_transfer_file(grb_src, grb_file, headers=headers)
 
-            grb_info[parm] = dict()
-            grb_info[parm]['filename'] = grb_file
-            grb_info[parm]['mb_numbers'] = mb_numbers
+            grb_info[parm] = grb_file
 
         # Remove the inv file
         if os.path.exists(inv_name):
             os.unlink(inv_name)
 
         return grb_info
+
+    # ------------------------------------------------------------------------
+    def build_header_files(self, grb_info):
+        '''
+        Description:
+            Configures a command line for calling the wgrib executable to
+            build the headers files
+
+        Returns: (dict)
+            hdr_info - A dictionary containing the filenames for each
+                       parameter downloaded along with the mb numbers.
+                       {
+                          'PARM_NAME_1': 'NAME_OF_THE_FILE_1',
+                          'PARM_NAME_2': 'NAME_OF_THE_FILE_2',
+                          ...
+                          'PARM_NAME_N':
+                          'PARM_NAME_N': 'NAME_OF_THE_FILE_N'
+                       }
+        '''
+
+        logger = logging.getLogger(__name__)
+
+        hdr_info = dict()
+        for parm in self._parms_to_extract:
+
+            grb_file = grb_info[parm]
+            hdr_file = grb_file.replace('.grb', '.hdr')
+
+            logger.info("Building {0} header file".format(hdr_file))
+
+            cmd = ['wgrib', grb_file, '-h', '>', hdr_file]
+            cmd = ' '.join(cmd)
+
+            # Extract the pressure data and raise any errors
+            output = ''
+            try:
+                logger.debug("Executing: [{0}]".format(cmd))
+                output = execute_cmd(cmd)
+            except Exception:
+                logger.error("Failed reading {0} file".format(grb_file))
+                raise
+            finally:
+                if len(output) > 0:
+                    logger.info(output)
+
+            hdr_info[parm] = hdr_file
+
+        return hdr_info
+
+    # ------------------------------------------------------------------------
+    def archive_files(self, year, month, day, grb_info, hdr_info):
+        '''
+        Description:
+        '''
+
+        logger = logging.getLogger(__name__)
+
+        if not os.path.isdir(self._base_aux_dir):
+            raise Exception("Base auxillary directory does not exist")
+
+        dest_path = '{0}/{1:0>4}/{2:0>2}/{3:0>2}'.format(self._base_aux_dir,
+                                                         year, month, day)
+
+        logger.info("Archiving into [{0}]".format(dest_path))
+
+        create_directory(dest_path)
+
+        for parm in self._parms_to_extract:
+
+            grb_file = grb_info[parm]
+            dest_file = os.path.join(dest_path, grb_file)
+            shutil.copyfile(grb_file, dest_file)
+
+            hdr_file = hdr_info[parm]
+            dest_file = os.path.join(dest_path, hdr_file)
+            shutil.copyfile(hdr_file, dest_file)
 
     # ------------------------------------------------------------------------
     def process_aux_data(self):
@@ -403,21 +463,31 @@ class AUX_Processor(object):
                 day = start_date.day
 
                 # The NARR data is provided in 3hr increments
-                # TODO TODO TODO - Change to the full day range
-                for hour in range(0, 3, 3):
+                # 24 doesn't exist, but range doesn't include it either
+                for hour in range(0, 24, 3):
 
                     # Retrieve the auxillary data and extract it
                     grb_info = self.retrieve_aux_data(year, month, day, hour)
 
-                    self.extract_grib_data(grb_info)
+                    hdr_info = self.build_header_files(grb_info)
+
+                    self.archive_files(year, month, day, grb_info, hdr_info)
+
+                    # Remove the grb and hdr files
+                    for parm in self._parms_to_extract:
+                        if os.path.exists(grb_info[parm]):
+                            os.unlink(grb_info[parm])
+                        if os.path.exists(hdr_info[parm]):
+                            os.unlink(hdr_info[parm])
+
 
                 start_date += self._time_inc
         finally:
             # Change back to the previous directory
             os.chdir(current_directory)
 
-#            # Remove the temporary processing directory
-#            shutil.rmtree(temp_processing_dir, ignore_errors=True)
+            # Remove the temporary processing directory
+            shutil.rmtree(temp_processing_dir, ignore_errors=True)
 
 
 # ============================================================================
@@ -429,12 +499,12 @@ if __name__ == '__main__':
 
     # Verify environment variable exists along with the directory that is
     # specified
-    base_aux_dir = os.environ.get('NARR_AUX_DIR')
+    base_aux_dir = os.environ.get('LST_AUX_DIR')
     if base_aux_dir is None:
-        raise Exception("Missing environment variable NARR_AUX_DIR")
+        raise Exception("Missing environment variable LST_AUX_DIR")
 
     if not os.path.isdir(base_aux_dir):
-        raise Exception("NARR_AUX_DIR directory does not exist")
+        raise Exception("LST_AUX_DIR directory does not exist")
 
     # Create a command line arugment parser
     description = ("Retrieves and generates auxillary LST inputs, then"
