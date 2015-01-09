@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 
 '''
-    FILE: lst_download_extract_aux_data.py
+    FILE: extract_aux_data.py
 
     PURPOSE: Read the metadata XML file to determine the NARR data to be
-             downloaded.  After download the required parameters are extracted
-             to specific sub-directories for follow-on processing.
+             used.  Extract the data to specific sub-directories for
+             follow-on processing.
 
     PROJECT: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -25,9 +25,6 @@ import errno
 import re
 import commands
 import logging
-import requests
-from requests.exceptions import ConnectionError as Requests_ConnectionError
-from requests.exceptions import Timeout as Requests_Timeout
 from argparse import ArgumentParser
 from time import sleep
 
@@ -90,100 +87,6 @@ def create_directory(directory):
             pass
         else:
             raise
-
-
-# ============================================================================
-def http_transfer_file(download_url, destination_file, headers=None):
-    '''
-    Description:
-        Using http transfer a file from a source location to a destination
-        file on the localhost.
-
-        HTTP headers can be specified to modify how the download happens.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    logger.info("Transfering {0}".format(download_url))
-
-    session = requests.Session()
-
-    session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
-
-    sleep_count = 0
-    done = False
-    while not done:
-        if sleep_count > 3:
-            raise Exception("Transfer Failed - HTTP"
-                            " - exceeded retry limit")
-
-        req = None
-        try:
-            req = session.get(url=download_url, headers=headers)
-
-            if not req.ok:
-                logger.error("Transfer Failed - HTTP")
-                req.raise_for_status()
-
-            with open(destination_file, 'wb') as local_fd:
-                local_fd.write(req.content)
-
-            done = True
-
-        except:
-            logger.exception("Transfer Issue - HTTP")
-            sleep(int(1.5 * sleep_count))
-            sleep_count = sleep_count + 1
-            if sleep_count > 3:
-                raise
-
-        finally:
-            if req is not None:
-                req.close()
-
-    logger.info("Transfer Complete - HTTP")
-
-
-# ============================================================================
-def determine_grib_bytes(inv_file, parm):
-    '''
-    Description:
-        Reads the specified inv file and extracts the requested information
-        to produce a bytes string which is compatable for using http RANGE
-        for extraction of certain bytes from the source file.
-
-    Returns: (str, list)
-        bytes - A string containing the byte range information.
-        pressure_numbers - A list of the pressure numbers in the order found.
-    '''
-
-    start_bytes = list()
-    end_bytes = list()
-    pressure_numbers = list()
-    start = False
-    with open(inv_file, 'r') as inv_fd:
-        for line in inv_fd.readlines():
-            line = line.rstrip('\r\n')
-            split_line = line.split(':')
-            current_byte = int(split_line[1])
-            line_parm = split_line[3]
-            if start:
-                end_bytes.append(current_byte - 1)
-                start = False
-
-            marker = split_line[4]
-            if (line_parm == parm and re.search('\d+ mb', marker)):
-                pressure_number = re.match('(\d+) mb', marker)
-                if pressure_number is not None:
-                    pressure_numbers.append(str(pressure_number.groups()[0]))
-                    start_bytes.append(current_byte)
-                    start = True
-
-    grib_ranges = list(zip(start_bytes, end_bytes))
-
-    bytes = ','.join(['{0}-{1}'.format(s, e) for s, e in grib_ranges])
-    return (bytes, pressure_numbers)
 
 
 # ============================================================================
