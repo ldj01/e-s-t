@@ -3,11 +3,14 @@
 #include <stdarg.h>
 #include <time.h>
 
+
+#include "const.h"
+#include "2d_array.h"
+#include "utilities.h"
 #include "input.h"
 #include "output.h"
 #include "scene_based_lst.h"
-#include "2d_array.h"
-#include "const.h"
+
 
 /******************************************************************************
 METHOD:  scene_based_lst
@@ -34,7 +37,8 @@ NOTES: type ./scene_based_lst --help for information to run the code
 int
 main (int argc, char *argv[])
 {
-    char errstr[MAX_STR_LEN];   /* error string */
+    char FUNC_NAME[] = "main";
+    char msg_str[MAX_STR_LEN];  /* input data scene name */
     char *xml_name = NULL;      /* input XML filename */
     char *dem_name = NULL;      /* input DEM filename */
     char *emissivity_name = NULL;       /* input Emissivity filename */
@@ -58,7 +62,9 @@ main (int argc, char *argv[])
 
     time_t now;
     time (&now);
-    printf ("scene_based_lst start_time=%s\n", ctime (&now));
+    snprintf (msg_str, sizeof(msg_str),
+              "scene_based_lst start_time=%s\n", ctime (&now));
+    LOG_MESSAGE (msg_str, FUNC_NAME);
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
@@ -66,14 +72,14 @@ main (int argc, char *argv[])
                        &verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "calling get_args");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Validate the input metadata file */
     if (validate_xml_file (xml_name) != SUCCESS)
-    {                           /* Error messages already written */
-        LST_ERROR (errstr, "main");
+    {
+        /* Error messages already written */
+        return EXIT_FAILURE;
     }
 
     /* Initialize the metadata structure */
@@ -83,23 +89,24 @@ main (int argc, char *argv[])
        allocates space as needed for various pointers in the global and band
        metadata */
     if (parse_metadata (xml_name, &xml_metadata) != SUCCESS)
-    {                           /* Error messages already written */
-        LST_ERROR (errstr, "main");
+    {
+        /* Error messages already written */
+        return EXIT_FAILURE;
     }
 
     /* Split the filename to obtain the directory, scene name, and extension */
     split_filename (xml_name, directory, scene_name, extension);
     if (verbose)
+    {
         printf ("directory, scene_name, extension=%s,%s,%s\n",
                 directory, scene_name, extension);
+    }
 
     /* Open input file, read metadata, and set up buffers */
     input = OpenInput (&xml_metadata);
     if (input == NULL)
     {
-        sprintf (errstr, "opening the TOA and brightness temp files in: %s",
-                 xml_name);
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("opening input files", FUNC_NAME, EXIT_FAILURE);
     }
 
     if (verbose)
@@ -167,8 +174,7 @@ main (int argc, char *argv[])
     status = build_modtran_input (input, &num_points, verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Building MODTRAN input\n");
-        LST_ERROR (errstr, "scene_based_lst");
+        RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     if (verbose)
@@ -189,24 +195,22 @@ main (int argc, char *argv[])
                                              sizeof (char));
     if (case_list == NULL)
     {
-        sprintf (errstr, "Allocating case_list memory");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, EXIT_FAILURE);
     }
 
     command_list = (char **) allocate_2d_array (num_cases, MAX_STR_LEN,
                                                 sizeof (char));
     if (command_list == NULL)
     {
-        sprintf (errstr, "Allocating command_list memory");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Allocating command_list memory", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Read case_list from caseList file */
     fd = fopen ("caseList", "r");
     if (fd == NULL)
     {
-        sprintf (errstr, "Opening file: caseList\n");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Read in the caseList file */
@@ -219,16 +223,14 @@ main (int argc, char *argv[])
     status = fclose (fd);
     if (status)
     {
-        sprintf (errstr, "Closing file: caseList\n");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Read command_list from commandList file */
     fd = fopen ("commandList", "r");
     if (fd == NULL)
     {
-        sprintf (errstr, "Opening file: commandList\n");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Read in the commandList file */
@@ -241,8 +243,7 @@ main (int argc, char *argv[])
     status = fclose (fd);
     if (status)
     {
-        sprintf (errstr, "Closing file: commandList\n");
-        LST_ERROR (errstr, "first_files");
+        RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* perform modtran runs by calling command_list */
@@ -251,8 +252,8 @@ main (int argc, char *argv[])
         status = system (command_list[i]);
         if (status != SUCCESS)
         {
-            sprintf (errstr, "executing command_list[i]");
-            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+            RETURN_ERROR ("executing command_list[i]", FUNC_NAME,
+                          EXIT_FAILURE);
         }
     }
 
@@ -262,8 +263,7 @@ main (int argc, char *argv[])
     status = system ("cp $BIN/tape6parser.bash .");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "cp $BIN/tape6parser.bash\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("cp $BIN/tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     for (i = 0; i < num_cases; i++)
@@ -273,8 +273,7 @@ main (int argc, char *argv[])
         status = system (command);
         if (status != SUCCESS)
         {
-            sprintf (errstr, "./tape6parser.bash\n");
-            RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+            RETURN_ERROR ("./tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
         }
     }
 
@@ -309,16 +308,15 @@ main (int argc, char *argv[])
     status = system ("rm tape6parser.bash");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "rm tape6parser.bash\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("rm tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free memory allocation */
     status = free_2d_array ((void **) command_list);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: command_list\n");
-        RETURN_ERROR (errstr, "scene_based_list", FAILURE);
+        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Allocate memory for results */
@@ -326,8 +324,7 @@ main (int argc, char *argv[])
                                             sizeof (float));
     if (results == NULL)
     {
-        sprintf (errstr, "Allocating results memory");
-        LST_ERROR (errstr, "second_narr");
+        RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* call second_narr to generate parameters for each height and NARR point */
@@ -335,16 +332,15 @@ main (int argc, char *argv[])
         second_narr (input, num_points, alb, case_list, results, verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Calling scene_based_list\n");
-        LST_ERROR (errstr, "scene_based_lst");
+        RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free memory allocation */
     status = free_2d_array ((void **) case_list);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: current_case\n");
-        RETURN_ERROR (errstr, "scene_based_list", FAILURE);
+        RETURN_ERROR ("Freeing memory: current_case\n", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* call third_pixels_post to generate parameters for each Landsat pixel */
@@ -352,8 +348,7 @@ main (int argc, char *argv[])
                                 results, verbose);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Calling scene_based_list\n");
-        LST_ERROR (errstr, "scene_based_lst");
+        RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
 
 #if 0
@@ -362,35 +357,35 @@ main (int argc, char *argv[])
     if (input->meta.ul_corner.is_fill &&
         input->meta.lr_corner.is_fill &&
         (input->meta.ul_corner.lat - input->meta.lr_corner.lat) < MINSIGMA)
+    {
         input->meta.sun_az = sun_azi_temp;
+    }
 
     /* Open the output file */
     output = OpenOutput (&xml_metadata, input);
     if (output == NULL)
     {                           /* error message already printed */
-        sprintf (errstr, "Opening output file");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("Opening output file", FUNC_NAME, EXIT_FAILURE);
     }
 
     if (!PutOutput (output, pixel_mask))
     {
-        sprintf (errstr, "Writing output LST in HDF files\n");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("Writing output LST in HDF files\n", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Close the output file */
     if (!CloseOutput (output))
     {
-        sprintf (errstr, "closing output file");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("closing output file", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Create the ENVI header file this band */
     if (create_envi_struct (&output->metadata.band[0], &xml_metadata.global,
                             &envi_hdr) != SUCCESS)
     {
-        sprintf (errstr, "Creating ENVI header structure.");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("Creating ENVI header structure.", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Write the ENVI header */
@@ -398,30 +393,29 @@ main (int argc, char *argv[])
     cptr = strchr (envi_file, '.');
     if (cptr == NULL)
     {
-        sprintf (errstr, "error in ENVI header filename");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("error in ENVI header filename", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     strcpy (cptr, ".hdr");
     if (write_envi_hdr (envi_file, &envi_hdr) != SUCCESS)
     {
-        sprintf (errstr, "Writing ENVI header file.");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("Writing ENVI header file.", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Append the LST band to the XML file */
     if (append_metadata (output->nband, output->metadata.band, xml_name)
         != SUCCESS)
     {
-        sprintf (errstr, "Appending spectral index bands to XML file.");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("Appending spectral index bands to XML file.",
+                      FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free the structure */
     if (!FreeOutput (output))
     {
-        sprintf (errstr, "freeing output file structure");
-        LST_ERROR (errstr, "main");
+        RETURN_ERROR ("freeing output file structure", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Free the metadata structure */
@@ -439,8 +433,7 @@ main (int argc, char *argv[])
     status = free_2d_array ((void **) results);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: results\n");
-        RETURN_ERROR (errstr, "scene_based_list", FAILURE);
+        RETURN_ERROR ("Freeing memory: results\n", FUNC_NAME, EXIT_FAILURE);
     }
 
 #if 0
@@ -448,58 +441,56 @@ main (int argc, char *argv[])
     status = system ("rm newHead*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting newHead* files\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting newHead* files\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     status = system ("rm newTail*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting newTail* files\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting newTail* files\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     status = system ("rm tempLayers.txt");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting tempLayers file\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting tempLayers file\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Delete temporary directories */
     status = system ("\rm -r HGT*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting HGT* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting HGT* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     status = system ("\rm -r SHUM*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting SHUM* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting SHUM* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     status = system ("\rm -r TMP*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting TMP* directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting TMP* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     status = system ("\rm -r 4?.*_*");
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Deleting temporary directories\n");
-        RETURN_ERROR (errstr, "scene_based_lst", FAILURE);
+        RETURN_ERROR ("Deleting temporary directories\n", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 #endif
 
     time (&now);
-    printf ("scene_based_lst end_time=%s\n", ctime (&now));
-    return (SUCCESS);
+    snprintf (msg_str, sizeof(msg_str),
+              "scene_based_lst end_time=%s\n", ctime (&now));
+    LOG_MESSAGE (msg_str, FUNC_NAME);
+
+    return EXIT_SUCCESS;
 }
+
 
 /******************************************************************************
 MODULE:  usage
@@ -518,7 +509,6 @@ Date        Programmer       Reason
 2/19/2014   Gail Schmidt     Modified to utilize the ESPA internal raw binary
                              file format
 
-NOTES: 
 ******************************************************************************/
 void
 usage ()

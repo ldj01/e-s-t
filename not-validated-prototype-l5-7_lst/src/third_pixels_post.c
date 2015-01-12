@@ -1,50 +1,63 @@
+
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
-#include "2d_array.h"
-#include "input.h"
+
+
 #include "const.h"
+#include "2d_array.h"
+#include "utilities.h"
+#include "input.h"
 #include "scene_based_lst.h"
 
+
 #ifndef max
-#define max(a,b) (((a) (b)) ? (a) : (b))
+    #define max(a,b) (((a) (b)) ? (a) : (b))
 #endif
+
 #ifndef min
-#define min(a,b) (((a) < (b)) ? (a) : (b))
+    #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-int partition(float arr[], int left, int right)
+
+int
+partition (float arr[], int left, int right)
 {
-      int i = left, j = right;
-      int tmp;
-      int pivot = arr[(left + right) / 2];
+    int i = left, j = right;
+    int tmp;
+    int pivot = arr[(left + right) / 2];
 
-      while (i <= j) {
-            while (arr[i] < pivot)
-                  i++;
-            while (arr[j] > pivot)
-                  j--;
-            if (i <= j) {
-                  tmp = arr[i];
-                  arr[i] = arr[j];
-                  arr[j] = tmp;
-                  i++;
-                  j--;
-            }
-      }
+    while (i <= j)
+    {
+        while (arr[i] < pivot)
+            i++;
+        while (arr[j] > pivot)
+            j--;
+        if (i <= j)
+        {
+            tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i++;
+            j--;
+        }
+    }
 
-      return i;
+    return i;
 }
 
-void quick_sort(float arr[], int left, int right)
-{
-      int index = partition(arr, left, right);
 
-      if (left < index - 1)
-       quick_sort(arr, left, index - 1);
-      if (index < right)
-       quick_sort(arr, index, right);
+void
+quick_sort (float arr[], int left, int right)
+{
+    int index = partition (arr, left, right);
+
+    if (left < index - 1)
+        quick_sort (arr, left, index - 1);
+    if (index < right)
+        quick_sort (arr, index, right);
 }
+
 
 /******************************************************************************
 MODULE:  distance_in_utm
@@ -58,28 +71,22 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 10/10/2014   Song Guo         Original Development
 ******************************************************************************/
-void distance_in_utm
-(
-    float e1,
-    float n1,
-    float e2,
-    float n2,
-    float *dis
-)
+void distance_in_utm (float e1, float n1, float e2, float n2, float *dis)
 {
-    float s = 0.9996;   /* scale factor */
-    float r = 6378137;  /* earth radius */
+    float s = 0.9996;           /* scale factor */
+    float r = 6378137;          /* earth radius */
     float sr1, sr2, sr3;
     float edist;
 
-    sr1 = s / (cos(e1/r));
-    sr2 = s / (cos(((e2 - e1) / 6.0) / r));
-    sr3 = s / (cos(e2 / r));
+    sr1 = s / (cos (e1 / r));
+    sr2 = s / (cos (((e2 - e1) / 6.0) / r));
+    sr3 = s / (cos (e2 / r));
 
-    edist = ((e2-e1)/6.0)*(sr1+4*sr2+sr3);
+    edist = ((e2 - e1) / 6.0) * (sr1 + 4 * sr2 + sr3);
 
-    *dis = sqrt(edist*edist+(n2-n1)*(n2-n1));
+    *dis = sqrt (edist * edist + (n2 - n1) * (n2 - n1));
 }
+
 
 /******************************************************************************
 MODULE:  convert_ll_utm
@@ -95,19 +102,14 @@ Date        Programmer       Reason
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
 void convert_ll_utm
-(
-    Input_t *input,
-    float *lat,
-    float *lon,
-    int num_points,
-    float **narr_utm
-)
+    (Input_t * input,
+     float *lat, float *lon, int num_points, float **narr_utm)
 {
     int i;
-    float a = 6378137.0;    /* equatorial radius */
-    float b = 6356752.3;    /* polar radius */
-    float k0 = 0.9996;      /* scale factor */
-    float e;                /* eccentricity */
+    float a = 6378137.0;        /* equatorial radius */
+    float b = 6356752.3;        /* polar radius */
+    float k0 = 0.9996;          /* scale factor */
+    float e;                    /* eccentricity */
     float eprimesqrd;
     float n;
 //    float rho;
@@ -136,52 +138,62 @@ void convert_ll_utm
     zone_cm = (float) (6 * input->meta.zone - 183);
 //    zone_cm_rad =  zone_cm * PI / 180.0;
 
-    e = sqrt(1.0-pow(b/a, 2));
-    eprimesqrd = e*e/(1.0-e*e);
-    n = (a-b)/(a+b);
+    e = sqrt (1.0 - pow (b / a, 2));
+    eprimesqrd = e * e / (1.0 - e * e);
+    n = (a - b) / (a + b);
 
     /* calculate meridional arc length */
-    a0 = a*(1.0-n+(5.0*n*n/4.0)*(1.0-n)+(81.0* (float)pow(n,4)/64.0)*(1.0-n));
-    b0 = (3.0*a*n/2.0)*(1.0-n-(7.0*n*n/8.0)*(1.0-n)+55.0*(float)pow(n,4)/64.0);
-    c0 = (15.0*a*n*n/16.0)*(1.0-n+(3.0*n*n/4.0)*(1.0-n));
-    d0 = (35*a*(float)pow(n,3)/48.0)*(1.0-n+11.0*n*n/16.0);
-    e0 = (315.0*a*(float)pow(n,4)/51.0)*(1.0-n);
+    a0 = a * (1.0 - n + (5.0 * n * n / 4.0) * (1.0 - n) +
+              (81.0 * (float) pow (n, 4) / 64.0) * (1.0 - n));
+    b0 = (3.0 * a * n / 2.0) * (1.0 - n - (7.0 * n * n / 8.0) * (1.0 - n) +
+                                55.0 * (float) pow (n, 4) / 64.0);
+    c0 = (15.0 * a * n * n / 16.0) * (1.0 - n +
+                                      (3.0 * n * n / 4.0) * (1.0 - n));
+    d0 = (35 * a * (float) pow (n, 3) / 48.0) * (1.0 - n +
+                                                 11.0 * n * n / 16.0);
+    e0 = (315.0 * a * (float) pow (n, 4) / 51.0) * (1.0 - n);
 
-    for ( i = 0; i < num_points; i++)
+    for (i = 0; i < num_points; i++)
     {
         delta_lon = lon[i] - zone_cm;
-        p = delta_lon * PI/ 180.0;
+        p = delta_lon * PI / 180.0;
         /* convert lat and lon points from decimal degrees to radians */
-        lat_rad = lat[i]*PI/180.0;
+        lat_rad = lat[i] * PI / 180.0;
 //        lon_rad = lon[i]*PI/180.0;
 
 //        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
 //              (3.0/2.0)));
-        nu = a/pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),(1.0/2.0));
+        nu = a / pow ((1.0 - (e * sin (lat_rad)) * (e * sin (lat_rad))),
+                      (1.0 / 2.0));
 
 
-        s = a0*lat_rad - b0*sin(2*lat_rad) + c0*sin(4*lat_rad) -
-            d0*sin(6*lat_rad) + e0*sin(8*lat_rad);
+        s = a0 * lat_rad - b0 * sin (2 * lat_rad) + c0 * sin (4 * lat_rad) -
+            d0 * sin (6 * lat_rad) + e0 * sin (8 * lat_rad);
 
         /* coefficients for UTM coordinates */
-        ki = s*k0;
-        kii = nu*sin(lat_rad)*cos(lat_rad)*k0/2.0;
-        kiii = (pow(nu*sin(lat_rad)*cos(lat_rad),3)/24.0)*
-            pow((5-tan(lat_rad)),2)+9.0*eprimesqrd*pow(cos(lat_rad),2)+
-            4.0*eprimesqrd*eprimesqrd*pow(cos(lat_rad),4)*k0;
-        kiv = nu*cos(lat_rad)*k0;
-        kv = pow(cos(lat_rad),3)*(nu/6.0)*(1-tan(lat_rad)*tan(lat_rad)+
-             eprimesqrd*cos(lat_rad)*cos(lat_rad))*k0;
+        ki = s * k0;
+        kii = nu * sin (lat_rad) * cos (lat_rad) * k0 / 2.0;
+        kiii = (pow (nu * sin (lat_rad) * cos (lat_rad), 3) / 24.0) *
+            pow ((5 - tan (lat_rad)),
+                 2) + 9.0 * eprimesqrd * pow (cos (lat_rad),
+                                              2) +
+            4.0 * eprimesqrd * eprimesqrd * pow (cos (lat_rad), 4) * k0;
+        kiv = nu * cos (lat_rad) * k0;
+        kv = pow (cos (lat_rad),
+                  3) * (nu / 6.0) * (1 - tan (lat_rad) * tan (lat_rad) +
+                                     eprimesqrd * cos (lat_rad) *
+                                     cos (lat_rad)) * k0;
 
         /* calculate UTM coordinates */
-        northing = (ki+kii*p*p+kiii*pow(p,4));
-        easting = 500000.0 + (kiv*p+kv*pow(p,3));
+        northing = (ki + kii * p * p + kiii * pow (p, 4));
+        easting = 500000.0 + (kiv * p + kv * pow (p, 3));
 
-        /* assign to narr_utm array*/
+        /* assign to narr_utm array */
         narr_utm[i][0] = easting;
         narr_utm[i][1] = northing;
     }
 }
+
 
 /******************************************************************************
 MODULE:  dn_to_radiance
@@ -196,26 +208,28 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
-void dn_to_radiance
-(
-    Input_t *input
-)
+void dn_to_radiance (Input_t * input)
 {
     int pix;
     for (pix = 0; pix < input->size_th.s; pix++)
     {
         if (input->therm_buf[pix] == 0)
+        {
             input->therm_buf[pix] = 0;
+        }
         else
         {
             input->therm_buf[pix] = (int16) (input->meta.gain_th *
-                   (float)input->therm_buf[pix] +
-                   input->meta.bias_th);
+                                             (float) input->therm_buf[pix] +
+                                             input->meta.bias_th);
         }
         if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
-         input->therm_buf[pix] = (int16) (input->therm_buf[pix] + 0.044);
+        {
+            input->therm_buf[pix] = (int16) (input->therm_buf[pix] + 0.044);
+        }
     }
 }
+
 
 /******************************************************************************
 MODULE:  interpolate_to_height
@@ -232,12 +246,12 @@ Date        Programmer       Reason
 ******************************************************************************/
 void interpolate_to_height
 (
-    float *height,              /*I: list of height of one location */
-    float *atm1,                /*I: atmospheric parameter colum1 */
-    float *atm2,                /*I: atmospheric parameter colum2 */
-    float *atm3,                /*I: atmospheric parameter colum3 */
-    float interpolate_to,       /*I: current landsat pixel height */
-    float *at_height            /*O: interpolated height */
+    float *height,        /*I: list of height of one location */
+    float *atm1,          /*I: atmospheric parameter colum1 */
+    float *atm2,          /*I: atmospheric parameter colum2 */
+    float *atm3,          /*I: atmospheric parameter colum3 */
+    float interpolate_to, /*I: current landsat pixel height */
+    float *at_height      /*O: interpolated height */
 )
 {
     int i;
@@ -293,6 +307,7 @@ void interpolate_to_height
     }
 }
 
+
 /******************************************************************************
 MODULE:  interpolate_to_location
 
@@ -312,7 +327,7 @@ void interpolate_to_location
     float **at_height,          /*I: current height atmospheric results */
     float interpolate_easting,  /*I: interpolate to easting */
     float interpolate_northing, /*I: interpolate to northing */
-    float *parameters           /*O: interpolated pixel atmospheric parameters */
+    float *parameters     /*O: interpolated pixel atmospheric parameters */
 )
 {
     int i, j;
@@ -323,11 +338,12 @@ void interpolate_to_location
     /* shepard's method */
     for (i = 0; i < 4; i++)
     {
-        h[i] = (coordinates[i][0] - interpolate_easting) * (coordinates[i][0] -
-            interpolate_easting) + (coordinates[i][1] - interpolate_northing) *
-            (coordinates[i][1] - interpolate_northing);
+        h[i] = (coordinates[i][0] - interpolate_easting)
+                 * (coordinates[i][0] - interpolate_easting)
+               + (coordinates[i][1] - interpolate_northing)
+                 * (coordinates[i][1] - interpolate_northing);
     }
-    quick_sort(h, 0, 3);
+    quick_sort (h, 0, 3);
 
     for (i = 0; i < 4; i++)
     {
@@ -349,6 +365,7 @@ void interpolate_to_location
     }
 }
 
+
 /******************************************************************************
 MODULE:  third_pixels_post
 
@@ -364,20 +381,21 @@ Date        Programmer       Reason
 10/8/2014   Song Guo         Original Development
 ******************************************************************************/
 int third_pixels_post
-(    Input_t *input,             /*I: input structure */
-    int num_points,             /*I: number of narr points */
-    char *dem_infile,           /*I: address of input DEM filename */
-    char *emi_infile,           /*I: address of input Emissivity filename */
-    float **modtran_results,    /*I: atmospheric parameter for modtarn run */
-    bool verbose                /*I: value to indicate if intermediate messages
-                                     be printed */
+(
+    Input_t * input,         /*I: input structure */
+    int num_points,          /*I: number of narr points */
+    char *dem_infile,        /*I: address of input DEM filename */
+    char *emi_infile,        /*I: address of input Emissivity filename */
+    float **modtran_results, /*I: atmospheric parameter for modtarn run */
+    bool verbose             /*I: value to indicate if intermediate messages
+                                  be printed */
 )
 {
     int row, col;
-    int16 *dem=NULL;         /* input DEM data (meters) */
-    int offset;              /* offset in the raw binary DEM file to seek to
-                                to begin reading the window in the DEM */
-    FILE *dem_fptr=NULL;     /* input scene-based DEM file pointer */
+    int16 *dem = NULL;          /* input DEM data (meters) */
+    int offset;                 /* offset in the raw binary DEM file to seek to
+                                   to begin reading the window in the DEM */
+    FILE *dem_fptr = NULL;      /* input scene-based DEM file pointer */
     int **eye;
     int **jay;
     float **lat;
@@ -435,69 +453,63 @@ int third_pixels_post
     int status;
 
     /* Dynamic allocate the 2d memory */
-    eye = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int));
+    eye = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (eye == NULL)
     {
-        sprintf (errstr, "Allocating eye memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating eye memory", "third_pixels_post");
     }
 
-    jay = (int **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(int));
+    jay = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (jay == NULL)
     {
-        sprintf (errstr, "Allocating jay memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating jay memory", "third_pixels_post");
     }
 
-    lat = (float **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(float));
+    lat = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lat == NULL)
     {
-        sprintf (errstr, "Allocating lat memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating lat memory", "third_pixels_post");
     }
 
-    lon = (float **)allocate_2d_array(NARR_ROW, NARR_COL, sizeof(float));
+    lon = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lon == NULL)
     {
-        sprintf (errstr, "Allocating lon memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating lon memory", "third_pixels_post");
     }
 
-    lst_path = getenv("LST_DATA");
+    lst_path = getenv ("LST_DATA");
     if (lst_path == NULL)
     {
-        sprintf (errstr, "LST_DATA environment variable is not set");
-        LST_ERROR(errstr, "third_pixels_post");
+        ERROR_MESSAGE ("LST_DATA environment variable is not set",
+                       "third_pixels_post");
     }
 
-    sprintf(full_path,"%s/%s",lst_path,"coordinates.txt");
-    fd = fopen(full_path, "r");
+    sprintf (full_path, "%s/%s", lst_path, "coordinates.txt");
+    fd = fopen (full_path, "r");
     if (fd == NULL)
     {
-        sprintf (errstr, "Can't open coordinates.txt file");
-        LST_ERROR(errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Can't open coordinates.txt file", "third_pixels_post");
     }
 
     for (j = 0; j < NARR_COL; j++)
     {
         for (i = 0; i < NARR_ROW; i++)
         {
-            if (fscanf(fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j],
-                       &lon[i][j]) == EOF)
+            if (fscanf (fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j],
+                        &lon[i][j]) == EOF)
             {
-                sprintf (errstr, "End of file (EOF) is met before NARR_ROW * "
-                      "NARR_COL lines");
-                LST_ERROR(errstr, "firstfile");
+                ERROR_MESSAGE ("End of file (EOF) is met before"
+                               " NARR_ROW * NARR_COL lines", "firstfile");
             }
 
             /* adjust longitude range to [-180, 180] */
             if ((lon[i][j] - 180.0) > MINSIGMA)
                 lon[i][j] = 360.0 - lon[i][j];
             else
-                lon[i][j] = - lon[i][j];
+                lon[i][j] = -lon[i][j];
         }
     }
-    fclose(fd);
+    fclose (fd);
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
@@ -523,10 +535,10 @@ int third_pixels_post
                 && (lon[i][j] - narr_lr_lon) < MINSIGMA
                 && (lon[i][j] - narr_ul_lon) > MINSIGMA)
             {
-                max_eye = max(max_eye, eye[i][j]);
-                min_eye = min(min_eye, eye[i][j]);
-                max_jay = max(max_jay, jay[i][j]);
-                min_jay = min(min_jay, jay[i][j]);
+                max_eye = max (max_eye, eye[i][j]);
+                min_eye = min (min_eye, eye[i][j]);
+                max_jay = max (max_jay, jay[i][j]);
+                min_jay = min (min_jay, jay[i][j]);
                 in_counter++;
             }
         }
@@ -539,39 +551,34 @@ int third_pixels_post
     num_jays = max_jay - min_jay + 1;
 
     /* Allocate memory for height of NARR points within the rectangular */
-    narr_eye = (float *)malloc(num_points * sizeof(float));
+    narr_eye = (float *) malloc (num_points * sizeof (float));
     if (narr_eye == NULL)
     {
-        sprintf (errstr, "Allocating narr_eye memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_eye memory", "third_pixels_post");
     }
 
-    narr_jay = (float *)malloc(num_points * sizeof(float));
+    narr_jay = (float *) malloc (num_points * sizeof (float));
     if (narr_jay == NULL)
     {
-        sprintf (errstr, "Allocating narr_jay memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_jay memory", "third_pixels_post");
     }
 
-     narr_lat = (float *)malloc(num_points * sizeof(float));
+    narr_lat = (float *) malloc (num_points * sizeof (float));
     if (narr_lat == NULL)
     {
-        sprintf (errstr, "Allocating narr_lat memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_lat memory", "third_pixels_post");
     }
 
-    narr_lon = (float *)malloc(num_points * sizeof(float));
+    narr_lon = (float *) malloc (num_points * sizeof (float));
     if (narr_lon == NULL)
     {
-        sprintf (errstr, "Allocating narr_lon memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_lon memory", "third_pixels_post");
     }
 
-    narr_utm = (float **)allocate_2d_array(num_points, 2, sizeof(float));
+    narr_utm = (float **) allocate_2d_array (num_points, 2, sizeof (float));
     if (narr_utm == NULL)
     {
-        sprintf (errstr, "Allocating narr_utm memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_utm memory", "third_pixels_post");
     }
 
     /* extract coordinates within the NARR rectangle */
@@ -579,60 +586,54 @@ int third_pixels_post
     {
         for (i = min_eye; i <= max_eye; i++)
         {
-            narr_eye[(j-min_jay) * num_eyes + (i-min_eye)] = eye[i][j];
-            narr_jay[(j-min_jay) * num_eyes + (i-min_eye)] = jay[i][j];
-            narr_lat[(j-min_jay) * num_eyes + (i-min_eye)] = lat[i][j];
-            narr_lon[(j-min_jay) * num_eyes + (i-min_eye)] = lon[i][j];
+            narr_eye[(j - min_jay) * num_eyes + (i - min_eye)] = eye[i][j];
+            narr_jay[(j - min_jay) * num_eyes + (i - min_eye)] = jay[i][j];
+            narr_lat[(j - min_jay) * num_eyes + (i - min_eye)] = lat[i][j];
+            narr_lon[(j - min_jay) * num_eyes + (i - min_eye)] = lon[i][j];
         }
     }
 
     /* Release memory */
-    status = free_2d_array((void **)eye);
+    status = free_2d_array ((void **) eye);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: eye\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: eye\n", "third_pixels_post", FAILURE);
     }
 
-    status = free_2d_array((void **)jay);
+    status = free_2d_array ((void **) jay);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: jay\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: jay\n", "third_pixels_post", FAILURE);
     }
 
-    status = free_2d_array((void **)lat);
+    status = free_2d_array ((void **) lat);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: lat\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: lat\n", "third_pixels_post", FAILURE);
     }
 
-    status = free_2d_array((void **)lon);
+    status = free_2d_array ((void **) lon);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: lon\n");
-        RETURN_ERROR (errstr, "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: lon\n", "third_pixels_post", FAILURE);
     }
 
     /* Convert NARR lat/lon to UTM */
-    convert_ll_utm(input, narr_lat, narr_lon, num_points, narr_utm);
+    convert_ll_utm (input, narr_lat, narr_lon, num_points, narr_utm);
 
     /* Dynamic allocate the memory */
-    east_grid = (float **)allocate_2d_array(num_eyes, num_jays,
-                                            sizeof(float));
+    east_grid = (float **) allocate_2d_array (num_eyes, num_jays,
+                                              sizeof (float));
     if (east_grid == NULL)
     {
-        sprintf (errstr, "Allocating east_grid memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating east_grid memory", "third_pixels_post");
     }
 
-    north_grid = (float **)allocate_2d_array(num_eyes, num_jays,
-                                             sizeof(float));
+    north_grid = (float **) allocate_2d_array (num_eyes, num_jays,
+                                               sizeof (float));
     if (north_grid == NULL)
     {
-        sprintf (errstr, "Allocating north_grid memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating north_grid memory", "third_pixels_post");
     }
 
     for (j = 0; j < num_jays; j++)
@@ -648,104 +649,102 @@ int third_pixels_post
     dem_fptr = fopen (dem_infile, "rb");
     if (dem_fptr == NULL)
     {
-        sprintf (errstr, "Error opening the DEM file: %s", dem_infile);
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Error opening the DEM file", "third_pixels_post");
     }
 
     /* Allocate memory for the DEM */
-    dem = (int16 *) calloc (input->size_th.s, sizeof(int16));
+    dem = (int16 *) calloc (input->size_th.s, sizeof (int16));
     if (dem == NULL)
     {
-        sprintf (errstr, "Error allocating memory for the DEM data");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Error allocating memory for the DEM data",
+                       "third_pixels_post");
     }
 
     /* Open the intermediate binary files for writing
        Note: Needs to be deleted before release */
-    therm_fptr = fopen(therm_fname, "wb");
+    therm_fptr = fopen (therm_fname, "wb");
     if (therm_fptr == NULL)
     {
-        sprintf(errstr, "Opening report file: %s", therm_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Opening report file: %s", therm_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    trans_fptr = fopen(trans_fname, "wb");
+    trans_fptr = fopen (trans_fname, "wb");
     if (trans_fptr == NULL)
     {
-        sprintf(errstr, "Opening report file: %s", trans_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Opening report file: %s", trans_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    up_fptr = fopen(up_fname, "wb");
+    up_fptr = fopen (up_fname, "wb");
     if (up_fptr == NULL)
     {
-        sprintf(errstr, "Opening report file: %s", up_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Opening report file: %s", up_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    down_fptr = fopen(down_fname, "wb");
+    down_fptr = fopen (down_fname, "wb");
     if (down_fptr == NULL)
     {
-        sprintf(errstr, "Opening report file: %s", down_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Opening report file: %s", down_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
     /* Allocate memory for landsat_results */
-    landsat_results = (float **)allocate_2d_array(3, input->size_th.s,
-                                                  sizeof(float));
+    landsat_results = (float **) allocate_2d_array (3, input->size_th.s,
+                                                    sizeof (float));
     if (landsat_results == NULL)
     {
-        sprintf (errstr, "Allocating landsat_results memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating landsat_results memory",
+                       "third_pixels_post");
     }
 
     /* Allocate memory for coordinates */
-    coordinates = (float **)allocate_2d_array(4, 2, sizeof(float));
+    coordinates = (float **) allocate_2d_array (4, 2, sizeof (float));
     if (coordinates == NULL)
     {
-        sprintf (errstr, "Allocating coordinates memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating coordinates memory", "third_pixels_post");
     }
 
     /* Allocate memory for at_height */
-    at_height = (float **)allocate_2d_array(4, 3, sizeof(float));
+    at_height = (float **) allocate_2d_array (4, 3, sizeof (float));
     if (at_height == NULL)
     {
-        sprintf (errstr, "Allocating at_height memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating at_height memory", "third_pixels_post");
     }
 
     /* Allocate memory for current_location */
-    current_location = (float **)allocate_2d_array(num_points * NUM_ELEVATIONS,
-                                                   6, sizeof(float));
+    current_location =
+        (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
+                                      sizeof (float));
     if (current_location == NULL)
     {
-        sprintf (errstr, "Allocating current_location memory");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Allocating current_location memory",
+                       "third_pixels_post");
     }
 
     if (verbose)
-        printf("Iterate through all rows in landsat scene\n");
+        printf ("Iterate through all rows in landsat scene\n");
     /* Loop through each line in the image */
     for (row = 0; row < input->size_th.l; row++)
     {
         /* Print status on every 1000 lines */
-        if (!(row%1000))
+        if (!(row % 1000))
         {
             if (verbose)
             {
-                printf ("Processing line %d\r",row);
+                printf ("Processing line %d\r", row);
                 fflush (stdout);
             }
         }
 
         /* Read the input thermal band -- data is read into input->therm_buf */
-        if (!GetInputThermLine(input, row))
+        if (!GetInputThermLine (input, row))
         {
             sprintf (errstr, "Reading input thermal data for line %d", row);
-            LST_ERROR (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
-        dn_to_radiance(input);
+        dn_to_radiance (input);
 
         /* Start reading DEM from the start_line */
         offset = sizeof (int16) * row * input->size_th.s;
@@ -754,11 +753,11 @@ int third_pixels_post
             != input->size_th.s)
         {
             sprintf (errstr, "Error reading values from the DEM file "
-                "starting at line %d.", row);
-            LST_ERROR (errstr, "third_pixels_post");
+                             "starting at line %d.", row);
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
 
-        /* Can also read in one line of DEM data here*/
+        /* Can also read in one line of DEM data here */
 
         /* set first_line be 1 */
         first_line = 1;
@@ -768,9 +767,9 @@ int third_pixels_post
             {
                 /* determine UTM coordinates of current pixel */
                 current_easting = input->meta.ul_map_corner.x
-                                  + row * input->meta.pixel_size[0];
+                    + row * input->meta.pixel_size[0];
                 current_northing = input->meta.ul_map_corner.y
-                                   + row * input->meta.pixel_size[1];
+                    + row * input->meta.pixel_size[1];
 
                 if (first_line == 1)
                 {
@@ -778,29 +777,29 @@ int third_pixels_post
                        points in UTM coordinates
 
                        Note: consider only calculating points within a small
-                             range nearby */
-                    distances = malloc(num_points * sizeof(float));
+                       range nearby */
+                    distances = malloc (num_points * sizeof (float));
                     if (distances == NULL)
                     {
-                        sprintf (errstr, "Allocating distances memory");
-                        LST_ERROR (errstr, "third_pixels_post");
+                        ERROR_MESSAGE ("Allocating distances memory",
+                                       "third_pixels_post");
                     }
-                    distance_copy = malloc(num_points * sizeof(float));
+                    distance_copy = malloc (num_points * sizeof (float));
                     if (distances == NULL)
                     {
-                        sprintf (errstr, "Allocating distance_copy memory");
-                        LST_ERROR (errstr, "third_pixels_post");
+                        ERROR_MESSAGE ("Allocating distance_copy memory",
+                                       "third_pixels_post");
                     }
                     for (g = 0; g < num_points; g++)
                     {
-                        distance_in_utm(narr_utm[g][0], narr_utm[g][1],
-                                        current_easting, current_northing,
-                                        &distances[g]);
+                        distance_in_utm (narr_utm[g][0], narr_utm[g][1],
+                                         current_easting, current_northing,
+                                         &distances[g]);
                         distance_copy[g] = distances[g];
                     }
 
                     /* find indices of 6 closet points */
-                    quick_sort(distances, 0, num_points-1);
+                    quick_sort (distances, 0, num_points - 1);
 
                     n = 0;
                     /* find indices of 6 closest points */
@@ -826,20 +825,24 @@ int third_pixels_post
                     min_injay = narr_jay[closest[below[0]]];
                     for (g = 1; g < n; g++)
                     {
-                        min_ineye = min(min_ineye, narr_eye[closest[below[g]]]);
-                        min_injay = min(min_injay, narr_jay[closest[below[g]]]);
+                        min_ineye =
+                            min (min_ineye, narr_eye[closest[below[g]]]);
+                        min_injay =
+                            min (min_injay, narr_jay[closest[below[g]]]);
                     }
 
                     /* extract UTM coordinates of four points to be
                        interpolated and build array */
-                    coordinates[0][0] =  east_grid[min_ineye][min_injay];
-                    coordinates[0][1] =  north_grid[min_ineye][min_injay];
-                    coordinates[1][0] =  east_grid[min_ineye][min_injay+1];
-                    coordinates[1][1] =  north_grid[min_ineye][min_injay+1];
-                    coordinates[2][0] =  east_grid[min_ineye+1][min_injay];
-                    coordinates[2][1] =  north_grid[min_ineye+1][min_injay];
-                    coordinates[3][0] =  east_grid[min_ineye+1][min_injay+1];
-                    coordinates[3][1] =  north_grid[min_ineye+1][min_injay+1];
+                    coordinates[0][0] = east_grid[min_ineye][min_injay];
+                    coordinates[0][1] = north_grid[min_ineye][min_injay];
+                    coordinates[1][0] = east_grid[min_ineye][min_injay + 1];
+                    coordinates[1][1] = north_grid[min_ineye][min_injay + 1];
+                    coordinates[2][0] = east_grid[min_ineye + 1][min_injay];
+                    coordinates[2][1] = north_grid[min_ineye + 1][min_injay];
+                    coordinates[3][0] =
+                        east_grid[min_ineye + 1][min_injay + 1];
+                    coordinates[3][1] =
+                        north_grid[min_ineye + 1][min_injay + 1];
 
                     /* determine index of four points in order to pull from
                        MODTRAN results */
@@ -855,54 +858,64 @@ int third_pixels_post
                 {
                     /* given indices of previous pixel, there are six possible
                        quads to move into check 6 distances to determine new
-                       upperleft corner*/
-                    distance_in_utm(east_grid[min_ineye][min_injay],
-                         north_grid[min_ineye][min_injay],
-                         current_easting, current_northing, &stay_right);
+                       upperleft corner */
+                    distance_in_utm (east_grid[min_ineye][min_injay],
+                                     north_grid[min_ineye][min_injay],
+                                     current_easting, current_northing,
+                                     &stay_right);
 
                     if ((min_injay + 2) < num_jays)
-                        distance_in_utm(east_grid[min_ineye][min_injay+2],
-                             north_grid[min_ineye][min_injay+2],
-                             current_easting, current_northing, &move_right);
+                        distance_in_utm (east_grid[min_ineye][min_injay + 2],
+                                         north_grid[min_ineye][min_injay + 2],
+                                         current_easting, current_northing,
+                                         &move_right);
                     else
-                         stay_right = (float) SHRT_MAX;
+                        stay_right = (float) SHRT_MAX;
 
-                    distance_in_utm(east_grid[min_ineye+1][min_injay+1],
-                             north_grid[min_ineye+1][min_injay+1],
-                             current_easting, current_northing, &stay_up);
+                    distance_in_utm (east_grid[min_ineye + 1][min_injay + 1],
+                                     north_grid[min_ineye + 1][min_injay + 1],
+                                     current_easting, current_northing,
+                                     &stay_up);
 
-                    distance_in_utm(east_grid[min_ineye-1][min_injay+1],
-                             north_grid[min_ineye-1][min_injay+1],
-                             current_easting, current_northing, &move_up);
+                    distance_in_utm (east_grid[min_ineye - 1][min_injay + 1],
+                                     north_grid[min_ineye - 1][min_injay + 1],
+                                     current_easting, current_northing,
+                                     &move_up);
 
-                    distance_in_utm(east_grid[min_ineye][min_injay+1],
-                             north_grid[min_ineye][min_injay+1],
-                             current_easting, current_northing, &stay_down);
+                    distance_in_utm (east_grid[min_ineye][min_injay + 1],
+                                     north_grid[min_ineye][min_injay + 1],
+                                     current_easting, current_northing,
+                                     &stay_down);
 
                     if ((min_ineye + 2) < num_eyes)
-                         distance_in_utm(east_grid[min_ineye+2][min_injay+1],
-                             north_grid[min_ineye+2][min_injay+1],
-                             current_easting, current_northing, &move_down);
+                        distance_in_utm (east_grid[min_ineye + 2]
+                                         [min_injay + 1],
+                                         north_grid[min_ineye + 2][min_injay +
+                                                                   1],
+                                         current_easting, current_northing,
+                                         &move_down);
                     else
-                         move_down = (float) SHRT_MAX;
+                        move_down = (float) SHRT_MAX;
 
                     if ((move_right - stay_right) < MINSIGMA)
-                         min_injay++;
+                        min_injay++;
                     if ((move_up - stay_up) < MINSIGMA)
-                         min_ineye--;
+                        min_ineye--;
                     if ((move_down - stay_down) < MINSIGMA)
-                         min_ineye++;
+                        min_ineye++;
 
                     /* extract UTM coordinates of four points to be interpolated
                        and build array */
-                    coordinates[0][0] =  east_grid[min_ineye][min_injay];
-                    coordinates[0][1] =  north_grid[min_ineye][min_injay];
-                    coordinates[1][0] =  east_grid[min_ineye+1][min_injay];
-                    coordinates[1][1] =  north_grid[min_ineye+1][min_injay];
-                    coordinates[2][0] =  east_grid[min_ineye][min_injay+1];
-                    coordinates[2][1] =  north_grid[min_ineye][min_injay+1];
-                    coordinates[3][0] =  east_grid[min_ineye+1][min_injay+1];
-                    coordinates[3][1] =  north_grid[min_ineye+1][min_injay+1];
+                    coordinates[0][0] = east_grid[min_ineye][min_injay];
+                    coordinates[0][1] = north_grid[min_ineye][min_injay];
+                    coordinates[1][0] = east_grid[min_ineye + 1][min_injay];
+                    coordinates[1][1] = north_grid[min_ineye + 1][min_injay];
+                    coordinates[2][0] = east_grid[min_ineye][min_injay + 1];
+                    coordinates[2][1] = north_grid[min_ineye][min_injay + 1];
+                    coordinates[3][0] =
+                        east_grid[min_ineye + 1][min_injay + 1];
+                    coordinates[3][1] =
+                        north_grid[min_ineye + 1][min_injay + 1];
 
                     /* determine index of four points in order to pull from
                        MODTRAN results */
@@ -921,28 +934,31 @@ int third_pixels_post
                 {
                     current_index = indices[g] * NUM_ELEVATIONS;
                     /* extract atmospheric parameters for all heights at current
-                       location*/
+                       location */
                     for (n = 0; n < 6; n++)
                     {
                         for (k = current_index; k < current_index +
-                            NUM_ELEVATIONS - 1; k++)
+                             NUM_ELEVATIONS - 1; k++)
                         {
-                                current_location[k - current_index][n] =
-                                    modtran_results[k][n];
+                            current_location[k - current_index][n] =
+                                modtran_results[k][n];
                         }
                     }
 
                     /* interpolate three atmospheric parameters to current
-                       height*/
-                    interpolate_to_height(current_location[2],
-                            current_location[3], current_location[4],
-                            current_location[5], dem[col], at_height[g]);
+                       height */
+                    interpolate_to_height (current_location[2],
+                                           current_location[3],
+                                           current_location[4],
+                                           current_location[5], dem[col],
+                                           at_height[g]);
                 }
 
                 /* interpolate parameters at appropriate height to location of
-                   current pixel*/
-                interpolate_to_location(coordinates, at_height, current_easting,
-                                        current_northing, parameters);
+                   current pixel */
+                interpolate_to_location (coordinates, at_height,
+                                         current_easting, current_northing,
+                                         parameters);
 
                 /* convert radiances to W*m^(-2)*sr(-1) */
                 landsat_results[0][col] = parameters[0];
@@ -954,117 +970,111 @@ int third_pixels_post
 
         /* Write out the temporary binary output files
            Note: needs to be deleted before release */
-        status = fwrite(&input->therm_buf[0], sizeof(int16),
-                 input->size_th.s, therm_fptr);
+        status = fwrite (&input->therm_buf[0], sizeof (int16),
+                         input->size_th.s, therm_fptr);
         if (status != input->size_th.s)
         {
-            sprintf(errstr, "Writing to %s", therm_fname);
-            LST_ERROR (errstr, "third_pixels_post");
+            sprintf (errstr, "Writing to %s", therm_fname);
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
 
-        status = fwrite(&landsat_results[0][0], sizeof(float),
-                 input->size_th.s, trans_fptr);
+        status = fwrite (&landsat_results[0][0], sizeof (float),
+                         input->size_th.s, trans_fptr);
         if (status != input->size_th.s)
         {
-            sprintf(errstr, "Writing to %s", trans_fname);
-            LST_ERROR (errstr, "third_pixels_post");
+            sprintf (errstr, "Writing to %s", trans_fname);
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
 
-        status = fwrite(&landsat_results[1][0], sizeof(float),
-                 input->size_th.s, up_fptr);
+        status = fwrite (&landsat_results[1][0], sizeof (float),
+                         input->size_th.s, up_fptr);
         if (status != input->size_th.s)
         {
-            sprintf(errstr, "Writing to %s", up_fname);
-            LST_ERROR (errstr, "third_pixels_post");
+            sprintf (errstr, "Writing to %s", up_fname);
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
 
-        status = fwrite(&landsat_results[2][0], sizeof(float),
-                 input->size_th.s, down_fptr);
+        status = fwrite (&landsat_results[2][0], sizeof (float),
+                         input->size_th.s, down_fptr);
         if (status != input->size_th.s)
         {
-            sprintf(errstr, "Writing to %s", down_fname);
-            LST_ERROR (errstr, "third_pixels_post");
+            sprintf (errstr, "Writing to %s", down_fname);
+            ERROR_MESSAGE (errstr, "third_pixels_post");
         }
     }
 
     /* Free allocated memory */
-    free(narr_lat);
-    free(narr_lon);
-    free(distances);
-    free(distance_copy);
-    status = free_2d_array((void **)current_location);
+    free (narr_lat);
+    free (narr_lon);
+    free (distances);
+    free (distance_copy);
+    status = free_2d_array ((void **) current_location);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: at_height\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: at_height\n", "third_pixels_post");
     }
-    status = free_2d_array((void **)at_height);
+    status = free_2d_array ((void **) at_height);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: at_height\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: at_height\n", "third_pixels_post");
     }
-    status = free_2d_array((void **)coordinates);
+    status = free_2d_array ((void **) coordinates);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: coordinates\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: coordinates\n", "third_pixels_post");
     }
-    status = free_2d_array((void **)east_grid);
+    status = free_2d_array ((void **) east_grid);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: east_grid\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: east_grid\n", "third_pixels_post");
     }
-    status = free_2d_array((void **)north_grid);
+    status = free_2d_array ((void **) north_grid);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: north_grid\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: north_grid\n", "third_pixels_post");
     }
 
-    status = free_2d_array((void **)narr_utm);
+    status = free_2d_array ((void **) narr_utm);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: narr_utm\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: narr_utm\n", "third_pixels_post");
     }
 
-    status = free_2d_array((void **)landsat_results);
+    status = free_2d_array ((void **) landsat_results);
     if (status != SUCCESS)
     {
-        sprintf (errstr, "Freeing memory: landsat_results\n");
-        LST_ERROR (errstr, "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: landsat_results\n",
+                       "third_pixels_post");
     }
 
     /* Close the intermediate binary files
        Note: needs to be deleted before release */
-    status = fclose(therm_fptr);
-    if ( status )
+    status = fclose (therm_fptr);
+    if (status)
     {
-        sprintf(errstr, "Closing file %s", therm_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Closing file %s", therm_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    status = fclose(trans_fptr);
-    if ( status )
+    status = fclose (trans_fptr);
+    if (status)
     {
-        sprintf(errstr, "Closing file %s", trans_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Closing file %s", trans_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    status = fclose(up_fptr);
-    if ( status )
+    status = fclose (up_fptr);
+    if (status)
     {
-        sprintf(errstr, "Closing file %s", up_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Closing file %s", up_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
-    status = fclose(down_fptr);
-    if ( status )
+    status = fclose (down_fptr);
+    if (status)
     {
-        sprintf(errstr, "Closing file %s", down_fname);
-        LST_ERROR (errstr, "third_pixels_post");
+        sprintf (errstr, "Closing file %s", down_fname);
+        ERROR_MESSAGE (errstr, "third_pixels_post");
     }
 
     return SUCCESS;

@@ -1,14 +1,17 @@
+
 #include <stddef.h>
 #include <stdlib.h>
-#include "error.h"
-#include "2d_array.h"
+
 #include "const.h"
+#include "2d_array.h"
+#include "utilities.h"
+
 
 /* The 2D_ARRAY maintains a 2D array that can be sized at run-time. */
 typedef struct ias_2d_array
 {
     unsigned int signature; /* Signature used to make sure the pointer
-                               math from a row_array_ptr actually gets back to 
+                               math from a row_array_ptr actually gets back to
                                the expected structure (helps detect errors). */
     int rows;               /* Rows in the 2D array */
     int columns;            /* Columns in the 2D array */
@@ -25,15 +28,18 @@ typedef struct ias_2d_array
                                memory alignment on sparc boxes. */
 } IAS_2D_ARRAY;
 
+
 /* Define a unique (i.e. random) value that can be used to verify a pointer
    points to an IAS_2D_ARRAY. This is used to verify the operation succeeds to
    get an IAS_2D_ARRAY pointer from a row pointer. */
 #define SIGNATURE 0x326589ab
 
+
 /* Given an address returned by the allocate routine, get a pointer to the
    entire structure. */
 #define GET_ARRAY_STRUCTURE_FROM_PTR(ptr) \
     ((IAS_2D_ARRAY *)((char *)(ptr) - offsetof(IAS_2D_ARRAY, memory_block)))
+
 
 /*************************************************************************
 NAME: allocate_2d_array
@@ -52,29 +58,31 @@ Date        Programmer       Reason
 **************************************************************************/
 void **allocate_2d_array
 (
-    int rows,            /* I: Number of rows for the 2D array */
-    int columns,         /* I: Number of columns for the 2D array */
-    size_t member_size   /* I: Size of the 2D array element */
+    int rows,          /* I: Number of rows for the 2D array */
+    int columns,       /* I: Number of columns for the 2D array */
+    size_t member_size /* I: Size of the 2D array element */
 )
 {
-    int row;             /* row number */  
-    IAS_2D_ARRAY *array; /* */
-    size_t size;         /* */
-    int data_start_index;/* data starting index */
+    int row;
+    IAS_2D_ARRAY *array;
+    size_t size;
+    int data_start_index;
 
     /* Calculate the size needed for the array memory. The size includes the
        size of the base structure, an array of pointers to the rows in the
        2D array, an array for the data, and additional space
        (2 * sizeof(void*)) to account for different memory alignment rules
        on some machine architectures. */
-    size = sizeof(*array) + (rows * sizeof(void*))
-        + (rows * columns * member_size) + 2 * sizeof(void*);
+    size = sizeof (*array) + (rows * sizeof (void *))
+        + (rows * columns * member_size) + 2 * sizeof (void *);
 
     /* Allocate the structure */
-    array = malloc(size);
+    array = malloc (size);
     if (!array)
-        RETURN_ERROR("Failure to allocate memory for the array",
-                     "allocate_2d_array", NULL);
+    {
+        RETURN_ERROR ("Failure to allocate memory for the array",
+                      "allocate_2d_array", NULL);
+    }
 
     /* Initialize the member structures */
     array->signature = SIGNATURE;
@@ -84,12 +92,13 @@ void **allocate_2d_array
 
     /* The array of pointers to rows starts at the beginning of the memory 
        block */
-    array->row_array_ptr = (void **)array->memory_block;
+    array->row_array_ptr = (void **) array->memory_block;
 
     /* The data starts after the row pointers, with the index adjusted in
        case the void pointer and memory block pointers are not the same
        size */
-    data_start_index = rows * sizeof(void *) / sizeof(array->memory_block[0]);
+    data_start_index =
+        rows * sizeof (void *) / sizeof (array->memory_block[0]);
     if ((rows % 2) == 1)
         data_start_index++;
     array->data_ptr = &array->memory_block[data_start_index];
@@ -97,12 +106,13 @@ void **allocate_2d_array
     /* Initialize the row pointers */
     for (row = 0; row < rows; row++)
     {
-        array->row_array_ptr[row] = array->data_ptr 
+        array->row_array_ptr[row] = array->data_ptr
             + row * columns * member_size;
     }
 
     return array->row_array_ptr;
 }
+
 
 /*************************************************************************
 NAME: free_2d_array
@@ -118,22 +128,23 @@ Date        Programmer       Reason
 **************************************************************************/
 int free_2d_array
 (
-    void **array_ptr    /* I: Pointer returned by the alloc routine */
+    void **array_ptr /* I: Pointer returned by the alloc routine */
 )
 {
     if (array_ptr != NULL)
     {
         /* Convert the array_ptr into a pointer to the structure */
-        IAS_2D_ARRAY *array = GET_ARRAY_STRUCTURE_FROM_PTR(array_ptr);
+        IAS_2D_ARRAY *array = GET_ARRAY_STRUCTURE_FROM_PTR (array_ptr);
 
         /* Verify it is a valid 2D array */
         if (array->signature != SIGNATURE)
         {
             /* Programming error of sort - exit the program */
-            RETURN_ERROR("Invalid signature on 2D array - memory "
-                "corruption or programming error?", "free_2d_array", FAILURE);
+            RETURN_ERROR ("Invalid signature on 2D array - memory "
+                          "corruption or programming error?", "free_2d_array",
+                          FAILURE);
         }
-        free(array);
+        free (array);
     }
 
     return SUCCESS;
