@@ -18,7 +18,6 @@ add_executable ( scene_based_lst input.c
                                  date.c
                                  misc.c
                                  split_filename.c
-                                 error.c
                                  build_modtran_input.c
                                  second_narr.c
                                  third_pixels_post.c
