@@ -11,10 +11,18 @@ find_library ( Math_Library m ) # We need the standard math library
 
 include_directories ( ${LibESPA_INCLUDES} ${LIBXML2_INCLUDE_DIR} )
 
-add_executable ( scene_based_lst error.c input.c 2d_array.c scene_based_lst.c
-                                 first_files.c second_narr.c
-                                 third_pixels_post.c date.c split_filename.c
-                                 misc.c output.c )
+add_executable ( scene_based_lst input.c
+                                 output.c
+                                 utilities.c
+                                 2d_array.c
+                                 date.c
+                                 misc.c
+                                 split_filename.c
+                                 error.c
+                                 build_modtran_input.c
+                                 second_narr.c
+                                 third_pixels_post.c
+                                 scene_based_lst.c )
 
 target_link_libraries ( scene_based_lst ${LibESPA_LIBRARIES}
                                         ${LIBXML2_LIBRARIES}
