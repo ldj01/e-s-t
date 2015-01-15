@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 
+/* Define logging routines */
 #define LOG_MESSAGE(message, module) \
             write_message((message), (module), "INFO", \
                           __FILE__, __LINE__, stdout);
@@ -37,6 +38,19 @@ void write_message
                                generated */
     FILE * fd            /* I: where to write the log message */
 );
+
+
+/* Re-define minimum and maximum to our versions */
+#ifdef min
+    #undef min
+    #define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+
+
+#ifdef max
+    #undef max
+    #define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
 
 
 #endif /* UTILITIES_H */
