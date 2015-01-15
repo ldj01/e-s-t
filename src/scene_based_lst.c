@@ -59,6 +59,7 @@ main (int argc, char *argv[])
     float **results = NULL;
     FILE *fd;
     int num_cases;
+    char *tmp_env = NULL;
 
     time_t now;
     time (&now);
@@ -73,6 +74,15 @@ main (int argc, char *argv[])
     if (status != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
+    }
+
+    /* Verify the existence of required environment variables */
+    /* Grab the environment path to the LST_DATA_DIR */
+    tmp_env = getenv ("LST_DATA_DIR");
+    if (tmp_env == NULL)
+    {
+        RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
+                      FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Validate the input metadata file */
