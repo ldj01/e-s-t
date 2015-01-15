@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <math.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 
 #include "const.h"
@@ -12,16 +13,12 @@
 #include "scene_based_lst.h"
 
 
-#ifndef max
-    #define max(a,b) (((a) (b)) ? (a) : (b))
-#endif
+#define STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD 9.80665
+#define POLAR_RADIUS_IN_KM 6356.752
+#define EQUATORIAL_RADIUS_IN_KM 6378.137
 
 
-#ifndef min
-    #define min(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
-/******************************************************************************
+/*****************************************************************************
 MODULE:  convert_geopotential_geometric
 
 PURPOSE: Convert array of geopotential heights to array of geometric heights
@@ -34,69 +31,103 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/22/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 int convert_geopotential_geometric
 (
-    int num_points,
-    float *lat,
-    float **geo_potential,
-    float **geo_metric
+    int num_points,        /* I: number of points */
+    float *lat,            /* I: latitude in degrees */
+    float **geo_potential, /* I: geo_potential height */
+    float **geo_metric     /* O: geo_metric height */
 )
 {
-    float *radlat;
+    char FUNC_NAME[] = "convert_geopotential_geometric";
     int i, j;
-    float g_0 = 9.80665;
-    float r_max = 6378.137;
-    float r_min = 6356.752;
-    float *radius;
-    float *gravity_ratio;
+    double *radlat;        /* radians of the latitude */
+    double *radius;        /* radius in meters at the latitude */
+    double *gravity_ratio; /* gravity ratio at the latitude */
+
+    double sin_lat;
+    double cos_lat;
+    double cos_2lat;
+
+    double inv_r_min_sqrd;
+    double inv_r_max_sqrd;
+    double inv_std_gravity;
+
+    int array_bytes = num_points * sizeof (double);
 
     /* Allocate memeory */
-    radlat = (float *) malloc (num_points * sizeof (float));
+    radlat = (double *) malloc (array_bytes);
     if (radlat == NULL)
     {
-        ERROR_MESSAGE ("Allocating radlat memory",
-                       "convert_geopotential_geometric");
+        RETURN_ERROR ("Allocating radlat memory", FUNC_NAME, FAILURE);
     }
 
-    radius = (float *) malloc (num_points * sizeof (float));
+    radius = (double *) malloc (array_bytes);
     if (radius == NULL)
     {
-        ERROR_MESSAGE ("Allocating radius memory",
-                       "convert_geopotential_geometric");
+        RETURN_ERROR ("Allocating radius memory", FUNC_NAME, FAILURE);
     }
 
-    gravity_ratio = (float *) malloc (num_points * sizeof (float));
+    gravity_ratio = (double *) malloc (array_bytes);
     if (gravity_ratio == NULL)
     {
-        ERROR_MESSAGE ("Allocating gravity_ratio memory",
-                       "convert_geopotential_geometric");
+        RETURN_ERROR ("Allocating gravity_ratio memory", FUNC_NAME, FAILURE);
     }
 
+    inv_r_min_sqrd = 1.0 / (POLAR_RADIUS_IN_KM * POLAR_RADIUS_IN_KM);
+    inv_r_max_sqrd = 1.0 / (EQUATORIAL_RADIUS_IN_KM * EQUATORIAL_RADIUS_IN_KM);
+    inv_std_gravity = 1.0 / STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD;
+
+    /* Calculate values for each point
+       NOTE - These are constant for this scene, yet calculated twice since
+              this routine is called twice.  Should not be a time hog though
+              since the number of points is low and will be lower with
+              MERRA data if we use MERRA later. */
     for (i = 0; i < num_points; i++)
     {
-        radlat[i] = (lat[i] * PI) / 180.0;
+        /* Convert the latitude to radians */
+        radlat[i] = lat[i] * RAD;
 
-        /* define variable based on latitude */
+        /* Only calculate these once for the latitude */
+        sin_lat = sin (radlat[i]);
+        cos_lat = cos (radlat[i]);
+        cos_2lat = cos (2.0 * radlat[i]);
+
+        /* Determine the radius at the latitude in meters */
+        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
+                            then we would not have to multiply by 1000.0 here
+                            to get meters.  Or at least that is what I
+                            currently assume is happening. */
+        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
+                            then we would not have to multiply by 1000.0 here
+                            to get meters.  Or at least that is what I
+                            currently assume is happening. */
+        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
+                            then we would not have to multiply by 1000.0 here
+                            to get meters.  Or at least that is what I
+                            currently assume is happening. */
         radius[i] = 1000.0
-                    * (sqrt (1.0 / ((cos (radlat[i]) * cos (radlat[i]))
-                                    / (r_max * r_max)
-                                    + ((sin (radlat[i]) * sin (radlat[i]))
-                                       / (r_min * r_min)))));
+                    * sqrt (1.0 / (((cos_lat * cos_lat) * inv_r_max_sqrd)
+                                   + ((sin_lat * sin_lat) * inv_r_min_sqrd)));
+
+        /* Determine the gravity ratio at the latitude */
         gravity_ratio[i] = (9.80616
-                            * (1 - 0.002637 * cos (2.0 * radlat[i])
-                               + 0.0000059 * (cos (2.0 * radlat[i])
-                                              * cos (2.0 * radlat[i]))))
-                           / g_0;
+                            * (1.0
+                               - (0.002637 * cos_2lat)
+                               + (0.0000059 * (cos_2lat * cos_2lat))))
+                           * inv_std_gravity;
     }
 
+    /* Calculate the geompetric height for each point in each layer */
     for (i = 0; i < P_LAYER; i++)
     {
         for (j = 0; j < num_points; j++)
         {
+            /* The values should all be double until converted to float here */
             geo_metric[i][j] = (geo_potential[i][j] * radius[j])
-                / (1000.0 * (gravity_ratio[j] * radius[j]
-                             - geo_potential[i][j]));
+                               / (1000.0 * (gravity_ratio[j] * radius[j]
+                                            - geo_potential[i][j]));
         }
     }
 
@@ -109,7 +140,7 @@ int convert_geopotential_geometric
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  convert_sh_rh
 
 PURPOSE: Given array of specific humidities, temperature, and pressure,
@@ -122,17 +153,18 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/22/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 int convert_sh_rh
 (
-    int num_points,
-    float *lat,
+    int num_points,   /* I: number of points */
+    float *lat,       /* I: latitude in degrees */
     float **spec_hum,
     float **temp_k,
     float **pressure,
-    float **rh
+    float **rh        /* O: relative humidity */
 )
 {
+    char FUNC_NAME[] = "convert_sh_rh";
     int i, j;
     float mh20 = 18.01534;
     float mdry = 28.9644;
@@ -144,44 +176,46 @@ int convert_sh_rh
     float a4w = 3.0312403963e-6;
     float a5w = 2.034080948e-8;
     float a6w = 6.136820929e-11;
+
     float **temp_c;
     float **ewater;
-    float **e2;
+// TODO TODO TODO - RDD - This was calculated but not used??????????
+//    float **e2;
     float **goff;
     float **ph20;
-    int status;
 
     /* Allocate memory */
-    temp_c =
-        (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
+    temp_c = (float **) allocate_2d_array (P_LAYER, num_points,
+                                           sizeof (float));
     if (temp_c == NULL)
     {
-        ERROR_MESSAGE ("Allocating temp_c memory", "first_files");
+        RETURN_ERROR ("Allocating temp_c memory", FUNC_NAME, FAILURE);
     }
 
-    ewater =
-        (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
+    ewater = (float **) allocate_2d_array (P_LAYER, num_points,
+                                           sizeof (float));
     if (ewater == NULL)
     {
-        ERROR_MESSAGE ("Allocating ewater memory", "first_files");
+        RETURN_ERROR ("Allocating ewater memory", FUNC_NAME, FAILURE);
     }
 
-    e2 = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
-    if (e2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating e2 memory", "first_files");
-    }
+// TODO TODO TODO - RDD - This was calculated but not used??????????
+//    e2 = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
+//    if (e2 == NULL)
+//    {
+//        RETURN_ERROR ("Allocating e2 memory", FUNC_NAME, FAILURE);
+//    }
 
     goff = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
     if (goff == NULL)
     {
-        ERROR_MESSAGE ("Allocating goff memory", "first_files");
+        RETURN_ERROR ("Allocating goff memory", FUNC_NAME, FAILURE);
     }
 
     ph20 = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
     if (ph20 == NULL)
     {
-        ERROR_MESSAGE ("Allocating  memory", "first_files");
+        RETURN_ERROR ("Allocating  memory", FUNC_NAME, FAILURE);
     }
 
     for (i = 0; i < P_LAYER; i++)
@@ -190,49 +224,289 @@ int convert_sh_rh
         {
             /* Convert temperature to C */
             temp_c[i][j] = temp_k[i][j] - 273.15;
+
             /* calculate vapor pressure at given temperature */
-            ewater[i][j] = a0w + temp_c[i][j] * (a1w + temp_c[i][j] * (a2w + temp_c[i][j] * (a3w + temp_c[i][j] * (a4w + temp_c[i][j] * (a5w + temp_c[i][j] * (a6w * temp_c[i][j]))))));        /* hpa */
+            ewater[i][j] = a0w + temp_c[i][j]
+                           * (a1w + temp_c[i][j]
+                              * (a2w + temp_c[i][j]
+                                 * (a3w + temp_c[i][j]
+                                    * (a4w + temp_c[i][j]
+                                       * (a5w + temp_c[i][j]
+                                          * (a6w * temp_c[i][j]))))));/* hpa */
 
-            e2[i][j] = exp (-0.58002206e4 / temp_k[i][j] + 0.13914993 - 0.48640239e-1 * temp_k[i][j] + 0.41764768e-4 * pow (temp_k[i][j], 2.0) - 0.14452093e-7 * pow (temp_k[i][j], 3.0) + 0.65459673 * log (temp_k[i][j]));    /* Pa */
+// TODO TODO TODO - RDD - This was calculated but not used??????????
+//            e2[i][j] = exp (-0.58002206e4 / temp_k[i][j]
+//                            + 0.13914993
+//                            - 0.48640239e-1 * temp_k[i][j]
+//                            + 0.41764768e-4 * pow (temp_k[i][j], 2.0)
+//                            - 0.14452093e-7 * pow (temp_k[i][j], 3.0)
+//                            + 0.65459673 * log (temp_k[i][j])); /* Pa */
 
-            goff[i][j] = -7.90298 * (373.16 / temp_k[i][j] - 1) + 5.02808 * log10 (373.16 / temp_k[i][j]) - 1.3816e-7 * pow (10.0, (11.344 * (1.0 - (temp_k[i][j] / 373.16))) - 1.0) + 8.1328e-3 * pow (10.0, (-3.49149 * (373.16 / temp_k[i][j] - 1.0)) - 1.0) + log10 (1013.246);     /* hPa */
+            goff[i][j] = -7.90298 * (373.16 / temp_k[i][j] - 1.0)
+                         + 5.02808 * log10 (373.16 / temp_k[i][j])
+                         - 1.3816e-7 * pow (10.0, (11.344
+                                                   * (1.0
+                                                      - (temp_k[i][j]
+                                                         / 373.16)))
+                                                  - 1.0)
+                         + 8.1328e-3 * pow (10.0, (-3.49149
+                                                   * (373.16 / temp_k[i][j]
+                                                      - 1.0))
+                                                  - 1.0)
+                         + log10 (1013.246); /* hPa */
 
             ph20[i][j] = (spec_hum[i][j] * pressure[i][j] * mdry)
-                / (mh20 - spec_hum[i][j] * mh20 + spec_hum[i][j] * mdry);
+                         / (mh20
+                            - spec_hum[i][j] * mh20
+                            + spec_hum[i][j] * mdry);
 
             rh[i][j] = (ph20[i][j] / pow (10.0, goff[i][j])) * 100.0;
         }
     }
 
     /* Free allocated memory */
-    status = free_2d_array ((void **) temp_c);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) temp_c) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: temp_c\n", "first_files");
+        RETURN_ERROR ("Freeing memory: temp_c\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) ewater);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) ewater) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: ewater\n", "first_files");
+        RETURN_ERROR ("Freeing memory: ewater\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) e2);
-    if (status != SUCCESS)
+// TODO TODO TODO - RDD - This was calculated but not used??????????
+//    if (free_2d_array ((void **) e2) != SUCCESS)
+//    {
+//        RETURN_ERROR ("Freeing memory: e2\n", FUNC_NAME, FAILURE);
+//    }
+
+    if (free_2d_array ((void **) goff) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: e2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: goff\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) goff);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) ph20) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: goff\n", "first_files");
+        RETURN_ERROR ("Freeing memory: ph20\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) ph20);
-    if (status != SUCCESS)
+    return SUCCESS;
+}
+
+
+/******************************************************************************
+MODULE:  read_narr_coordinates
+
+PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+
+RETURN: SUCCESS
+        FAILURE
+******************************************************************************/
+int read_narr_coordinates
+(
+    char *lst_data_dir,
+    int **grid_i,
+    int **grid_j,
+    float **lat,
+    float **lon
+)
+{
+    char FUNC_NAME[] = "read_narr_coordinates";
+    int i, j;
+    int count;
+    char coord_file[PATH_MAX];
+    FILE *fd = NULL;
+
+    /* Setup the string to be used to open the coordinates file */
+    count = snprintf (coord_file, sizeof (coord_file),
+                      "%s/%s", lst_data_dir, "narr_coordinates.txt");
+    if (count < 0 || count >= sizeof (coord_file))
     {
-        ERROR_MESSAGE ("Freeing memory: ph20\n", "first_files");
+        RETURN_ERROR ("Failed initializing coord_file variable for"
+                      " narr_coordinates.txt", FUNC_NAME, FAILURE);
+    }
+
+    /* Open the NARR coordinates file */
+    fd = fopen (coord_file, "r");
+    if (fd == NULL)
+    {
+        RETURN_ERROR ("Can't open narr_coordinates.txt file", FUNC_NAME,
+                      FAILURE);
+    }
+
+    /* Read each value from the file */
+    for (j = 0; j < NARR_COL; j++)
+    {
+        for (i = 0; i < NARR_ROW; i++)
+        {
+            /* File Format:
+               Grid_I Grid_J Latitude Longitude
+             */
+            if (fscanf (fd, "%d %d %f %f",
+                        &grid_i[i][j], &grid_j[i][j],
+                        &lat[i][j], &lon[i][j]) == EOF)
+            {
+                RETURN_ERROR ("End of file (EOF) is met before"
+                              " NARR_ROW * NARR_COL lines",
+                              FUNC_NAME, FAILURE);
+            }
+
+            /* TODO - Should think about fixing the input file, so that this
+                      confusing conversion is not needed.
+                      When you read  the file data, it is as if you are
+                      reading the values from the lower left to the upper
+                      right as applied to the earth.  And the values being
+                      read in start with an origin somewhere around the lower
+                      left, hence the need for the following conversion. */
+            if ((lon[i][j] - 180.0) > MINSIGMA)
+                lon[i][j] = 360.0 - lon[i][j];
+            else
+                lon[i][j] = -lon[i][j];
+        }
+    }
+
+    if (fclose (fd) != SUCCESS)
+    {
+        RETURN_ERROR ("Closing file: narr_coordinates.txt\n",
+                      FUNC_NAME, FAILURE);
+    }
+
+    return SUCCESS;
+}
+
+
+/******************************************************************************
+MODULE:  read_std_mid_lat_summer_atmos
+
+PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+
+RETURN: SUCCESS
+        FAILURE
+******************************************************************************/
+int read_std_mid_lat_summer_atmos
+(
+    char *lst_data_dir,
+    float *stan_height,
+    float *stan_pre,
+    float *stan_temp,
+    float *stan_rh
+)
+{
+    char FUNC_NAME[] = "read_std_mid_lat_summer_atmos";
+    int i;
+    int count;
+    char atmos_file[PATH_MAX];
+    FILE *fd = NULL;
+
+    /* read in file containing standard mid lat summer atmosphere information
+       to be used for upper layers */
+    count = snprintf (atmos_file, sizeof (atmos_file),
+                      "%s/%s", lst_data_dir, "std_mid_lat_summer_atmos.txt");
+    if (count < 0 || count >= sizeof (atmos_file))
+    {
+        RETURN_ERROR ("Failed initializing atmos_file variable for"
+                      " std_mid_lat_summer_atmos.txt", FUNC_NAME, FAILURE);
+    }
+
+    fd = fopen (atmos_file, "r");
+    if (fd == NULL)
+    {
+        RETURN_ERROR ("Opening file: std_mid_lat_summer_atmos.txt\n",
+                      FUNC_NAME, FAILURE);
+    }
+
+    for (i = 0; i < STAN_LAYER; i++)
+    {
+        if (fscanf (fd, "%f %f %f %f", &stan_height[i], &stan_pre[i],
+                    &stan_temp[i], &stan_rh[i]) == EOF)
+        {
+            RETURN_ERROR ("End of file (EOF) is met before STAN_LAYER lines",
+                          FUNC_NAME, FAILURE);
+        }
+    }
+
+    if (fclose (fd) != SUCCESS)
+    {
+        RETURN_ERROR ("Closing file: std_mid_lat_summer_atmos.txt\n",
+                      FUNC_NAME, FAILURE);
+    }
+
+    return SUCCESS;
+}
+
+
+/******************************************************************************
+MODULE:  read_narr_parameter_values
+
+PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+
+RETURN: SUCCESS
+        FAILURE
+******************************************************************************/
+int read_narr_parameter_values
+(
+    int *layers,
+    char *parameter,
+    float **output_2d_array
+)
+{
+    char FUNC_NAME[] = "read_narr_parameter_values";
+    char msg_str[MAX_STR_LEN];
+    char parm_filename[PATH_MAX];
+    int i, j;
+    int count;
+    int file_rows, file_cols;
+    FILE *fd = NULL;
+
+    /* Read each layers parameter file into memory */
+    for (i = 0; i < P_LAYER; i++)
+    {
+        /* Build the full path to the parameter file */
+        count = snprintf (parm_filename, sizeof (parm_filename),
+                           "%s/%d%s", parameter, layers[i], ".txt");
+        if (count < 0 || count >= sizeof (parm_filename))
+        {
+            RETURN_ERROR ("Failed initializing parm_filename variable for"
+                          " NARR parameters", FUNC_NAME, FAILURE);
+        }
+
+        snprintf(msg_str, sizeof (msg_str), "Reading [%s]", parm_filename);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
+
+        /* Open the parameter file for reading */
+        fd = fopen (parm_filename, "r");
+        if (fd == NULL)
+        {
+            RETURN_ERROR ("Can't HGT_1 txt file", FUNC_NAME, FAILURE);
+        }
+
+        /* Read the number of rows and columns and verify them */
+        fscanf (fd, "%d %d", &file_rows, &file_cols);
+        if (file_rows != NARR_ROW || file_cols != NARR_COL)
+        {
+            RETURN_ERROR ("Parameter file contains invalid number of rows and"
+                          " columns", FUNC_NAME, FAILURE);
+        }
+
+        /* Read the values into memory */
+        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        {
+            if (fscanf (fd, "%f", &output_2d_array[i][j]) == EOF)
+            {
+                RETURN_ERROR ("End of file (EOF) is met before "
+                              "NARR_ROW * NARR_COL lines",
+                               FUNC_NAME, FAILURE);
+            }
+        }
+
+        /* Close the current parameter file */
+        if (fclose (fd) != SUCCESS)
+        {
+            snprintf(msg_str, sizeof (msg_str),
+                     "Closing file: %s/%d.txt\n", parameter, layers[i]);
+            RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
+        }
     }
 
     return SUCCESS;
@@ -255,28 +529,29 @@ Date        Programmer       Reason
 int build_modtran_input
 (
     Input_t *input,  /*I: input structure */
-    int *num_points, /*O: number of NARR points */
-    bool verbose     /*I: value to indicate if intermediate messages
+    int *num_pts,    /*O: number of NARR points */
+    bool verbose     /*I: value to indicate if intermediate messages should
                           be printed */
 )
 {
+    char FUNC_NAME[] = "build_modtran_input";
     int **eye;
     int **jay;
     float **lat;
     float **lon;
     float **hgt1;
-    float **shum1;
+    float **spfh1;
     float **tmp1;
     float **hgt2;
-    float **shum2;
+    float **spfh2;
     float **tmp2;
     float *narr_lat;
     float *narr_lon;
     float **narr_hgt1;
-    float **narr_shum1;
+    float **narr_spfh1;
     float **narr_tmp1;
     float **narr_hgt2;
-    float **narr_shum2;
+    float **narr_spfh2;
     float **narr_tmp2;
     float **narr_height;
     float **narr_height1;
@@ -286,20 +561,17 @@ int build_modtran_input
     float **narr_rh2;
     float **narr_tmp;
     int i, j, k;
-    int p[P_LAYER] = { 1000, 975, 950, 925, 900,
-        875, 850, 825, 800, 775,
-        750, 725, 700, 650, 600,
-        550, 500, 450, 400, 350,
-        300, 275, 250, 225, 200,
-        175, 150, 125, 100
-    };
-    char full_path[MAX_STR_LEN];
-//    int landsat_hemi;
+    int layers[P_LAYER] = { 1000, 975, 950, 925, 900,
+                            875, 850, 825, 800, 775,
+                            750, 725, 700, 650, 600,
+                            550, 500, 450, 400, 350,
+                            300, 275, 250, 225, 200,
+                            175, 150, 125, 100 };
+    int num_points;
     float narr_ul_lat;
     float narr_ul_lon;
     float narr_lr_lat;
     float narr_lr_lon;
-    int in_counter = 0;
     int max_eye;
     int min_eye;
     int max_jay;
@@ -311,7 +583,9 @@ int build_modtran_input
     int rem2;
     float hour1;
     float hour2;
+    float inv_hour_diff;
     float time;
+    float time_diff;
     FILE *fd;
     float *stan_height;
     float *stan_pre;
@@ -324,7 +598,8 @@ int build_modtran_input
     float gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1, 2.6,
         3.1, 3.6, 4.05
     };
-    int num_cases;
+    float inv_narr_height_diff;
+    int num_modtran_runs;
     char command[MAX_STR_LEN];
     char current_gdalt[MAX_STR_LEN];
     char current_temp[MAX_STR_LEN];
@@ -342,255 +617,54 @@ int build_modtran_input
     int *counter;
     float tmp[3] = { 273.0, 310.0, 0.0 };
     float alb[3] = { 0.0, 0.0, 0.1 };
-    char *path = NULL;
+    char *lst_data_dir = NULL;
     char *modtran_path = NULL;
     char *modtran_data_dir = NULL;
-    struct stat s;
-    int status;
-    int temp_int1, temp_int2;
     int case_counter;
     char **case_list;
     char **command_list;
+    char lat_str[7]; /* 6 plus the string termination character */
+    char lon_str[7]; /* 6 plus the string termination character */
+    char msg_str[MAX_STR_LEN];
 
-    /* Dynamic allocate the 2d memory */
+    /* Dynamic allocate the 2d memory for the coordinates */
     eye = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (eye == NULL)
     {
-        ERROR_MESSAGE ("Allocating eye memory", "first_files");
+        RETURN_ERROR ("Allocating eye memory", FUNC_NAME, FAILURE);
     }
 
     jay = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (jay == NULL)
     {
-        ERROR_MESSAGE ("Allocating jay memory", "first_files");
+        RETURN_ERROR ("Allocating jay memory", FUNC_NAME, FAILURE);
     }
 
     lat = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lat == NULL)
     {
-        ERROR_MESSAGE ("Allocating lat memory", "first_files");
+        RETURN_ERROR ("Allocating lat memory", FUNC_NAME, FAILURE);
     }
 
     lon = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lon == NULL)
     {
-        ERROR_MESSAGE ("Allocating lon memory", "first_files");
+        RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
     }
 
-    path = getenv ("LST_DATA_DIR");
-    if (path == NULL)
+    /* Grab the environment path to the LST_DATA_DIR */
+    lst_data_dir = getenv ("LST_DATA_DIR");
+    if (lst_data_dir == NULL)
     {
-        ERROR_MESSAGE ("LST_DATA_DIR environment variable is not set",
-                       "first_files");
+        RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
+                      FUNC_NAME, FAILURE);
     }
 
-    sprintf (full_path, "%s/%s", path, "narr_coordinates.txt");
-    fd = fopen (full_path, "r");
-    if (fd == NULL)
+    /* Read the coordinates into memory */
+    if (read_narr_coordinates (lst_data_dir, eye, jay, lat, lon) != SUCCESS)
     {
-        ERROR_MESSAGE ("Can't open narr_coordinates.txt file", "first_files");
+        RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
     }
-
-    for (j = 0; j < NARR_COL; j++)
-    {
-        for (i = 0; i < NARR_ROW; i++)
-        {
-            if (fscanf (fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j],
-                        &lon[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before"
-                               " NARR_ROW * NARR_COL lines", "first_file");
-            }
-            if ((lon[i][j] - 180.0) > MINSIGMA)
-                lon[i][j] = 360.0 - lon[i][j];
-            else
-                lon[i][j] = -lon[i][j];
-        }
-    }
-    fclose (fd);
-
-    /* Dynamic allocate the 2d memory */
-    hgt1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                         sizeof (float));
-    if (hgt1 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating hgt_1 memory", "first_files");
-    }
-
-    shum1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                          sizeof (float));
-    if (shum1 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating shum_1 memory", "first_files");
-    }
-
-    tmp1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                         sizeof (float));
-    if (tmp1 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating tmp_1 memory", "first_files");
-    }
-
-    /* Read in NARR height for time before landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "HGT_1/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't HGT_1 txt file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &hgt1[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* Read in NARR specific humidity for time before landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "SHUM_1/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't open SHUM_1 file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &shum1[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* Read in NARR temperature for time before landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "TMP_1/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't open TMP_1 file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &tmp1[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* Dynamic allocate the 2d memory */
-    hgt2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                         sizeof (float));
-    if (hgt2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating hgt_2 memory", "first_files");
-    }
-
-    shum2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                          sizeof (float));
-    if (shum2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating shum_2 memory", "first_files");
-    }
-
-    tmp2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
-                                         sizeof (float));
-    if (tmp2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating tmp_2 memory", "first_files");
-    }
-
-    /* Read in NARR height for time after landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "HGT_2/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't HGT_2 txt file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &hgt2[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* Read in NARR specific humidity for time after landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "SHUM_2/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't open SHUM_2 file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &shum2[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* Read in NARR temperature for time after landsat acqusition */
-    for (i = 0; i < P_LAYER; i++)
-    {
-        sprintf (full_path, "%s/%d%s", "TMP_2/", p[i], ".txt");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            ERROR_MESSAGE ("Can't open TMP_2 file", "first_files");
-        }
-
-        fscanf (fd, "%d %d", &temp_int1, &temp_int2);
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
-        {
-            if (fscanf (fd, "%f", &tmp2[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before "
-                               "NARR_ROW * NARR_COL lines", "first_files");
-            }
-        }
-        fclose (fd);
-    }
-
-    /* determine if landsat is in the northern or southern hemisphere.
-       '6' = northern hemisphere, '7' = southern hermisphere. */
-//    if (input->meta.ul_geo_corner.lat > MINSIGMA)
-//        landsat_hemi = 6;
-//    else
-//        landsat_hemi = 7; 
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
@@ -620,7 +694,6 @@ int build_modtran_input
                 min_eye = min (min_eye, eye[i][j]);
                 max_jay = max (max_jay, jay[i][j]);
                 min_jay = min (min_jay, jay[i][j]);
-                in_counter++;
             }
         }
     }
@@ -630,63 +703,160 @@ int build_modtran_input
     min_jay--;
     num_eyes = max_eye - min_eye + 1;
     num_jays = max_jay - min_jay + 1;
-    *num_points = num_eyes * num_jays;
+    num_points = num_eyes * num_jays;
+
+    /* Free eye and jay memory since they are not used anymore */
+    if (free_2d_array ((void **) eye) != SUCCESS)
+    {
+        RETURN_ERROR ("Freeing memory: eye\n", FUNC_NAME, FAILURE);
+    }
+    eye = NULL;
+
+    if (free_2d_array ((void **) jay) != SUCCESS)
+    {
+        RETURN_ERROR ("Freeing memory: jay\n", FUNC_NAME, FAILURE);
+    }
+    jay = NULL;
+
+    /* ==================================================================== */
+
+    /* Dynamic allocate the 2d memory for time before Landsat Acq. */
+    hgt1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                         sizeof (float));
+    if (hgt1 == NULL)
+    {
+        RETURN_ERROR ("Allocating HGT_1 memory", FUNC_NAME, FAILURE);
+    }
+
+    spfh1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                          sizeof (float));
+    if (spfh1 == NULL)
+    {
+        RETURN_ERROR ("Allocating SPFH_1 memory", FUNC_NAME, FAILURE);
+    }
+
+    tmp1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                         sizeof (float));
+    if (tmp1 == NULL)
+    {
+        RETURN_ERROR ("Allocating TMP_1 memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Dynamic allocate the 2d memory for time after Landsat Acq. */
+    hgt2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                         sizeof (float));
+    if (hgt2 == NULL)
+    {
+        RETURN_ERROR ("Allocating HGT_2 memory", FUNC_NAME, FAILURE);
+    }
+
+    spfh2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                          sizeof (float));
+    if (spfh2 == NULL)
+    {
+        RETURN_ERROR ("Allocating SPFH_2 memory", FUNC_NAME, FAILURE);
+    }
+
+    tmp2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+                                         sizeof (float));
+    if (tmp2 == NULL)
+    {
+        RETURN_ERROR ("Allocating TMP_2 memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR height for time before landsat acqusition */
+    if (read_narr_parameter_values (layers, "HGT_1", hgt1) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR specific humidity for time before landsat acqusition */
+    if (read_narr_parameter_values (layers, "SPFH_1", spfh1) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading SPFH_1 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR temperature for time before landsat acqusition */
+    if (read_narr_parameter_values (layers, "TMP_1", tmp1) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading TMP_1 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR height for time after landsat acqusition */
+    if (read_narr_parameter_values (layers, "HGT_2", hgt2) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading HGT_2 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR specific humidity for time after landsat acqusition */
+    if (read_narr_parameter_values (layers, "SPFH_2", spfh2) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading SPFH_2 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* Read in NARR temperature for time after landsat acqusition */
+    if (read_narr_parameter_values (layers, "TMP_2", tmp2) != SUCCESS)
+    {
+        RETURN_ERROR ("Failed loading TMP_2 parameters", FUNC_NAME, FAILURE);
+    }
+
+    /* ==================================================================== */
 
     /* Allocate memory for height of NARR points within the rectangular */
-    narr_lat = (float *) malloc (*num_points * sizeof (float));
+    narr_lat = (float *) malloc (num_points * sizeof (float));
     if (narr_lat == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_lat memory", "first_files");
+        RETURN_ERROR ("Allocating narr_lat memory", FUNC_NAME, FAILURE);
     }
 
-    narr_lon = (float *) malloc (*num_points * sizeof (float));
+    narr_lon = (float *) malloc (num_points * sizeof (float));
     if (narr_lon == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_lon memory", "first_files");
+        RETURN_ERROR ("Allocating narr_lon memory", FUNC_NAME, FAILURE);
     }
 
-    narr_hgt1 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_hgt1 = (float **) allocate_2d_array (P_LAYER, num_points,
                                               sizeof (float));
     if (narr_hgt1 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_hgt1 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_hgt1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_hgt2 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_hgt2 = (float **) allocate_2d_array (P_LAYER, num_points,
                                               sizeof (float));
     if (narr_hgt2 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_hgt2 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_hgt2 memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory for humidity of NARR points within the rectangular */
-    narr_shum1 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_spfh1 = (float **) allocate_2d_array (P_LAYER, num_points,
                                                sizeof (float));
-    if (narr_shum1 == NULL)
+    if (narr_spfh1 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_shum1 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_spfh1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_shum2 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_spfh2 = (float **) allocate_2d_array (P_LAYER, num_points,
                                                sizeof (float));
-    if (narr_shum2 == NULL)
+    if (narr_spfh2 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_shum2 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_spfh2 memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory for temperature of NARR points within the rectangular */
-    narr_tmp1 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_tmp1 = (float **) allocate_2d_array (P_LAYER, num_points,
                                               sizeof (float));
     if (narr_tmp1 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_tmp1 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_tmp1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_tmp2 = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_tmp2 = (float **) allocate_2d_array (P_LAYER, num_points,
                                               sizeof (float));
     if (narr_tmp2 == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_tmp2 memory", "first_files");
+        RETURN_ERROR ("Allocating narr_tmp2 memory", FUNC_NAME, FAILURE);
     }
 
     /* extract coordinates within the NARR rectangle */
@@ -706,14 +876,14 @@ int build_modtran_input
             {
                 narr_hgt1[k][(j - min_jay) * num_eyes + (i - min_eye)]
                     = hgt1[k][j * NARR_ROW + i];
-                narr_shum1[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = shum1[k][j * NARR_ROW + i];
+                narr_spfh1[k][(j - min_jay) * num_eyes + (i - min_eye)]
+                    = spfh1[k][j * NARR_ROW + i];
                 narr_tmp1[k][(j - min_jay) * num_eyes + (i - min_eye)]
                     = tmp1[k][j * NARR_ROW + i];
                 narr_hgt2[k][(j - min_jay) * num_eyes + (i - min_eye)]
                     = hgt2[k][j * NARR_ROW + i];
-                narr_shum2[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = shum2[k][j * NARR_ROW + i];
+                narr_spfh2[k][(j - min_jay) * num_eyes + (i - min_eye)]
+                    = spfh2[k][j * NARR_ROW + i];
                 narr_tmp2[k][(j - min_jay) * num_eyes + (i - min_eye)]
                     = tmp2[k][j * NARR_ROW + i];
             }
@@ -721,171 +891,167 @@ int build_modtran_input
     }
 
     /* Release memory */
-    status = free_2d_array ((void **) eye);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) lat) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: eye\n", "first_files");
+        RETURN_ERROR ("Freeing memory: lat\n", FUNC_NAME, FAILURE);
     }
+    lat = NULL;
 
-    status = free_2d_array ((void **) jay);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) lon) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: jay\n", "first_files");
+        RETURN_ERROR ("Freeing memory: lon\n", FUNC_NAME, FAILURE);
     }
+    lon = NULL;
 
-    status = free_2d_array ((void **) lat);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) hgt1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: lat\n", "first_files");
+        RETURN_ERROR ("Freeing memory: hgt1\n", FUNC_NAME, FAILURE);
     }
+    hgt1 = NULL;
 
-    status = free_2d_array ((void **) lon);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) spfh1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: lon\n", "first_files");
+        RETURN_ERROR ("Freeing memory: spfh1\n", FUNC_NAME, FAILURE);
     }
+    spfh1 = NULL;
 
-    status = free_2d_array ((void **) hgt1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) tmp1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: hgt1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: tmp1\n", FUNC_NAME, FAILURE);
     }
+    tmp1 = NULL;
 
-    status = free_2d_array ((void **) shum1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) hgt2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: shum1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: ght2\n", FUNC_NAME, FAILURE);
     }
+    hgt2 = NULL;
 
-    status = free_2d_array ((void **) tmp1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) spfh2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: tmp1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: spfh2\n", FUNC_NAME, FAILURE);
     }
+    spfh2 = NULL;
 
-    status = free_2d_array ((void **) hgt2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) tmp2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: ght2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: tmp2\n", FUNC_NAME, FAILURE);
     }
+    tmp2 = NULL;
 
-    status = free_2d_array ((void **) shum2);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: shum2\n", "first_files");
-    }
-
-    status = free_2d_array ((void **) tmp2);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: tmp2\n", "first_files");
-    }
+    /* ==================================================================== */
 
     /* Allocate memory */
-    pressure = (float **) allocate_2d_array (P_LAYER, *num_points,
+    pressure = (float **) allocate_2d_array (P_LAYER, num_points,
                                              sizeof (float));
     if (pressure == NULL)
     {
-        ERROR_MESSAGE ("Allocating pressure memory", "first_files");
-    }
-
-    narr_height1 = (float **) allocate_2d_array (P_LAYER, *num_points,
-                                                 sizeof (float));
-    if (narr_height1 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating narr_height1 memory", "first_files");
-    }
-
-    narr_height2 = (float **) allocate_2d_array (P_LAYER, *num_points,
-                                                 sizeof (float));
-    if (narr_height2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating narr_height2 memory", "first_files");
-    }
-
-    narr_rh1 = (float **) allocate_2d_array (P_LAYER, *num_points,
-                                             sizeof (float));
-    if (narr_rh1 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating narr_rh1 memory", "first_files");
-    }
-
-    narr_rh2 = (float **) allocate_2d_array (P_LAYER, *num_points,
-                                             sizeof (float));
-    if (narr_rh2 == NULL)
-    {
-        ERROR_MESSAGE ("Allocating narr_rh2 memory", "first_files");
+        RETURN_ERROR ("Allocating pressure memory", FUNC_NAME, FAILURE);
     }
 
     for (i = 0; i < P_LAYER; i++)
     {
-        for (j = 0; j < *num_points; j++)
+        for (j = 0; j < num_points; j++)
         {
-            pressure[i][j] = p[i];
+            pressure[i][j] = layers[i];
         }
     }
 
+    /* ==================================================================== */
+
+    narr_height1 = (float **) allocate_2d_array (P_LAYER, num_points,
+                                                 sizeof (float));
+    if (narr_height1 == NULL)
+    {
+        RETURN_ERROR ("Allocating narr_height1 memory", FUNC_NAME, FAILURE);
+    }
+
+    narr_height2 = (float **) allocate_2d_array (P_LAYER, num_points,
+                                                 sizeof (float));
+    if (narr_height2 == NULL)
+    {
+        RETURN_ERROR ("Allocating narr_height2 memory", FUNC_NAME, FAILURE);
+    }
+
+    narr_rh1 = (float **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (float));
+    if (narr_rh1 == NULL)
+    {
+        RETURN_ERROR ("Allocating narr_rh1 memory", FUNC_NAME, FAILURE);
+    }
+
+    narr_rh2 = (float **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (float));
+    if (narr_rh2 == NULL)
+    {
+        RETURN_ERROR ("Allocating narr_rh2 memory", FUNC_NAME, FAILURE);
+    }
+
     /* convert grib data to variables to be input to MODTRAN */
-    status = convert_geopotential_geometric (*num_points, narr_lat, narr_hgt1,
-                                             narr_height1);
-    if (status != SUCCESS)
+    if (convert_geopotential_geometric (num_points, narr_lat,
+                                        narr_hgt1, narr_height1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Calling convert_geopotential_geometric1",
-                       "first_files");
+        RETURN_ERROR ("Calling convert_geopotential_geometric for height 1",
+                      FUNC_NAME, FAILURE);
     }
 
-    status = convert_geopotential_geometric (*num_points, narr_lat, narr_hgt2,
-                                             narr_height2);
-    if (status != SUCCESS)
+    if (convert_geopotential_geometric (num_points, narr_lat,
+                                        narr_hgt2, narr_height2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Calling convert_geopotential_geometric2",
-                       "first_files");
+        RETURN_ERROR ("Calling convert_geopotential_geometric for height 2",
+                      FUNC_NAME, FAILURE);
     }
 
-    status = convert_sh_rh (*num_points, narr_lat, narr_shum1, narr_tmp1,
-                            pressure, narr_rh1);
-    if (status != SUCCESS)
+    if (convert_sh_rh (num_points, narr_lat, narr_spfh1, narr_tmp1,
+                       pressure, narr_rh1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Calling convert_sh_rh1", "first_files");
+        RETURN_ERROR ("Calling convert_sh_rh for temp 1", FUNC_NAME,
+                      FAILURE);
     }
 
-    status = convert_sh_rh (*num_points, narr_lat, narr_shum2, narr_tmp2,
-                            pressure, narr_rh2);
-    if (status != SUCCESS)
+    if (convert_sh_rh (num_points, narr_lat, narr_spfh2, narr_tmp2,
+                       pressure, narr_rh2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Calling convert_sh_rh1", "first_files");
+        RETURN_ERROR ("Calling convert_sh_rh for temp 2", FUNC_NAME,
+                      FAILURE);
     }
 
     /* free allocated memory */
-    status = free_2d_array ((void **) narr_hgt1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_hgt1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_hgt1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_hgt1\n", FUNC_NAME, FAILURE);
     }
+    narr_hgt1 = NULL;
 
-    status = free_2d_array ((void **) narr_hgt2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_hgt2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_hgt2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_hgt2\n", FUNC_NAME, FAILURE);
     }
+    narr_hgt2 = NULL;
 
-    status = free_2d_array ((void **) narr_shum1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_spfh1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_shum1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_spfh1\n", FUNC_NAME, FAILURE);
     }
+    narr_spfh1 = NULL;
 
-    status = free_2d_array ((void **) narr_shum2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_spfh2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_shum2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_spfh2\n", FUNC_NAME, FAILURE);
     }
+    narr_spfh2 = NULL;
+
+    /* ==================================================================== */
 
     /* determine three hour-increment before and after scene center scan time */
+    /* TODO TODO TODO - Does not take into consideration day traversal..... */
+    /* TODO TODO TODO - Does not take into consideration day traversal..... */
+    /* TODO TODO TODO - Does not take into consideration day traversal..... */
     rem1 = input->meta.acq_date.hour % 3;
     rem2 = 3 - rem1;
     hour1 = (float) (input->meta.acq_date.hour - rem1);
     hour2 = (float) (input->meta.acq_date.hour + rem2);
+    inv_hour_diff = 1.0 / (hour2 - hour1);
 
     /* Round to the nearest minute */
     if ((input->meta.acq_date.second - 30.0) >= MINSIGMA)
@@ -893,30 +1059,33 @@ int build_modtran_input
 
     /* convert hour-min acquisition time to decimal time */
     time = (float) input->meta.acq_date.hour
-        + (float) input->meta.acq_date.minute / 60.0;
+           + (float) input->meta.acq_date.minute / 60.0F;
+    time_diff = time - hour1;
+
+    /* ==================================================================== */
 
     /* Allocate memory */
-    narr_height = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_height = (float **) allocate_2d_array (P_LAYER, num_points,
                                                 sizeof (float));
     if (narr_height == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_height memory", "first_files");
+        RETURN_ERROR ("Allocating narr_height memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory */
-    narr_rh = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_rh = (float **) allocate_2d_array (P_LAYER, num_points,
                                             sizeof (float));
     if (narr_rh == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_rh memory", "first_files");
+        RETURN_ERROR ("Allocating narr_rh memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory */
-    narr_tmp = (float **) allocate_2d_array (P_LAYER, *num_points,
+    narr_tmp = (float **) allocate_2d_array (P_LAYER, num_points,
                                              sizeof (float));
     if (narr_tmp == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_tmp memory", "first_files");
+        RETURN_ERROR ("Allocating narr_tmp memory", FUNC_NAME, FAILURE);
     }
 
     /* linearly interpolate geometric height, relative humidity, and
@@ -925,167 +1094,234 @@ int build_modtran_input
        appropriated variable for MODTRAN input */
     for (i = 0; i < P_LAYER; i++)
     {
-        for (j = 0; j < *num_points; j++)
+        for (j = 0; j < num_points; j++)
         {
-            narr_height[i][j] = narr_height1[i][j] + (time - hour1) *
-                ((narr_height2[i][j] - narr_height1[i][j]) / (hour2 - hour1));
-            narr_rh[i][j] = narr_rh1[i][j] + (time - hour1) *
-                ((narr_rh2[i][j] - narr_rh1[i][j]) / (hour2 - hour1));
-            narr_tmp[i][j] = narr_tmp1[i][j] + (time - hour1) *
-                ((narr_tmp2[i][j] - narr_tmp1[i][j]) / (hour2 - hour1));
+            narr_height[i][j] = narr_height1[i][j] + time_diff
+                                * ((narr_height2[i][j] - narr_height1[i][j])
+                                   * inv_hour_diff);
+            narr_rh[i][j] = narr_rh1[i][j] + time_diff
+                            * ((narr_rh2[i][j] - narr_rh1[i][j])
+                               * inv_hour_diff);
+            narr_tmp[i][j] = narr_tmp1[i][j] + time_diff
+                             * ((narr_tmp2[i][j] - narr_tmp1[i][j])
+                                * inv_hour_diff);
         }
     }
 
     /* Free allocated memory */
-    status = free_2d_array ((void **) narr_height1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_height1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_height1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_height1\n", FUNC_NAME, FAILURE);
     }
+    narr_height1 = NULL;
 
-    status = free_2d_array ((void **) narr_height2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_height2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_height2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_height2\n", FUNC_NAME, FAILURE);
     }
+    narr_height2 = NULL;
 
-    status = free_2d_array ((void **) narr_rh1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_rh1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_rh1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_rh1\n", FUNC_NAME, FAILURE);
     }
+    narr_rh1 = NULL;
 
-    status = free_2d_array ((void **) narr_rh2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_rh2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_rh2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_rh2\n", FUNC_NAME, FAILURE);
     }
+    narr_rh2 = NULL;
 
-    status = free_2d_array ((void **) narr_tmp1);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_tmp1) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_tmp1\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_tmp1\n", FUNC_NAME, FAILURE);
     }
+    narr_tmp1 = NULL;
 
-    status = free_2d_array ((void **) narr_tmp2);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_tmp2) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_tmp2\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_tmp2\n", FUNC_NAME, FAILURE);
     }
+    narr_tmp2 = NULL;
 
-    /* Build tape 5 files */
+    /************************** Build tape 5 files **************************/
+
     /* Allocate memory */
     stan_height = (float *) malloc (STAN_LAYER * sizeof (float));
     if (stan_height == NULL)
     {
-        ERROR_MESSAGE ("Allocating stan_height memory", "first_files");
+        RETURN_ERROR ("Allocating stan_height memory", FUNC_NAME, FAILURE);
     }
 
     stan_pre = (float *) malloc (STAN_LAYER * sizeof (float));
     if (stan_pre == NULL)
     {
-        ERROR_MESSAGE ("Allocating stan_pre memory", "first_files");
+        RETURN_ERROR ("Allocating stan_pre memory", FUNC_NAME, FAILURE);
     }
 
     stan_temp = (float *) malloc (STAN_LAYER * sizeof (float));
     if (stan_temp == NULL)
     {
-        ERROR_MESSAGE ("Allocating stan_temp memory", "first_files");
+        RETURN_ERROR ("Allocating stan_temp memory", FUNC_NAME, FAILURE);
     }
 
     stan_rh = (float *) malloc (STAN_LAYER * sizeof (float));
     if (stan_rh == NULL)
     {
-        ERROR_MESSAGE ("Allocating stan_rh memory", "first_files");
+        RETURN_ERROR ("Allocating stan_rh memory", FUNC_NAME, FAILURE);
     }
 
-    /* read in file containing standard mid lat summer atmosphere information
-       to be used for upper layers */
-    sprintf (full_path, "%s/%s", path, "std_mid_lat_summer_atmos.txt");
-    fd = fopen (full_path, "r");
-    if (fd == NULL)
+    if (read_std_mid_lat_summer_atmos (lst_data_dir, stan_height, stan_pre,
+                                       stan_temp, stan_rh)
+        != SUCCESS)
     {
-        ERROR_MESSAGE ("Opening file: std_mid_lat_summer_atmos.txt\n",
-                       "first_files");
-    }
-
-    for (i = 0; i < STAN_LAYER; i++)
-    {
-        if (fscanf (fd, "%f %f %f %f", &stan_height[i], &stan_pre[i],
-                    &stan_temp[i], &stan_rh[i]) == EOF)
-        {
-            ERROR_MESSAGE ("End of file (EOF) is met before STAN_LAYER lines",
-                           "first_files");
-        }
-    }
-
-    status = fclose (fd);
-    if (status)
-    {
-        ERROR_MESSAGE ("Closing file: std_mid_lat_summer_atmos.txt\n",
-                       "first_files");
+        RETURN_ERROR ("Failed loading std_mid_lat_summer_atmos",
+                      FUNC_NAME, FAILURE);
     }
 
     /* determine number of MODTRAN runs */
-    num_cases = *num_points * NUM_ELEVATIONS * 3;
+    num_modtran_runs = num_points * NUM_ELEVATIONS * 3;
 
     /* Allocate memory */
     counter = (int *) malloc (STAN_LAYER * sizeof (int));
     if (counter == NULL)
     {
-        ERROR_MESSAGE ("Allocating counter memory", "first_files");
+        RETURN_ERROR ("Allocating counter memory", FUNC_NAME, FAILURE);
     }
 
-    case_list = (char **) allocate_2d_array (num_cases, MAX_STR_LEN,
+    case_list = (char **) allocate_2d_array (num_modtran_runs, MAX_STR_LEN,
                                              sizeof (char));
     if (case_list == NULL)
     {
-        ERROR_MESSAGE ("Allocating case_list memory", "first_files");
+        RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, FAILURE);
     }
 
-    command_list = (char **) allocate_2d_array (num_cases, MAX_STR_LEN,
+    command_list = (char **) allocate_2d_array (num_modtran_runs, MAX_STR_LEN,
                                                 sizeof (char));
     if (command_list == NULL)
     {
-        ERROR_MESSAGE ("Allocating command_list memory", "first_files");
+        RETURN_ERROR ("Allocating command_list memory", FUNC_NAME, FAILURE);
     }
 
     modtran_path = getenv ("MODTRAN_PATH");
     if (modtran_path == NULL)
     {
-        ERROR_MESSAGE ("MODTRAN_PATH environment variable is not set",
-                       "first_files");
+        RETURN_ERROR ("MODTRAN_PATH environment variable is not set",
+                      FUNC_NAME, FAILURE);
     }
 
     modtran_data_dir = getenv ("MODTRAN_DATA_DIR");
     if (modtran_data_dir == NULL)
     {
-        ERROR_MESSAGE ("MODTRAN_DATA_DIR environment variable is not set",
-                       "first_files");
+        RETURN_ERROR ("MODTRAN_DATA_DIR environment variable is not set",
+                      FUNC_NAME, FAILURE);
     }
 
     getcwd (curr_path, MAX_STR_LEN);
 
-    for (i = 0; i < *num_points; i++)
+    /* Allocate some temp memory */
+    temp_height = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    if (temp_height == NULL)
     {
-        /* create a directory for the current NARR point */
+        RETURN_ERROR ("Allocating temp_height memory", FUNC_NAME, FAILURE);
+    }
+
+    temp_pressure = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    if (temp_pressure == NULL)
+    {
+        RETURN_ERROR ("Allocating temp_pressure memory", FUNC_NAME, FAILURE);
+    }
+
+    temp_temp = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    if (temp_temp == NULL)
+    {
+        RETURN_ERROR ("Allocating temp_temp memory", FUNC_NAME, FAILURE);
+    }
+
+    temp_rh = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    if (temp_rh == NULL)
+    {
+        RETURN_ERROR ("Allocating temp_rh memory", FUNC_NAME, FAILURE);
+    }
+
+    for (i = 0; i < num_points; i++)
+    {
+        /* ****************************************************************
+           MODTRAN uses longitudinal degree values from 0 to 360 starting at
+           Greenwich and moving west.
+
+           The following logic fixes the longitude to be for MODTRAN and we
+           also use those values for generating the output directory names.
+           **************************************************************** */
         if (narr_lon[i] < 0)
+        {
+            /* We are a west longitude value so negate it to the positive
+               equivalent value.
+               i.e.   W40 normally represented as -40 would be changed to a
+                      positive 40 value. */
             narr_lon[i] = -narr_lon[i];
+        }
         else
+        {
+            /* We are a east longitude value so fix it to be greater than
+               180 west.
+               i.e.   E10 would be turned into W350, and be positive 350 not
+                      negative.  */
             narr_lon[i] = 360.0 - narr_lon[i];
+        }
+
+        /* Figure out the lat and lon strings to use */
+        if ((fabs (narr_lat[i]) - 100.0) < MINSIGMA)
+            snprintf (lat_str, sizeof (lat_str), "%6.3f", narr_lat[i]);
+        else
+            snprintf (lat_str, sizeof (lat_str), "%6.2f", narr_lat[i]);
 
         if ((fabs (narr_lon[i]) - 100.0) < MINSIGMA)
-            sprintf (current_point, "%6.3f_%6.3f", narr_lat[i], narr_lon[i]);
+            snprintf (lon_str, sizeof (lon_str), "%6.3f", narr_lon[i]);
         else
-            sprintf (current_point, "%6.3f_%6.2f", narr_lat[i], narr_lon[i]);
+            snprintf (lon_str, sizeof (lon_str), "%6.2f", narr_lon[i]);
 
-        if (stat (current_point, &s) == -1)
+        /* Create the name of the directory for the current NARR point */
+        snprintf (current_point, sizeof (current_point),
+                  "%s_%s", lat_str, lon_str);
+
+        /* Create the directory */
+        snprintf(msg_str, sizeof (msg_str),
+                 "Creating directory [%s]", current_point);
+        LOG_MESSAGE(msg_str, FUNC_NAME);
+        if (mkdir (current_point, 0755) != SUCCESS)
         {
-            status = mkdir (current_point, 0755);
-            if (status != SUCCESS)
+            if (errno != EEXIST)
             {
-                ERROR_MESSAGE ("system call 1", "first_files");
+                snprintf (msg_str, sizeof (msg_str),
+                          "Failed creating directory [%s]", current_point);
+                RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
             }
+        }
+
+        /* determine latitude and longitude of current NARR point and insert
+           into tail file */
+        /* TODO - The sed commands could be combined into one to save
+                  traversing the file three times.  But the file is small. */
+        snprintf (command, sizeof (command),
+                  "cat %s/modtran_tail.txt"
+                  " | sed 's/latitu/%s/'"
+                  " | sed 's/longit/%s/'"
+                  " | sed 's/jay/%d/' > newTail.txt",
+                  lst_data_dir, lat_str, lon_str, input->meta.acq_date.doy);
+        if (system (command) != SUCCESS)
+        {
+            RETURN_ERROR ("Failed creating newTail.txt", FUNC_NAME, FAILURE);
+        }
+
+        /* Clear the temp memory */
+        for (j = 0; j < MAX_MODTRAN_LAYER; j++)
+        {
+            temp_height[j] = 0.0;
+            temp_pressure[j] = 0.0;
+            temp_temp[j] = 0.0;
+            temp_rh[j] = 0.0;
         }
 
         /* set lowest altitude is the first geometric height at that NARR
@@ -1095,83 +1331,21 @@ int build_modtran_input
         else
             gndalt[0] = narr_height[0][i];
 
-        /* determine latitude and longitude of current NARR point and insert
-           into tail file */
-        if (fabs (narr_lat[i] - 100.0) < MINSIGMA)
-            sprintf (command, "cat %s/modtran_tail.txt"
-                     " | sed 's/latitu/%6.3f/'"
-                     " > newTail.txt", path, narr_lat[i]);
-        else
-            sprintf (command, "cat %s/modtran_tail.txt"
-                     " | sed 's/latitu/%6.2f/'"
-                     " > newTail.txt", path, narr_lat[i]);
-        status = system (command);
-        if (status != SUCCESS)
-        {
-            ERROR_MESSAGE ("system call 2", "first_file");
-        }
-
-        if (fabs (narr_lon[i] - 100.0) < MINSIGMA)
-            sprintf (command, "cat newTail.txt"
-                     " | sed 's/longit/%6.3f/'"
-                     " > newTail2.txt", narr_lon[i]);
-        else
-            sprintf (command, "cat newTail.txt"
-                     " | sed 's/longit/%6.2f/'"
-                     " > newTail2.txt", narr_lon[i]);
-        status = system (command);
-        if (status != SUCCESS)
-        {
-            ERROR_MESSAGE ("system call 3", "first_file");
-        }
-
-        /* insert current julian day into tail file */
-        sprintf (command, "cat newTail2.txt"
-                 " | sed 's/jay/%d/'"
-                 " > newTail3.txt", input->meta.acq_date.doy);
-        status = system (command);
-        if (status != SUCCESS)
-        {
-            ERROR_MESSAGE ("system call 4", "first_file");
-        }
-
-        /* Allocate memory */
-        temp_height = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
-        if (temp_height == NULL)
-        {
-            ERROR_MESSAGE ("Allocating temp_height memory", "first_files");
-        }
-
-        temp_pressure = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
-        if (temp_pressure == NULL)
-        {
-            ERROR_MESSAGE ("Allocating temp_pressure memory", "first_files");
-        }
-
-        temp_temp = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
-        if (temp_temp == NULL)
-        {
-            ERROR_MESSAGE ("Allocating temp_temp memory", "first_files");
-        }
-
-        temp_rh = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
-        if (temp_rh == NULL)
-        {
-            ERROR_MESSAGE ("Allocating temp_rh memory", "first_files");
-        }
-
-        /* iterature through all ground altitudes at which modtran is run */
+        /* iterate through all ground altitudes at which MODTRAN is run */
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
             /* create a directory for the current height */
-            sprintf (current_gdalt, "%s/%5.3f", current_point, gndalt[j]);
+            snprintf (current_gdalt, sizeof (current_gdalt),
+                      "%s/%5.3f", current_point, gndalt[j]);
 
-            if (stat (current_gdalt, &s) == -1)
+            /* Create the directory */
+            if (mkdir (current_gdalt, 0755) != SUCCESS)
             {
-                status = mkdir (current_gdalt, 0755);
-                if (status != SUCCESS)
+                if (errno != EEXIST)
                 {
-                    ERROR_MESSAGE ("system call 4", "first_file");
+                    snprintf (msg_str, sizeof (msg_str),
+                              "Failed creating directory [%s]", current_gdalt);
+                    RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
                 }
             }
 
@@ -1193,27 +1367,27 @@ int build_modtran_input
                 index_above = 1;
             }
 
+            /* To save divisions */
+            inv_narr_height_diff = 1.0 / (narr_height[index_above][i]
+                                          - narr_height[index_below][i]);
+
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
-            new_pressure = pressure[index_below][i] + (gndalt[j] -
-                                                       narr_height
-                                                       [index_below][i]) *
-                ((pressure[index_above][i] -
-                  pressure[index_below][i]) / (narr_height[index_above][i] -
-                                               narr_height[index_below][i]));
-            new_temp =
-                narr_tmp[index_below][i] + (gndalt[j] -
-                                            narr_height[index_below][i]) *
-                ((narr_tmp[index_above][i] -
-                  narr_tmp[index_below][i]) / (narr_height[index_above][i] -
-                                               narr_height[index_below][i]));
-            new_rh =
-                narr_rh[index_below][i] + (gndalt[j] -
-                                           narr_height[index_below][i]) *
-                ((narr_rh[index_above][i] -
-                  narr_rh[index_below][i]) / (narr_height[index_above][i] -
-                                              narr_height[index_below][i]));
+            new_pressure = pressure[index_below][i]
+                           + (gndalt[j] - narr_height [index_below][i])
+                           * ((pressure[index_above][i]
+                               - pressure[index_below][i])
+                              * inv_narr_height_diff);
+            new_temp = narr_tmp[index_below][i]
+                       + (gndalt[j] - narr_height[index_below][i])
+                       * ((narr_tmp[index_above][i] - narr_tmp[index_below][i])
+                          * inv_narr_height_diff);
+            new_rh = narr_rh[index_below][i]
+                     + (gndalt[j] - narr_height[index_below][i])
+                     * ((narr_rh[index_above][i] - narr_rh[index_below][i])
+                        * inv_narr_height_diff);
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             /* create arrays containing only layers to be included in current
                tape5 file */
             index = 0;
@@ -1233,7 +1407,7 @@ int build_modtran_input
             }
 
 
-            /* modtran throws as error when there are two identical layers in
+            /* MODTRAN throws an error when there are two identical layers in
                the tape5 file, if the current ground altitude and the next
                highest layer are close enough, eliminate interpolated layer */
             if (fabs (gndalt[j] - narr_height[index_above][i] - 0.001)
@@ -1270,29 +1444,24 @@ int build_modtran_input
             new_height = 0;
             if (index2 >= 3)
             {
-                new_height =
-                    (stan_height[counter[2]] + temp_height[index - 1]) / 2.0;
-                new_pressure =
-                    temp_pressure[index - 1] + (new_height -
-                                                temp_height[index -
-                                                            1]) *
-                    ((stan_pre[counter[2]] -
-                      temp_pressure[index - 1]) / (stan_height[counter[2]] -
-                                                   temp_height[index - 1]));
-                new_temp =
-                    temp_temp[index - 1] + (new_height -
-                                            temp_height[index -
-                                                        1]) *
-                    ((stan_temp[counter[2]] -
-                      temp_temp[index - 1]) / (stan_height[counter[2]] -
-                                               temp_height[index - 1]));
-                new_rh =
-                    temp_rh[counter[2]] + (new_height -
-                                           temp_height[index -
-                                                       1]) *
-                    ((stan_rh[counter[2]] -
-                      temp_rh[index - 1]) / (stan_height[counter[2]] -
-                                             temp_height[index - 1]));
+                new_height = (stan_height[counter[2]]
+                              + temp_height[index - 1]) / 2.0;
+                new_pressure = temp_pressure[index - 1]
+                               + (new_height - temp_height[index - 1])
+                               * ((stan_pre[counter[2]]
+                                   - temp_pressure[index - 1])
+                                  / (stan_height[counter[2]]
+                                     - temp_height[index - 1]));
+                new_temp = temp_temp[index - 1]
+                           + (new_height - temp_height[index - 1])
+                           * ((stan_temp[counter[2]] - temp_temp[index - 1])
+                              / (stan_height[counter[2]]
+                                 - temp_height[index - 1]));
+                new_rh = temp_rh[counter[2]]
+                         + (new_height - temp_height[index - 1])
+                         * ((stan_rh[counter[2]] - temp_rh[index - 1])
+                            / (stan_height[counter[2]]
+                               - temp_height[index - 1]));
             }
 
             /* concatenate NARR layers, new layer, and standard atmosphere
@@ -1316,8 +1485,8 @@ int build_modtran_input
             fd = fopen ("tempLayers.txt", "w");
             if (fd == NULL)
             {
-                ERROR_MESSAGE ("Opening file: tempLayers.txt\n",
-                               "first_files");
+                RETURN_ERROR ("Opening file: tempLayers.txt\n",
+                              FUNC_NAME, FAILURE);
             }
 
             /* Write out the intermediate file */
@@ -1329,31 +1498,29 @@ int build_modtran_input
             }
 
             /* Close the intermediate file */
-            status = fclose (fd);
-            if (status)
+            if (fclose (fd) != SUCCESS)
             {
-                ERROR_MESSAGE ("Closing file: tempLayers.txt\n",
-                               "first_files");
+                RETURN_ERROR ("Closing file: tempLayers.txt\n",
+                              FUNC_NAME, FAILURE);
             }
 
             /* determine number of layers for current ground altitude and
                insert into head file */
             sprintf (command, "cat %s/modtran_head.txt"
-                     " | sed 's/nml/%d/'" " > newHead.txt", path, index);
+                              " | sed 's/nml/%d/'" " > newHead.txt",
+                              lst_data_dir, index);
 
-            status = system (command);
-            if (status != SUCCESS)
+            if (system (command) != SUCCESS)
             {
-                ERROR_MESSAGE ("system call 5", "first_file");
+                RETURN_ERROR ("system call 5", FUNC_NAME, FAILURE);
             }
 
             /* insert current ground altitude into head file */
             sprintf (command, "cat newHead.txt"
                      " | sed 's/gdalt/%5.3f/'" " > newHead2.txt", gndalt[j]);
-            status = system (command);
-            if (status != SUCCESS)
+            if (system (command) != SUCCESS)
             {
-                ERROR_MESSAGE ("system call 6", "first_file");
+                RETURN_ERROR ("system call 6", FUNC_NAME, FAILURE);
             }
 
             /* iterate through [temperature,albedo] pairs at which to run
@@ -1368,61 +1535,62 @@ int build_modtran_input
                 /* create directory for the current temperature */
                 sprintf (current_temp, "%s/%s", current_gdalt, temp_out);
 
-                if (stat (current_temp, &s) == -1)
+                if (mkdir (current_temp, 0755) != SUCCESS)
                 {
-                    status = mkdir (current_temp, 0755);
-                    if (status != SUCCESS)
+                    if (errno != EEXIST)
                     {
-                        ERROR_MESSAGE ("system call 7", "first_file");
+                        snprintf (msg_str, sizeof (msg_str),
+                                  "Failed creating directory [%s]",
+                                  current_temp);
+                        RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
                     }
                 }
 
                 /* insert current temperature into head file */
                 sprintf (command, "cat newHead2.txt"
                          " | sed 's/tmp/%s/'" " > newHead3.txt", temp_out);
-                status = system (command);
-                if (status != SUCCESS)
+                if (system (command) != SUCCESS)
                 {
-                    ERROR_MESSAGE ("system call 8", "first_file");
+                    RETURN_ERROR ("system call 8", FUNC_NAME, FAILURE);
                 }
 
                 /* create directory for the current albedo */
                 sprintf (current_alb, "%s/%3.1f", current_temp, alb[k]);
-                if (stat (current_alb, &s) == -1)
+                if (mkdir (current_alb, 0755) != SUCCESS)
                 {
-                    status = mkdir (current_alb, 0755);
-                    if (status != SUCCESS)
+                    if (errno != EEXIST)
                     {
-                        ERROR_MESSAGE ("system call 9", "first_file");
+                        snprintf (msg_str, sizeof (msg_str),
+                                  "Failed creating directory [%s]",
+                                  current_alb);
+                        RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
                     }
                 }
 
                 /* insert current albedo into head file */
                 sprintf (command, "cat newHead3.txt"
                          " | sed 's/alb/%4.2f/'" " > newHead4.txt", alb[k]);
-                status = system (command);
-                if (status != SUCCESS)
+                if (system (command) != SUCCESS)
                 {
-                    ERROR_MESSAGE ("system call 10", "first_file");
+                    RETURN_ERROR ("system call 10", FUNC_NAME, FAILURE);
                 }
 
                 /* concatenate head file, atmospheric layers, and tail file to
-                   create a tape5 file for modtran specific to this location
+                   create a tape5 file for MODTRAN specific to this location
                    and ground altitude with variables for temperature and
                    albedo */
                 sprintf (command, "cat newHead4.txt"
                          " tempLayers.txt"
-                         " newTail3.txt" " > %s/tape5", current_alb);
-                status = system (command);
-                if (status != SUCCESS)
+                         " newTail.txt" " > %s/tape5", current_alb);
+                if (system (command) != SUCCESS)
                 {
-                    ERROR_MESSAGE ("system call 11", "first_file");
+                    RETURN_ERROR ("system call 11", FUNC_NAME, FAILURE);
                 }
 
                 /* create string for case list containing location of current
                    tape5 file
                    create string for command list containing commands for
-                   modtran run
+                   MODTRAN run
                    iterate entry count */
                 case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
                 sprintf (case_list[case_counter], "%s/%s",
@@ -1431,89 +1599,88 @@ int build_modtran_input
                          "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
                          case_list[case_counter], modtran_data_dir,
                          modtran_path);
-            }
-        }
-    }
+            } /* END - Tempurature Albedo Pairs */
+        } /* END - ground altitude ran by MODTRAN */
+    } /* END - number of points */
+
+    /* Free the temp memory */
+    free(temp_height);
+    free(temp_pressure);
+    free(temp_temp);
+    free(temp_rh);
 
     /* write caseList to a file */
     fd = fopen ("caseList", "w");
     if (fd == NULL)
     {
-        ERROR_MESSAGE ("Opening file: caseList\n", "first_files");
+        RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, FAILURE);
     }
 
     /* Write out the caseList file */
-    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
+    for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
     {
         fprintf (fd, "%s\n", case_list[k]);
     }
 
     /* Close the caseList file */
-    status = fclose (fd);
-    if (status)
+    if (fclose (fd) != SUCCESS)
     {
-        ERROR_MESSAGE ("Closing file: caseList\n", "first_files");
+        RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, FAILURE);
     }
 
     /* write commandList to a file */
     fd = fopen ("commandList", "w");
     if (fd == NULL)
     {
-        ERROR_MESSAGE ("Opening file: commandList\n", "first_files");
+        RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, FAILURE);
     }
 
     /* Write out the commandList file */
-    for (k = 0; k < *num_points * NUM_ELEVATIONS * 3; k++)
+    for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
     {
         fprintf (fd, "%s\n", command_list[k]);
     }
 
     /* Close the commandList file */
-    status = fclose (fd);
-    if (status)
+    if (fclose (fd) != SUCCESS)
     {
-        ERROR_MESSAGE ("Closing file: commandList\n", "first_files");
+        RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, FAILURE);
     }
 
     /* Free memory allocation */
-    status = free_2d_array ((void **) pressure);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) pressure) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: pressure\n", "first_files");
+        RETURN_ERROR ("Freeing memory: pressure\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) narr_height);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_height) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_height\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_height\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) narr_rh);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_rh) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_rh\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_rh\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) narr_tmp);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) narr_tmp) != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_tmp\n", "first_files");
+        RETURN_ERROR ("Freeing memory: narr_tmp\n", FUNC_NAME, FAILURE);
     }
 
     /* Free memory allocation */
-    status = free_2d_array ((void **) case_list);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) case_list) != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: command_list\n", "scene_based_list",
-                      FAILURE);
+        RETURN_ERROR ("Freeing memory: case_list\n", FUNC_NAME, FAILURE);
     }
 
-    status = free_2d_array ((void **) command_list);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) command_list) != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: command_list\n", "scene_based_list",
-                      FAILURE);
+        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME, FAILURE);
     }
+
+    /* Assign to the output variable */
+    *num_pts = num_points;
 
     return SUCCESS;
 }
