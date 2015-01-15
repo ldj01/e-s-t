@@ -11,17 +11,7 @@
 #include "scene_based_lst.h"
 
 
-#ifndef max
-    #define max(a,b) (((a) (b)) ? (a) : (b))
-#endif
-
-#ifndef min
-    #define min(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
-
-int
-partition (float arr[], int left, int right)
+int partition (float arr[], int left, int right)
 {
     int i = left, j = right;
     int tmp;
@@ -47,8 +37,7 @@ partition (float arr[], int left, int right)
 }
 
 
-void
-quick_sort (float arr[], int left, int right)
+void quick_sort (float arr[], int left, int right)
 {
     int index = partition (arr, left, right);
 
