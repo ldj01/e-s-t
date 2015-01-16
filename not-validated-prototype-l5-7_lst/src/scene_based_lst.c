@@ -46,7 +46,7 @@ main (int argc, char *argv[])
     char extension[MAX_STR_LEN];        /* input TOA file extension */
     Input_t *input = NULL;      /* input data and meta data */
     char scene_name[MAX_STR_LEN];       /* input data scene name */
-    char command[MAX_STR_LEN];
+    char command[PATH_MAX];
     int status;                 /* return value from function call */
     //    Output_t *output = NULL; /* output structure and metadata */
     bool verbose;               /* verbose flag for printing messages */
@@ -196,6 +196,7 @@ main (int argc, char *argv[])
     }
 
 #if 0
+TEMP TAKE THIS OUT TO SAVE TIME
     /* perform modtran runs by calling command_list */
     for (i = 0; i < num_modtran_runs; i++)
     {
@@ -212,29 +213,25 @@ main (int argc, char *argv[])
 #endif
 
     /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run),
-       copy program to delete headers and parse wavelength and total radiance
-       from tape6 file */
-    status = system ("cp $BIN/tape6parser.bash .");
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("cp $BIN/tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
+       parse wavelength and total radiance from tape6 file into parsed */
     for (i = 0; i < num_modtran_runs; i++)
     {
-        /* Just use $LST_DATA/elim2.sed directly instead of linking it */
-        sprintf (command, "./tape6parser.bash %s", case_list[i]);
+        snprintf (command, sizeof (command),
+                  "lst_extract_tape6_results.py"
+                  " --tape6 %s/tape6"
+                  " --parsed %s/parsed",
+                  case_list[i], case_list[i]);
+        snprintf (msg_str, sizeof(msg_str),
+                  "Executing [%s]", command);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
         status = system (command);
         if (status != SUCCESS)
         {
-            RETURN_ERROR ("./tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
+            RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
+                          FUNC_NAME, EXIT_FAILURE);
         }
     }
 
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
@@ -244,26 +241,6 @@ main (int argc, char *argv[])
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-    status = system ("rm tape6parser.bash");
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("rm tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
-    }
 
     /* Free memory allocation */
     status = free_2d_array ((void **) command_list);
