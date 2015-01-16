@@ -45,16 +45,19 @@ int get_args
     char **xml_infile,        /* I: address of input XML metadata filename  */
     char **dem_infile,        /* I: address of input DEM filename */
     char **emissivity_infile, /* I: address of input emissivity filename */
-    bool *verbose             /* O: verbose flag */
+    bool *verbose,            /* O: verbose flag */
+    bool *debug               /* O: debug flag */
 )
 {
     int c;                         /* current argument index */
     int option_index;              /* index for the command-line option */
     static int verbose_flag = 0;   /* verbose flag */
+    static int debug_flag = 0;     /* debug flag */
     char errmsg[MAX_STR_LEN];      /* error message */
     char FUNC_NAME[] = "get_args"; /* function name */
     static struct option long_options[] = {
         {"verbose", no_argument, &verbose_flag, 1},
+        {"debug", no_argument, &debug_flag, 1},
         {"xml", required_argument, 0, 'i'},
         {"dem", required_argument, 0, 'd'},
         {"emi", required_argument, 0, 'e'},
@@ -127,7 +130,6 @@ int get_args
                       FUNC_NAME, FAILURE);
     }
 
-
     /* Check the verbose flag */
     if (verbose_flag)
         *verbose = true;
@@ -140,6 +142,12 @@ int get_args
         printf ("DEM_input_file = %s\n", *dem_infile);
         printf ("Emissivity_input_file = %s\n", *emissivity_infile);
     }
+
+    /* Check the debug flag */
+    if (debug_flag)
+        *debug = true;
+    else
+        *debug = false;
 
     return SUCCESS;
 }

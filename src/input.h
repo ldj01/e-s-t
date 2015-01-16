@@ -181,7 +181,8 @@ int get_args
     char **xml_infile,        /* I: address of input XML metadata filename  */
     char **dem_infile,        /* I: address of input DEM filename */
     char **emissivity_infile, /* I: address of input emissivity filename */
-    bool *verbose             /* O: verbose flag */
+    bool *verbose,            /* O: verbose flag */
+    bool *debug               /* O: debug flag */
 );
 
 
