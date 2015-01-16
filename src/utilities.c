@@ -52,4 +52,6 @@ void write_message
              time_info->tm_min,
              time_info->tm_sec,
              pid, module, basename (file), line, type, message);
+
+    fflush(fd);
 }
