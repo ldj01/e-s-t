@@ -528,10 +528,15 @@ Date        Programmer       Reason
 ******************************************************************************/
 int build_modtran_input
 (
-    Input_t *input,  /*I: input structure */
-    int *num_pts,    /*O: number of NARR points */
-    bool verbose     /*I: value to indicate if intermediate messages should
-                          be printed */
+    Input_t *input,       /* I: input structure */
+    int *num_pts,         /* O: number of NARR points */
+    int *num_runs,        /* O: number of MODTRAN runs */
+    char ***case_list,    /* O: case list information (allocated here) */
+    char ***command_list, /* O: command list information (allocated here) */
+    bool verbose,         /* I: value to indicate if intermediate messages
+                                should be printed */
+    bool debug            /* I: value to indicate if debug should be
+                                generated */
 )
 {
     char FUNC_NAME[] = "build_modtran_input";
@@ -598,31 +603,28 @@ int build_modtran_input
     float gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1, 2.6,
         3.1, 3.6, 4.05
     };
-    float inv_narr_height_diff;
+    float inv_height_diff;
     int num_modtran_runs;
-    char command[MAX_STR_LEN];
-    char current_gdalt[MAX_STR_LEN];
-    char current_temp[MAX_STR_LEN];
-    char current_alb[MAX_STR_LEN];
-    char current_point[MAX_STR_LEN];
-    char temp_out[MAX_STR_LEN];
-    char curr_path[MAX_STR_LEN];
-    int index_below = 0;
-    int index_above = NUM_ELEVATIONS;
+    char command[PATH_MAX];
+    char current_gdalt[PATH_MAX];
+    char current_temp[PATH_MAX];
+    char current_alb[PATH_MAX];
+    char current_point[PATH_MAX];
+    char curr_path[PATH_MAX];
+    int layer_below = 0;
+    int layer_above = NUM_ELEVATIONS;
     float new_height;
     float new_pressure;
     float new_temp;
     float new_rh;
-    int index, index2;
+    int curr_layer, std_layer;
     int *counter;
-    float tmp[3] = { 273.0, 310.0, 0.0 };
+    char temp_strs[3][4] = { "273\0", "310\0", "000\0" };
     float alb[3] = { 0.0, 0.0, 0.1 };
     char *lst_data_dir = NULL;
     char *modtran_path = NULL;
     char *modtran_data_dir = NULL;
     int case_counter;
-    char **case_list;
-    char **command_list;
     char lat_str[7]; /* 6 plus the string termination character */
     char lon_str[7]; /* 6 plus the string termination character */
     char msg_str[MAX_STR_LEN];
@@ -1190,16 +1192,16 @@ int build_modtran_input
         RETURN_ERROR ("Allocating counter memory", FUNC_NAME, FAILURE);
     }
 
-    case_list = (char **) allocate_2d_array (num_modtran_runs, MAX_STR_LEN,
-                                             sizeof (char));
-    if (case_list == NULL)
+    *case_list = (char **) allocate_2d_array (num_modtran_runs, PATH_MAX,
+                                              sizeof (char));
+    if (*case_list == NULL)
     {
         RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, FAILURE);
     }
 
-    command_list = (char **) allocate_2d_array (num_modtran_runs, MAX_STR_LEN,
-                                                sizeof (char));
-    if (command_list == NULL)
+    *command_list = (char **) allocate_2d_array (num_modtran_runs, PATH_MAX,
+                                                 sizeof (char));
+    if (*command_list == NULL)
     {
         RETURN_ERROR ("Allocating command_list memory", FUNC_NAME, FAILURE);
     }
@@ -1218,7 +1220,7 @@ int build_modtran_input
                       FUNC_NAME, FAILURE);
     }
 
-    getcwd (curr_path, MAX_STR_LEN);
+    getcwd (curr_path, PATH_MAX);
 
     /* Allocate some temp memory */
     temp_height = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
@@ -1272,12 +1274,12 @@ int build_modtran_input
         }
 
         /* Figure out the lat and lon strings to use */
-        if ((fabs (narr_lat[i]) - 100.0) < MINSIGMA)
+        if ((narr_lat[i] - 100.0) < MINSIGMA)
             snprintf (lat_str, sizeof (lat_str), "%6.3f", narr_lat[i]);
         else
             snprintf (lat_str, sizeof (lat_str), "%6.2f", narr_lat[i]);
 
-        if ((fabs (narr_lon[i]) - 100.0) < MINSIGMA)
+        if ((narr_lon[i] - 100.0) < MINSIGMA)
             snprintf (lon_str, sizeof (lon_str), "%6.3f", narr_lon[i]);
         else
             snprintf (lon_str, sizeof (lon_str), "%6.2f", narr_lon[i]);
@@ -1289,7 +1291,7 @@ int build_modtran_input
         /* Create the directory */
         snprintf(msg_str, sizeof (msg_str),
                  "Creating directory [%s]", current_point);
-        LOG_MESSAGE(msg_str, FUNC_NAME);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
         if (mkdir (current_point, 0755) != SUCCESS)
         {
             if (errno != EEXIST)
@@ -1339,6 +1341,9 @@ int build_modtran_input
                       "%s/%5.3f", current_point, gndalt[j]);
 
             /* Create the directory */
+            snprintf (msg_str, sizeof (msg_str),
+                      "Creating directory [%s]", current_gdalt);
+            LOG_MESSAGE (msg_str, FUNC_NAME);
             if (mkdir (current_gdalt, 0755) != SUCCESS)
             {
                 if (errno != EEXIST)
@@ -1349,135 +1354,142 @@ int build_modtran_input
                 }
             }
 
-            /* determine layers below current gndalt and closest index
+            /* determine layers below current gndalt and closest layer
                above and below */
             for (k = 0; k < P_LAYER; k++)
             {
                 if ((narr_height[k][i] - gndalt[j]) >= MINSIGMA)
                 {
-                    index_below = k - 1;
-                    index_above = k;
+                    layer_below = k - 1;
+                    layer_above = k;
                     break;
                 }
             }
 
-            if (index_below < 0)
+            if (layer_below < 0)
             {
-                index_below = 0;
-                index_above = 1;
+                layer_below = 0;
+                layer_above = 1;
             }
 
             /* To save divisions */
-            inv_narr_height_diff = 1.0 / (narr_height[index_above][i]
-                                          - narr_height[index_below][i]);
+            inv_height_diff = 1.0 / (narr_height[layer_above][i]
+                                     - narr_height[layer_below][i]);
 
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
-            new_pressure = pressure[index_below][i]
-                           + (gndalt[j] - narr_height [index_below][i])
-                           * ((pressure[index_above][i]
-                               - pressure[index_below][i])
-                              * inv_narr_height_diff);
-            new_temp = narr_tmp[index_below][i]
-                       + (gndalt[j] - narr_height[index_below][i])
-                       * ((narr_tmp[index_above][i] - narr_tmp[index_below][i])
-                          * inv_narr_height_diff);
-            new_rh = narr_rh[index_below][i]
-                     + (gndalt[j] - narr_height[index_below][i])
-                     * ((narr_rh[index_above][i] - narr_rh[index_below][i])
-                        * inv_narr_height_diff);
+            new_pressure = pressure[layer_below][i]
+                           + (gndalt[j] - narr_height[layer_below][i])
+                           * ((pressure[layer_above][i]
+                               - pressure[layer_below][i])
+                              * inv_height_diff);
+            new_temp = narr_tmp[layer_below][i]
+                       + (gndalt[j] - narr_height[layer_below][i])
+                       * ((narr_tmp[layer_above][i] - narr_tmp[layer_below][i])
+                          * inv_height_diff);
+            new_rh = narr_rh[layer_below][i]
+                     + (gndalt[j] - narr_height[layer_below][i])
+                     * ((narr_rh[layer_above][i] - narr_rh[layer_below][i])
+                        * inv_height_diff);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             /* create arrays containing only layers to be included in current
                tape5 file */
-            index = 0;
-            temp_height[index] = gndalt[j];
-            temp_pressure[index] = new_pressure;
-            temp_temp[index] = new_temp;
-            temp_rh[index] = new_rh;
-            index++;
+            curr_layer = 0;
+            temp_height[curr_layer] = gndalt[j];
+            temp_pressure[curr_layer] = new_pressure;
+            temp_temp[curr_layer] = new_temp;
+            temp_rh[curr_layer] = new_rh;
+            curr_layer++;
 
-            for (k = index_above; k < P_LAYER; k++)
+            for (k = layer_above; k < P_LAYER; k++)
             {
-                temp_height[index] = narr_height[k][i];
-                temp_pressure[index] = pressure[k][i];
-                temp_temp[index] = narr_tmp[k][i];
-                temp_rh[index] = narr_rh[k][i];
-                index++;
+                temp_height[curr_layer] = narr_height[k][i];
+                temp_pressure[curr_layer] = pressure[k][i];
+                temp_temp[curr_layer] = narr_tmp[k][i];
+                temp_rh[curr_layer] = narr_rh[k][i];
+                curr_layer++;
             }
 
 
             /* MODTRAN throws an error when there are two identical layers in
                the tape5 file, if the current ground altitude and the next
                highest layer are close enough, eliminate interpolated layer */
-            if (fabs (gndalt[j] - narr_height[index_above][i] - 0.001)
+            if (fabs (gndalt[j] - narr_height[layer_above][i] - 0.001)
                 < MINSIGMA)
             {
-                index = 0;
-                for (k = index_above; k < P_LAYER; k++)
+                curr_layer = 0;
+                for (k = layer_above; k < P_LAYER; k++)
                 {
-                    temp_height[index] = narr_height[k][i];
-                    temp_pressure[index] = pressure[k][i];
-                    temp_temp[index] = narr_tmp[k][i];
-                    temp_rh[index] = narr_rh[k][i];
-                    index++;
+                    temp_height[curr_layer] = narr_height[k][i];
+                    temp_pressure[curr_layer] = pressure[k][i];
+                    temp_temp[curr_layer] = narr_tmp[k][i];
+                    temp_rh[curr_layer] = narr_rh[k][i];
+                    curr_layer++;
                 }
             }
 
             /* determine maximum height of NARR layers and where the standard 
                atmosphere is greater than this */
-            index2 = 0;
+            std_layer = 0;
             for (k = 0; k < STAN_LAYER; k++)
             {
                 if (stan_height[k] > narr_height[P_LAYER - 1][i])
                 {
-                    counter[index2] = k;
-                    index2++;
+                    counter[std_layer] = k;
+                    std_layer++;
                 }
             }
 
-            /* if there are at least three layers above to highest NARR layer,
-               add standard atmosphere layers and linearly interpolate height,
-               pressure, temp, and rel hum to create a smooth transition
-               between the NARR layers and the standard upper atmosphere */
-// RDD - Did this to remove a compiler warning, but something else may need to be done.
-            new_height = 0;
-            if (index2 >= 3)
+            /* If there are more than 2 layers above the highest NARR layer,
+               then we need to interpolate a value between the highest NARR
+               layer and the 2nd standard atmosphere layer above the NARR
+               layers to create a smooth transition between the NARR layers
+               and the standard upper atmosphere */
+            if (std_layer >= 3)
             {
+                snprintf (msg_str, sizeof (msg_str),
+                          "Adding interpolated layer between the NARR layers"
+                          " and the standard atmosphere.");
+                LOG_MESSAGE (msg_str, FUNC_NAME);
+
+                /* To save divisions */
+                inv_height_diff = 1.0 / (stan_height[counter[2]]
+                                         - temp_height[curr_layer - 1]);
+
                 new_height = (stan_height[counter[2]]
-                              + temp_height[index - 1]) / 2.0;
-                new_pressure = temp_pressure[index - 1]
-                               + (new_height - temp_height[index - 1])
+                              + temp_height[curr_layer - 1]) / 2.0;
+                new_pressure = temp_pressure[curr_layer - 1]
+                               + (new_height - temp_height[curr_layer - 1])
                                * ((stan_pre[counter[2]]
-                                   - temp_pressure[index - 1])
-                                  / (stan_height[counter[2]]
-                                     - temp_height[index - 1]));
-                new_temp = temp_temp[index - 1]
-                           + (new_height - temp_height[index - 1])
-                           * ((stan_temp[counter[2]] - temp_temp[index - 1])
-                              / (stan_height[counter[2]]
-                                 - temp_height[index - 1]));
+                                   - temp_pressure[curr_layer - 1])
+                                  * inv_height_diff);
+                new_temp = temp_temp[curr_layer - 1]
+                           + (new_height - temp_height[curr_layer - 1])
+                           * ((stan_temp[counter[2]]
+                               - temp_temp[curr_layer - 1])
+                              * inv_height_diff);
                 new_rh = temp_rh[counter[2]]
-                         + (new_height - temp_height[index - 1])
-                         * ((stan_rh[counter[2]] - temp_rh[index - 1])
-                            / (stan_height[counter[2]]
-                               - temp_height[index - 1]));
+                         + (new_height - temp_height[curr_layer - 1])
+                         * ((stan_rh[counter[2]] - temp_rh[curr_layer - 1])
+                            * inv_height_diff);
+
+                /* concatenate NARR layers, new layer, and standard atmosphere
+                   layers */
+                temp_height[curr_layer] = new_height;
+                temp_pressure[curr_layer] = new_pressure;
+                temp_temp[curr_layer] = new_temp;
+                temp_rh[curr_layer] = new_rh;
+                curr_layer++;
             }
 
-            /* concatenate NARR layers, new layer, and standard atmosphere
-               layers */
-            temp_height[index] = new_height;
-            temp_pressure[index] = new_pressure;
-            temp_temp[index] = new_temp;
-            temp_rh[index] = new_rh;
-            index++;
-            for (k = 2; k < index2; k++)
+            /* Add the remaining standard atmosphere layers */
+            for (k = 2; k < std_layer; k++)
             {
-                temp_height[index] = stan_height[counter[k]];
-                temp_pressure[index] = stan_pre[counter[k]];
-                temp_temp[index] = stan_temp[counter[k]];
-                temp_rh[index] = stan_rh[counter[k]];
-                index++;
+                temp_height[curr_layer] = stan_height[counter[k]];
+                temp_pressure[curr_layer] = stan_pre[counter[k]];
+                temp_temp[curr_layer] = stan_temp[counter[k]];
+                temp_rh[curr_layer] = stan_rh[counter[k]];
+                curr_layer++;
             }
 
             /* write atmospheric layers to a text file in format proper for
@@ -1490,7 +1502,7 @@ int build_modtran_input
             }
 
             /* Write out the intermediate file */
-            for (k = 0; k < index; k++)
+            for (k = 0; k < curr_layer; k++)
             {
                 fprintf (fd, "%10.3f%10.3e%10.3e%10.3e%10.3e%10.3e%16s\n",
                          temp_height[k], temp_pressure[k], temp_temp[k],
@@ -1503,38 +1515,32 @@ int build_modtran_input
                 RETURN_ERROR ("Closing file: tempLayers.txt\n",
                               FUNC_NAME, FAILURE);
             }
+            fd = NULL;
 
             /* determine number of layers for current ground altitude and
                insert into head file */
-            sprintf (command, "cat %s/modtran_head.txt"
-                              " | sed 's/nml/%d/'" " > newHead.txt",
-                              lst_data_dir, index);
-
+            snprintf (command, sizeof (command),
+                      "cat %s/modtran_head.txt"
+                      " | sed 's/nml/%d/'"
+                      " | sed 's/gdalt/%5.3f/'"
+                      " > baseHead.txt",
+                      lst_data_dir, curr_layer, gndalt[j]);
             if (system (command) != SUCCESS)
             {
-                RETURN_ERROR ("system call 5", FUNC_NAME, FAILURE);
-            }
-
-            /* insert current ground altitude into head file */
-            sprintf (command, "cat newHead.txt"
-                     " | sed 's/gdalt/%5.3f/'" " > newHead2.txt", gndalt[j]);
-            if (system (command) != SUCCESS)
-            {
-                RETURN_ERROR ("system call 6", FUNC_NAME, FAILURE);
+                RETURN_ERROR ("Failed creating tempHead.txt", FUNC_NAME,
+                              FAILURE);
             }
 
             /* iterate through [temperature,albedo] pairs at which to run
                MODTRAN */
             for (k = 0; k <= 2; k++)
             {
-                if (k == 2)
-                    sprintf (temp_out, "%s", "000");
-                else
-                    sprintf (temp_out, "%d", (int) tmp[k]);
-
                 /* create directory for the current temperature */
-                sprintf (current_temp, "%s/%s", current_gdalt, temp_out);
-
+                snprintf (current_temp, sizeof (current_temp),
+                          "%s/%s", current_gdalt, temp_strs[k]);
+                snprintf (msg_str, sizeof (msg_str),
+                          "Creating directory [%s]", current_temp);
+                LOG_MESSAGE (msg_str, FUNC_NAME);
                 if (mkdir (current_temp, 0755) != SUCCESS)
                 {
                     if (errno != EEXIST)
@@ -1546,16 +1552,12 @@ int build_modtran_input
                     }
                 }
 
-                /* insert current temperature into head file */
-                sprintf (command, "cat newHead2.txt"
-                         " | sed 's/tmp/%s/'" " > newHead3.txt", temp_out);
-                if (system (command) != SUCCESS)
-                {
-                    RETURN_ERROR ("system call 8", FUNC_NAME, FAILURE);
-                }
-
                 /* create directory for the current albedo */
-                sprintf (current_alb, "%s/%3.1f", current_temp, alb[k]);
+                snprintf (current_alb, sizeof (current_alb),
+                          "%s/%3.1f", current_temp, alb[k]);
+                snprintf (msg_str, sizeof (msg_str),
+                          "Creating directory [%s]", current_alb);
+                LOG_MESSAGE (msg_str, FUNC_NAME);
                 if (mkdir (current_alb, 0755) != SUCCESS)
                 {
                     if (errno != EEXIST)
@@ -1567,38 +1569,38 @@ int build_modtran_input
                     }
                 }
 
-                /* insert current albedo into head file */
-                sprintf (command, "cat newHead3.txt"
-                         " | sed 's/alb/%4.2f/'" " > newHead4.txt", alb[k]);
+                /* Concatenate the base head and atmospheric layers and tail
+                   files to create a tape 5 file for MODTRAN specific to this
+                   location and ground altitude with variables for temperature
+                   and albedo substituted file */
+                snprintf (command, sizeof (command),
+                          "cat baseHead.txt"
+                          " tempLayers.txt"
+                          " newTail.txt"
+                          " | sed 's/tmp/%s/'"
+                          " | sed 's/alb/%4.2f/'"
+                          " > %s/tape5",
+                          temp_strs[k], alb[k], current_alb);
                 if (system (command) != SUCCESS)
                 {
-                    RETURN_ERROR ("system call 10", FUNC_NAME, FAILURE);
+                    RETURN_ERROR ("Failed creating tape5", FUNC_NAME, FAILURE);
                 }
 
-                /* concatenate head file, atmospheric layers, and tail file to
-                   create a tape5 file for MODTRAN specific to this location
-                   and ground altitude with variables for temperature and
-                   albedo */
-                sprintf (command, "cat newHead4.txt"
-                         " tempLayers.txt"
-                         " newTail.txt" " > %s/tape5", current_alb);
-                if (system (command) != SUCCESS)
-                {
-                    RETURN_ERROR ("system call 11", FUNC_NAME, FAILURE);
-                }
+                /* create string for case list containing the location of the
+                   current tape5 file
 
-                /* create string for case list containing location of current
-                   tape5 file
-                   create string for command list containing commands for
-                   MODTRAN run
+                   create string for command list containing the commands for
+                   the MODTRAN run
+
                    iterate entry count */
                 case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
-                sprintf (case_list[case_counter], "%s/%s",
-                         curr_path, current_alb);
-                sprintf (command_list[case_counter],
-                         "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
-                         case_list[case_counter], modtran_data_dir,
-                         modtran_path);
+                snprintf ((*case_list)[case_counter], PATH_MAX,
+                          "%s/%s",
+                          curr_path, current_alb);
+                snprintf ((*command_list)[case_counter], PATH_MAX,
+                          "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
+                          (*case_list)[case_counter], modtran_data_dir,
+                          modtran_path);
             } /* END - Tempurature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
@@ -1608,79 +1610,81 @@ int build_modtran_input
     free(temp_pressure);
     free(temp_temp);
     free(temp_rh);
+    temp_height = NULL;
+    temp_pressure = NULL;
+    temp_temp = NULL;
+    temp_rh = NULL;
 
-    /* write caseList to a file */
-    fd = fopen ("caseList", "w");
-    if (fd == NULL)
+    if (debug)
     {
-        RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, FAILURE);
+        /* write caseList to a file */
+        fd = fopen ("caseList", "w");
+        if (fd == NULL)
+        {
+            RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, FAILURE);
+        }
+
+        /* Write out the caseList file */
+        for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
+        {
+            fprintf (fd, "%s\n", (*case_list)[k]);
+        }
+
+        /* Close the caseList file */
+        if (fclose (fd) != SUCCESS)
+        {
+            RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, FAILURE);
+        }
+
+        /* write commandList to a file */
+        fd = fopen ("commandList", "w");
+        if (fd == NULL)
+        {
+            RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, FAILURE);
+        }
+
+        /* Write out the commandList file */
+        for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
+        {
+            fprintf (fd, "%s\n", (*command_list)[k]);
+        }
+
+        /* Close the commandList file */
+        if (fclose (fd) != SUCCESS)
+        {
+            RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, FAILURE);
+        }
+        fd = NULL;
     }
 
-    /* Write out the caseList file */
-    for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
-    {
-        fprintf (fd, "%s\n", case_list[k]);
-    }
-
-    /* Close the caseList file */
-    if (fclose (fd) != SUCCESS)
-    {
-        RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, FAILURE);
-    }
-
-    /* write commandList to a file */
-    fd = fopen ("commandList", "w");
-    if (fd == NULL)
-    {
-        RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, FAILURE);
-    }
-
-    /* Write out the commandList file */
-    for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
-    {
-        fprintf (fd, "%s\n", command_list[k]);
-    }
-
-    /* Close the commandList file */
-    if (fclose (fd) != SUCCESS)
-    {
-        RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, FAILURE);
-    }
-
-    /* Free memory allocation */
+    /* Free remaining memory allocations */
     if (free_2d_array ((void **) pressure) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: pressure\n", FUNC_NAME, FAILURE);
     }
+    pressure = NULL;
 
     if (free_2d_array ((void **) narr_height) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: narr_height\n", FUNC_NAME, FAILURE);
     }
+    narr_height = NULL;
 
     if (free_2d_array ((void **) narr_rh) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: narr_rh\n", FUNC_NAME, FAILURE);
     }
+    narr_rh = NULL;
 
     if (free_2d_array ((void **) narr_tmp) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: narr_tmp\n", FUNC_NAME, FAILURE);
     }
+    narr_tmp = NULL;
 
-    /* Free memory allocation */
-    if (free_2d_array ((void **) case_list) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: case_list\n", FUNC_NAME, FAILURE);
-    }
-
-    if (free_2d_array ((void **) command_list) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME, FAILURE);
-    }
-
-    /* Assign to the output variable */
+    /* Assign to the output variables */
     *num_pts = num_points;
+    *num_runs = num_modtran_runs;
 
     return SUCCESS;
 }

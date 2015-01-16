@@ -50,27 +50,27 @@ main (int argc, char *argv[])
     int status;                 /* return value from function call */
     //    Output_t *output = NULL; /* output structure and metadata */
     bool verbose;               /* verbose flag for printing messages */
+    bool debug;                 /* debug flag for debug output */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
-    int i, k;
+    int i;
     int num_points;
+    int num_modtran_runs;
     char **case_list = NULL;
     char **command_list = NULL;
     float **results = NULL;
-    FILE *fd;
-    int num_cases;
     char *tmp_env = NULL;
 
     time_t now;
     time (&now);
     snprintf (msg_str, sizeof(msg_str),
-              "scene_based_lst start_time=%s\n", ctime (&now));
+              "scene_based_lst start_time=%s", ctime (&now));
     LOG_MESSAGE (msg_str, FUNC_NAME);
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
     status = get_args (argc, argv, &xml_name, &dem_name, &emissivity_name,
-                       &verbose);
+                       &verbose, &debug);
     if (status != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
@@ -122,37 +122,37 @@ main (int argc, char *argv[])
     if (verbose)
     {
         /* Print some info to show how the input metadata works */
-        printf ("DEBUG: Instrument: %d\n", input->meta.inst);
-        printf ("DEBUG: Satellite: %d\n", input->meta.sat);
-        printf ("DEBUG: Number of input thermal bands: %d\n",
+        printf ("Instrument: %d\n", input->meta.inst);
+        printf ("Satellite: %d\n", input->meta.sat);
+        printf ("Number of input thermal bands: %d\n",
                 input->nband_th);
-        printf ("DEBUG: Number of input lines: %d\n", input->size_th.l);
-        printf ("DEBUG: Number of input samples: %d\n", input->size_th.s);
-        printf ("DEBUG: ACQUISITION_DATE.DOY is %d\n",
+        printf ("Number of input lines: %d\n", input->size_th.l);
+        printf ("Number of input samples: %d\n", input->size_th.s);
+        printf ("ACQUISITION_DATE.DOY is %d\n",
                 input->meta.acq_date.doy);
-        printf ("DEBUG: Fill value is %d\n", input->meta.fill);
-        printf ("DEBUG: Thermal Band -->\n");
-        printf ("DEBUG:   therm_satu_value_ref: %d\n",
+        printf ("Fill value is %d\n", input->meta.fill);
+        printf ("Thermal Band -->\n");
+        printf ("  therm_satu_value_ref: %d\n",
                 input->meta.therm_satu_value_ref);
-        printf ("DEBUG:   therm_satu_value_max: %d\n",
+        printf ("  therm_satu_value_max: %d\n",
                 input->meta.therm_satu_value_max);
-        printf ("DEBUG:   therm_gain: %f, therm_bias: %f\n",
+        printf ("  therm_gain: %f, therm_bias: %f\n",
                 input->meta.gain_th, input->meta.bias_th);
 
-        printf ("DEBUG: SUN AZIMUTH: %f\n", input->meta.sun_az);
-        printf ("DEBUG: SUN ZENITH: %f\n", input->meta.sun_zen);
-        printf ("DEBUG: Year, Month, Day, Hour, Minute, Second: %d, "
+        printf ("SUN AZIMUTH: %f\n", input->meta.sun_az);
+        printf ("SUN ZENITH: %f\n", input->meta.sun_zen);
+        printf ("Year, Month, Day, Hour, Minute, Second: %d, "
                 "%d, %d, %d, %d,%f\n", input->meta.acq_date.year,
                 input->meta.acq_date.month, input->meta.acq_date.day,
                 input->meta.acq_date.hour, input->meta.acq_date.minute,
                 input->meta.acq_date.second);
-        printf ("DEBUG: UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
+        printf ("UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
                 input->meta.ul_map_corner.y);
-        printf ("DEBUG: LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
+        printf ("LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
                 input->meta.lr_map_corner.y);
-        printf ("DEBUG: UL_GEO_CORNER: %f, %f\n",
+        printf ("UL_GEO_CORNER: %f, %f\n",
                 input->meta.ul_geo_corner.lat, input->meta.ul_geo_corner.lon);
-        printf ("DEBUG: LR_GEO_CORNER: %f, %f\n",
+        printf ("LR_GEO_CORNER: %f, %f\n",
                 input->meta.lr_geo_corner.lat, input->meta.lr_geo_corner.lon);
     }
 
@@ -180,8 +180,11 @@ main (int argc, char *argv[])
     }
 #endif
 
+
     /* call build_modtran_input to generate tape5 file and commandList */
-    status = build_modtran_input (input, &num_points, verbose);
+    status = build_modtran_input (input, &num_points, &num_modtran_runs,
+                                  &case_list, &command_list,
+                                  verbose, debug);
     if (status != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
@@ -189,83 +192,24 @@ main (int argc, char *argv[])
 
     if (verbose)
     {
-        printf ("DEBUG: Number of Points: %d\n", num_points);
+        printf ("Number of Points: %d\n", num_points);
     }
 
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-    exit (0);
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-
-    num_cases = num_points * NUM_ELEVATIONS * 3;
-    case_list = (char **) allocate_2d_array (num_cases, MAX_STR_LEN,
-                                             sizeof (char));
-    if (case_list == NULL)
-    {
-        RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, EXIT_FAILURE);
-    }
-
-    command_list = (char **) allocate_2d_array (num_cases, MAX_STR_LEN,
-                                                sizeof (char));
-    if (command_list == NULL)
-    {
-        RETURN_ERROR ("Allocating command_list memory", FUNC_NAME,
-                      EXIT_FAILURE);
-    }
-
-    /* Read case_list from caseList file */
-    fd = fopen ("caseList", "r");
-    if (fd == NULL)
-    {
-        RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
-    /* Read in the caseList file */
-    for (k = 0; k < num_cases; k++)
-    {
-        fscanf (fd, "%s", case_list[k]);
-    }
-
-    /* Close the caseList file */
-    status = fclose (fd);
-    if (status)
-    {
-        RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
-    /* Read command_list from commandList file */
-    fd = fopen ("commandList", "r");
-    if (fd == NULL)
-    {
-        RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
-    /* Read in the commandList file */
-    for (k = 0; k < num_cases; k++)
-    {
-        fgets (command_list[k], MAX_STR_LEN, fd);
-    }
-
-    /* Close the commandList file */
-    status = fclose (fd);
-    if (status)
-    {
-        RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
+#if 0
     /* perform modtran runs by calling command_list */
-    for (i = 0; i < num_cases; i++)
+    for (i = 0; i < num_modtran_runs; i++)
     {
+        snprintf (msg_str, sizeof(msg_str),
+                  "Executing MODTRAN [%s]", command_list[i]);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
         status = system (command_list[i]);
         if (status != SUCCESS)
         {
-            RETURN_ERROR ("executing command_list[i]", FUNC_NAME,
+            RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
                           EXIT_FAILURE);
         }
     }
+#endif
 
     /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run),
        copy program to delete headers and parse wavelength and total radiance
@@ -276,7 +220,7 @@ main (int argc, char *argv[])
         RETURN_ERROR ("cp $BIN/tape6parser.bash\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    for (i = 0; i < num_cases; i++)
+    for (i = 0; i < num_modtran_runs; i++)
     {
         /* Just use $LST_DATA/elim2.sed directly instead of linking it */
         sprintf (command, "./tape6parser.bash %s", case_list[i]);
