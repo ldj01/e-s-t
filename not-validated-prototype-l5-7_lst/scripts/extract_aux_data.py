@@ -136,16 +136,8 @@ def extract_grib_data(hdr_path, grb_path, output_dir):
 def extract_aux_data(args, base_aux_dir):
     '''
     Description:
-        We are coding to use NARR data, which is provided in 3hr increments.
-
-        Builds the strings required to retrieve the auxillary data and then
-        downloads them to the current directory with specified names.
-
-        The parameters are then extracted from the downloaded grib files.
-
-    Note:
-        We use the "Range" option in the http headers to retrieve only the
-        portions of the auxillary data files that we need.
+        Builds the strings required to locate the auxillary data in the
+        archive then extracts the parameters into paremeter named directories.
     '''
 
     logger = logging.getLogger(__name__)

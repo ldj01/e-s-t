@@ -23,7 +23,6 @@ import errno
 import re
 import commands
 import logging
-import requests
 from argparse import ArgumentParser
 
 # espa-common objects and methods
@@ -87,37 +86,6 @@ def create_directory(directory):
 
 
 # ============================================================================
-def http_transfer_file(download_url, destination_file, headers=None):
-    '''
-    Description:
-        Using http transfer a file from a source location to a destination
-        file on the localhost.
-
-        HTTP headers can be specified to modify how the download happens.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    logger.info("Transfering {0}".format(download_url))
-
-    req = requests.get(download_url, headers=headers)
-
-    if not req.ok:
-        logger.error("Transfer Failed - HTTP")
-        req.raise_for_status()
-
-    try:
-        with open(destination_file, 'wb') as local_fd:
-            local_fd.write(req.content)
-    except:
-        logger.error("Transfer Failed - HTTP")
-        raise
-    finally:
-        req.close()
-    logger.info("Transfer Complete - HTTP")
-
-
-# ============================================================================
 def process_lst(args):
     '''
     Description:
@@ -129,7 +97,7 @@ def process_lst(args):
 
     # ------------------------------------------------------------------------
     # Retrieve and initial processing of the required AUX data
-    cmd = ['retrieve_extract_aux_data.py', '--xml', args.xml_filename]
+    cmd = ['extract_aux_data.py', '--xml', args.xml_filename]
     cmd = ' '.join(cmd)
     output = ''
     try:
@@ -150,10 +118,6 @@ def process_lst(args):
     emi_filename = '{0}_emissivity.img'.format(product_id)
 
     # ------------------------------------------------------------------------
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
     # TODO TODO TODO - Get the DEM myself or does ESPA do that???
     # TODO TODO TODO - Get the DEM myself or does ESPA do that???
     # TODO TODO TODO - Get the DEM myself or does ESPA do that???
@@ -179,6 +143,17 @@ def process_lst(args):
     # TODO TODO TODO - processed.  Processed to required input???
     # TODO TODO TODO - The emnissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - processed.  Processed to required input???
+    # ------------------------------------------------------------------------
 
     # ------------------------------------------------------------------------
     # Call the scene based lst
@@ -200,7 +175,7 @@ def process_lst(args):
             logger.info(output)
 
     # ------------------------------------------------------------------------
-    # TODO TODO TODO
+    # TODO TODO TODO - Don't know if anything here yet, except maybe cleanup
     # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
@@ -213,7 +188,7 @@ def process_lst(args):
 if __name__ == '__main__':
     '''
     Description:
-        Performs gathers input parameters and performs the LST processing.
+        Gathers input parameters and performs the LST processing.
     '''
 
     # Create a command line arugment parser
