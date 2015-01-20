@@ -111,13 +111,14 @@ def process_pltout_results(args):
 if __name__ == '__main__':
     '''
     Description:
-        Performs gathers input parameters and performs the LST tape6
+        Performs gathers input parameters and performs the LST MODTRAN results
         processing.
     '''
 
     # Create a command line arugment parser
-    description = ("Retrieves and generates auxillary LST inputs, then"
-                   " processes and calls other executables for LST generation")
+    description = ("Reads MODTRAN results from either tape6 or pltout.asc"
+                   " files processes them to the follow-on input format"
+                   " for the next step in LST generation")
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -153,9 +154,10 @@ if __name__ == '__main__':
 
     try:
         if not args.pltout_filename:
-            if args.tape6_filename == '':
+            if ((args.tape6_filename is None)
+                    or (args.tape6_filename == '')):
                 logger.fatal("No TAPE6 filename provided.")
-                logger.fatal("Error processing LST TAPE6 results."
+                logger.fatal("Error processing LST MODTRAN results."
                              "  Processing will terminate.")
                 sys.exit(EXIT_FAILURE)
 
@@ -164,7 +166,7 @@ if __name__ == '__main__':
         else:
             if args.pltout_filename == '':
                 logger.fatal("No pltout filename provided.")
-                logger.fatal("Error processing LST pltout results."
+                logger.fatal("Error processing LST MODTRAN results."
                              "  Processing will terminate.")
                 sys.exit(EXIT_FAILURE)
 
@@ -172,9 +174,9 @@ if __name__ == '__main__':
             process_pltout_results(args)
 
     except Exception, e:
-        logger.exception("Error processing LST TAPE6 results."
+        logger.exception("Error processing LST MODTRAN results."
                          "  Processing will terminate.")
         sys.exit(EXIT_FAILURE)
 
-    logger.info("LST TAPE6 results processing complete")
+    logger.info("LST MODTRAN results processing complete")
     sys.exit(EXIT_SUCCESS)
