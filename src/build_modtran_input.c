@@ -99,14 +99,6 @@ int convert_geopotential_geometric
                             then we would not have to multiply by 1000.0 here
                             to get meters.  Or at least that is what I
                             currently assume is happening. */
-        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
-                            then we would not have to multiply by 1000.0 here
-                            to get meters.  Or at least that is what I
-                            currently assume is happening. */
-        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
-                            then we would not have to multiply by 1000.0 here
-                            to get meters.  Or at least that is what I
-                            currently assume is happening. */
         radius[i] = 1000.0
                     * sqrt (1.0 / (((cos_lat * cos_lat) * inv_r_max_sqrd)
                                    + ((sin_lat * sin_lat) * inv_r_min_sqrd)));
@@ -179,8 +171,6 @@ int convert_sh_rh
 
     float **temp_c;
     float **ewater;
-// TODO TODO TODO - RDD - This was calculated but not used??????????
-//    float **e2;
     float **goff;
     float **ph20;
 
@@ -198,13 +188,6 @@ int convert_sh_rh
     {
         RETURN_ERROR ("Allocating ewater memory", FUNC_NAME, FAILURE);
     }
-
-// TODO TODO TODO - RDD - This was calculated but not used??????????
-//    e2 = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
-//    if (e2 == NULL)
-//    {
-//        RETURN_ERROR ("Allocating e2 memory", FUNC_NAME, FAILURE);
-//    }
 
     goff = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
     if (goff == NULL)
@@ -233,14 +216,6 @@ int convert_sh_rh
                                     * (a4w + temp_c[i][j]
                                        * (a5w + temp_c[i][j]
                                           * (a6w * temp_c[i][j]))))));/* hpa */
-
-// TODO TODO TODO - RDD - This was calculated but not used??????????
-//            e2[i][j] = exp (-0.58002206e4 / temp_k[i][j]
-//                            + 0.13914993
-//                            - 0.48640239e-1 * temp_k[i][j]
-//                            + 0.41764768e-4 * pow (temp_k[i][j], 2.0)
-//                            - 0.14452093e-7 * pow (temp_k[i][j], 3.0)
-//                            + 0.65459673 * log (temp_k[i][j])); /* Pa */
 
             goff[i][j] = -7.90298 * (373.16 / temp_k[i][j] - 1.0)
                          + 5.02808 * log10 (373.16 / temp_k[i][j])
@@ -274,12 +249,6 @@ int convert_sh_rh
     {
         RETURN_ERROR ("Freeing memory: ewater\n", FUNC_NAME, FAILURE);
     }
-
-// TODO TODO TODO - RDD - This was calculated but not used??????????
-//    if (free_2d_array ((void **) e2) != SUCCESS)
-//    {
-//        RETURN_ERROR ("Freeing memory: e2\n", FUNC_NAME, FAILURE);
-//    }
 
     if (free_2d_array ((void **) goff) != SUCCESS)
     {
@@ -358,7 +327,9 @@ int read_narr_coordinates
                       reading the values from the lower left to the upper
                       right as applied to the earth.  And the values being
                       read in start with an origin somewhere around the lower
-                      left, hence the need for the following conversion. */
+                      left, hence the need for the following conversion.
+               NOTE - If this is changed here, the else-where in the code will
+                      break. */
             if ((lon[i][j] - 180.0) > MINSIGMA)
                 lon[i][j] = 360.0 - lon[i][j];
             else
@@ -669,16 +640,24 @@ int build_modtran_input
     }
 
     /* expand range to include NARR points outside image for edge pixels */
+    /* TODO - 0.5deg at higher latitudes will not be sufficient for the
+              longitudinal test, since at lat(72deg) 1deg lon = 34504.22meters
+              and the NARR data is 34k between points.
+
+              This is probably only a CONUS quick and dirty solution.
+
+       NOTE - MERRA is even farther apart so this will not work for that. */
     buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
     buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
     buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
     buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
 
-    /* determine what points in the NARR dataset fall within the Landsat
-       image using logical operators lessThanLat and greaterThanLat are values
-       where the NARR values are less than or greater than the edges of the
-       Landsat corners values respectively pixels that are true in both fall
-       within the Landsat scene the same thing is done with longitude values */
+    /* determine what points in the NARR dataset fall within our buffered
+       Landsat area using logical operators lessThanLat and greaterThanLat
+       are values where the NARR values are less than or greater than the
+       edges of the Landsat corners values respectively pixels that are true
+       in both fall within the Landsat scene the same thing is done with
+       longitude values */
     max_eye = 0;
     min_eye = 1000;
     max_jay = 0;
@@ -1274,12 +1253,12 @@ int build_modtran_input
         }
 
         /* Figure out the lat and lon strings to use */
-        if ((narr_lat[i] - 100.0) < MINSIGMA)
+        if (narr_lat[i] < 100.0)
             snprintf (lat_str, sizeof (lat_str), "%6.3f", narr_lat[i]);
         else
             snprintf (lat_str, sizeof (lat_str), "%6.2f", narr_lat[i]);
 
-        if ((narr_lon[i] - 100.0) < MINSIGMA)
+        if (narr_lon[i] < 100.0)
             snprintf (lon_str, sizeof (lon_str), "%6.3f", narr_lon[i]);
         else
             snprintf (lon_str, sizeof (lon_str), "%6.2f", narr_lon[i]);
@@ -1414,8 +1393,7 @@ int build_modtran_input
             /* MODTRAN throws an error when there are two identical layers in
                the tape5 file, if the current ground altitude and the next
                highest layer are close enough, eliminate interpolated layer */
-            if (fabs (gndalt[j] - narr_height[layer_above][i] - 0.001)
-                < MINSIGMA)
+            if (fabs (gndalt[j] - narr_height[layer_above][i]) < 0.001)
             {
                 curr_layer = 0;
                 for (k = layer_above; k < P_LAYER; k++)
