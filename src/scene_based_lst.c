@@ -49,6 +49,7 @@ main (int argc, char *argv[])
     char command[PATH_MAX];
     int status;                 /* return value from function call */
     //    Output_t *output = NULL; /* output structure and metadata */
+    bool use_tape6;             /* Use the tape6 output */
     bool verbose;               /* verbose flag for printing messages */
     bool debug;                 /* debug flag for debug output */
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
@@ -70,7 +71,7 @@ main (int argc, char *argv[])
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
     status = get_args (argc, argv, &xml_name, &dem_name, &emissivity_name,
-                       &verbose, &debug);
+                       &use_tape6, &verbose, &debug);
     if (status != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
@@ -212,24 +213,45 @@ TEMP TAKE THIS OUT TO SAVE TIME
     }
 #endif
 
-    /* PARSING TAPE6 FILES: for each case in caseList (for each modtran run),
-       parse wavelength and total radiance from tape6 file into parsed */
-    for (i = 0; i < num_modtran_runs; i++)
+    /* Free memory allocation */
+    status = free_2d_array ((void **) command_list);
+    if (status != SUCCESS)
     {
-        snprintf (command, sizeof (command),
-                  "lst_extract_tape6_results.py"
-                  " --tape6 %s/tape6"
-                  " --parsed %s/parsed",
-                  case_list[i], case_list[i]);
-        snprintf (msg_str, sizeof(msg_str),
-                  "Executing [%s]", command);
-        LOG_MESSAGE (msg_str, FUNC_NAME);
-        status = system (command);
-        if (status != SUCCESS)
+        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
+                      EXIT_FAILURE);
+    }
+
+    if (use_tape6)
+    {
+        /* PARSING TAPE6 FILES:
+           for each case in caseList (for each modtran run),
+           parse wavelength and total radiance from tape6 file into parsed */
+        for (i = 0; i < num_modtran_runs; i++)
         {
-            RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
-                          FUNC_NAME, EXIT_FAILURE);
+            snprintf (command, sizeof (command),
+                      "lst_extract_tape6_results.py"
+                      " --tape6 %s/tape6"
+                      " --parsed %s/parsed",
+                      case_list[i], case_list[i]);
+            snprintf (msg_str, sizeof(msg_str),
+                      "Executing [%s]", command);
+            LOG_MESSAGE (msg_str, FUNC_NAME);
+            status = system (command);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
+                              FUNC_NAME, EXIT_FAILURE);
+            }
         }
+    }
+// TODO TODO TODO - Else use the pltout.asc since MODTRAN 5.X generates it and it  has more precision.
+
+    /* Allocate memory for results */
+    results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
+                                            sizeof (float));
+    if (results == NULL)
+    {
+        RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
     }
 
 // TODO TODO TODO - RDD - stopping here for right now
@@ -241,22 +263,6 @@ TEMP TAKE THIS OUT TO SAVE TIME
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
 // TODO TODO TODO - RDD - stopping here for right now
-
-    /* Free memory allocation */
-    status = free_2d_array ((void **) command_list);
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
-                      EXIT_FAILURE);
-    }
-
-    /* Allocate memory for results */
-    results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
-                                            sizeof (float));
-    if (results == NULL)
-    {
-        RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
-    }
 
     /* call second_narr to generate parameters for each height and NARR point */
     status =
@@ -420,51 +426,4 @@ TEMP TAKE THIS OUT TO SAVE TIME
     LOG_MESSAGE (msg_str, FUNC_NAME);
 
     return EXIT_SUCCESS;
-}
-
-
-/******************************************************************************
-MODULE:  usage
-
-PURPOSE:  Prints the usage information for this application.
-
-RETURN VALUE:
-Type = None
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-3/15/2013   Song Guo         Original Development
-8/15/2013   Song Guo         Modified to use TOA reflectance file 
-                             as input instead of metadata file
-2/19/2014   Gail Schmidt     Modified to utilize the ESPA internal raw binary
-                             file format
-
-******************************************************************************/
-void
-usage ()
-{
-    printf ("Landsat Surface Temperature\n");
-    printf ("\n");
-    printf ("usage: scene_based_lst"
-            " --xml=input_xml_filename"
-            " --dem=input_dem_filename"
-            " --emi=input_emissivity_filename" " [--verbose]\n");
-
-    printf ("\n");
-    printf ("where the following parameters are required:\n");
-    printf ("    -xml: name of the input XML file\n");
-    printf ("\n");
-    printf ("where the following parameters are optional:\n");
-    printf ("    -verbose: should intermediate messages be printed?"
-            " (default is false)\n");
-    printf ("\n");
-    printf ("scene_based_lst --help will print the usage statement\n");
-    printf ("\n");
-    printf ("Example: scene_based_lst"
-            " --xml=LE70390032010263EDC00.xml"
-            " --dem=17_30_DEM.tif"
-            " --emi=AG100B.v003.-20.122.0001.bin" " --verbose\n");
-    printf ("Note: The scene_based_lst must run from the directory"
-            " where the input data are located.\n\n");
 }
