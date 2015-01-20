@@ -116,13 +116,9 @@ def http_transfer_file(download_url, destination_file, headers=None):
     session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
     session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
 
-    sleep_count = 0
+    retry_attempt = 0
     done = False
     while not done:
-        if sleep_count > 3:
-            raise Exception("Transfer Failed - HTTP"
-                            " - exceeded retry limit")
-
         req = None
         try:
             req = session.get(url=download_url, headers=headers,
@@ -139,10 +135,11 @@ def http_transfer_file(download_url, destination_file, headers=None):
 
         except:
             logger.exception("Transfer Issue - HTTP")
-            sleep(int(1.5 * sleep_count))
-            sleep_count = sleep_count + 1
-            if sleep_count > 3:
-                raise
+            if retry_attempt > 3:
+                raise Exception("Transfer Failed - HTTP"
+                                " - exceeded retry limit")
+            retry_attempt += 1
+            sleep(int(1.5 * retry_attempt))
 
         finally:
             if req is not None:
