@@ -573,10 +573,10 @@ int build_modtran_input
                             300, 275, 250, 225, 200,
                             175, 150, 125, 100 };
     int num_points;
-    float narr_ul_lat;
-    float narr_ul_lon;
-    float narr_lr_lat;
-    float narr_lr_lon;
+    float buffered_ul_lat;
+    float buffered_ul_lon;
+    float buffered_lr_lat;
+    float buffered_lr_lon;
     int max_eye;
     int min_eye;
     int max_jay;
@@ -669,10 +669,10 @@ int build_modtran_input
     }
 
     /* expand range to include NARR points outside image for edge pixels */
-    narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
-    narr_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
-    narr_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
-    narr_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
+    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
+    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
+    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
+    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
 
     /* determine what points in the NARR dataset fall within the Landsat
        image using logical operators lessThanLat and greaterThanLat are values
@@ -687,10 +687,10 @@ int build_modtran_input
     {
         for (j = 0; j < NARR_COL - 1; j++)
         {
-            if ((lat[i][j] - narr_ul_lat) < MINSIGMA
-                && (lat[i][j] - narr_lr_lat) > MINSIGMA
-                && (lon[i][j] - narr_lr_lon) < MINSIGMA
-                && (lon[i][j] - narr_ul_lon) > MINSIGMA)
+            if ((buffered_ul_lat > lat[i][j])
+                && (buffered_lr_lat < lat[i][j])
+                && (buffered_ul_lon < lon[i][j])
+                && (buffered_lr_lon > lon[i][j]))
             {
                 max_eye = max (max_eye, eye[i][j]);
                 min_eye = min (min_eye, eye[i][j]);
