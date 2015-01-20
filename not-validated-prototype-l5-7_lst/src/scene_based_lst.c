@@ -197,7 +197,7 @@ main (int argc, char *argv[])
     }
 
 #if 0
-TEMP TAKE THIS OUT TO SAVE TIME
+// TEMP TAKE THIS OUT TO SAVE TIME
     /* perform modtran runs by calling command_list */
     for (i = 0; i < num_modtran_runs; i++)
     {
@@ -221,30 +221,40 @@ TEMP TAKE THIS OUT TO SAVE TIME
                       EXIT_FAILURE);
     }
 
-    if (use_tape6)
+    /* PARSING MODTRAN RESULTS:
+       for each case in caseList (for each modtran run),
+       parse wavelength and total radiance from tape6 file into parsed */
+    for (i = 0; i < num_modtran_runs; i++)
     {
-        /* PARSING TAPE6 FILES:
-           for each case in caseList (for each modtran run),
-           parse wavelength and total radiance from tape6 file into parsed */
-        for (i = 0; i < num_modtran_runs; i++)
+        if (use_tape6)
         {
+            /* Use modtran generated tape6 output */
             snprintf (command, sizeof (command),
-                      "lst_extract_tape6_results.py"
+                      "lst_extract_modtran_results.py"
                       " --tape6 %s/tape6"
                       " --parsed %s/parsed",
                       case_list[i], case_list[i]);
-            snprintf (msg_str, sizeof(msg_str),
-                      "Executing [%s]", command);
-            LOG_MESSAGE (msg_str, FUNC_NAME);
-            status = system (command);
-            if (status != SUCCESS)
-            {
-                RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
-                              FUNC_NAME, EXIT_FAILURE);
-            }
+        }
+        else
+        {
+            /* Use modtran generated pltout.asc output */
+            snprintf (command, sizeof (command),
+                      "lst_extract_modtran_results.py"
+                      " --pltout %s/pltout.asc"
+                      " --parsed %s/parsed",
+                      case_list[i], case_list[i]);
+        }
+
+        snprintf (msg_str, sizeof(msg_str),
+                  "Executing [%s]", command);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
+        status = system (command);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
+                          FUNC_NAME, EXIT_FAILURE);
         }
     }
-// TODO TODO TODO - Else use the pltout.asc since MODTRAN 5.X generates it and it  has more precision.
 
     /* Allocate memory for results */
     results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
