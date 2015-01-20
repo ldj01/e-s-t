@@ -82,6 +82,32 @@ def process_tape6_results(args):
 
 
 # ============================================================================
+def process_pltout_results(args):
+    '''
+    Description:
+        Parse and clean up the pltout.asc results.
+    '''
+
+    logger = logging.getLogger(__name__)
+
+    results_buffer = StringIO()
+
+    # Retrieve the auxillary data and extract it
+    with open(args.pltout_filename, "r") as pltout_fd:
+        for line in pltout_fd:
+            # Remove all whitespace and newlines
+            line = ' '.join(line.strip().split())
+
+            results_buffer.write(line)
+            results_buffer.write('\n')
+
+    with open(args.parsed_filename, "w") as parsed_fd:
+        parsed_fd.write(results_buffer.getvalue())
+
+    results_buffer.close()
+
+
+# ============================================================================
 if __name__ == '__main__':
     '''
     Description:
@@ -97,8 +123,14 @@ if __name__ == '__main__':
     # ---- Add parameters ----
     # Required parameters
     parser.add_argument('--tape6',
-                        action='store', dest='tape6_filename', required=True,
+                        action='store', dest='tape6_filename', required=False,
+                        default=None,
                         help="The TAPE6 file to process")
+
+    parser.add_argument('--pltout',
+                        action='store', dest='pltout_filename', required=False,
+                        default=None,
+                        help="The output parsed results file")
 
     parser.add_argument('--parsed',
                         action='store', dest='parsed_filename', required=True,
@@ -119,16 +151,25 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    if args.tape6_filename == '':
-        logger.fatal("No TAPE6 filename provided.")
-        logger.fatal("Error processing LST TAPE6 results."
-                     "  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
-
     try:
-        logger.info("Extracting TAPE6 results")
+        if not args.pltout_filename:
+            if args.tape6_filename == '':
+                logger.fatal("No TAPE6 filename provided.")
+                logger.fatal("Error processing LST TAPE6 results."
+                             "  Processing will terminate.")
+                sys.exit(EXIT_FAILURE)
 
-        process_tape6_results(args)
+            logger.info("Using TAPE6 results")
+            process_tape6_results(args)
+        else:
+            if args.pltout_filename == '':
+                logger.fatal("No pltout filename provided.")
+                logger.fatal("Error processing LST pltout results."
+                             "  Processing will terminate.")
+                sys.exit(EXIT_FAILURE)
+
+            logger.info("Using pltout.asc results")
+            process_pltout_results(args)
 
     except Exception, e:
         logger.exception("Error processing LST TAPE6 results."
