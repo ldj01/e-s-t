@@ -502,7 +502,7 @@ int build_modtran_input
     Input_t *input,       /* I: input structure */
     int *num_pts,         /* O: number of NARR points */
     int *num_runs,        /* O: number of MODTRAN runs */
-    char ***case_list,    /* O: case list information (allocated here) */
+    CASE_POINT **case_list, /* O: case list information (allocated here) */
     char ***command_list, /* O: command list information (allocated here) */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 should be printed */
@@ -1171,8 +1171,7 @@ int build_modtran_input
         RETURN_ERROR ("Allocating counter memory", FUNC_NAME, FAILURE);
     }
 
-    *case_list = (char **) allocate_2d_array (num_modtran_runs, PATH_MAX,
-                                              sizeof (char));
+    *case_list = (CASE_POINT *) malloc (num_modtran_runs * sizeof (CASE_POINT));
     if (*case_list == NULL)
     {
         RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, FAILURE);
@@ -1572,13 +1571,17 @@ int build_modtran_input
 
                    iterate entry count */
                 case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
-                snprintf ((*case_list)[case_counter], PATH_MAX,
+                snprintf ((*case_list)[case_counter].full_path, PATH_MAX,
                           "%s/%s",
                           curr_path, current_alb);
                 snprintf ((*command_list)[case_counter], PATH_MAX,
                           "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
-                          (*case_list)[case_counter], modtran_data_dir,
-                          modtran_path);
+                          (*case_list)[case_counter].full_path,
+                          modtran_data_dir, modtran_path);
+
+                (*case_list)[case_counter].latitude = narr_lat[i];
+                (*case_list)[case_counter].longitude = narr_lon[i];
+                (*case_list)[case_counter].height = gndalt[j];
             } /* END - Tempurature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
@@ -1593,6 +1596,19 @@ int build_modtran_input
     temp_temp = NULL;
     temp_rh = NULL;
 
+    /* Free the standard atmosphere memory */
+    free(stan_height);
+    free(stan_pre);
+    free(stan_temp);
+    free(stan_rh);
+    stan_height = NULL;
+    stan_pre = NULL;
+    stan_temp = NULL;
+    stan_rh = NULL;
+
+    free(counter);
+    counter = NULL;
+
     if (debug)
     {
         /* write caseList to a file */
@@ -1605,7 +1621,7 @@ int build_modtran_input
         /* Write out the caseList file */
         for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
         {
-            fprintf (fd, "%s\n", (*case_list)[k]);
+            fprintf (fd, "%s\n", (*case_list)[k].full_path);
         }
 
         /* Close the caseList file */
@@ -1636,6 +1652,9 @@ int build_modtran_input
     }
 
     /* Free remaining memory allocations */
+    free(narr_lat);
+    free(narr_lon);
+
     if (free_2d_array ((void **) pressure) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: pressure\n", FUNC_NAME, FAILURE);
