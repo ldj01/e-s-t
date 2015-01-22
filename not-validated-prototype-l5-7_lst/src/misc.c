@@ -96,14 +96,14 @@ NOTES:
 ******************************************************************************/
 int get_args
 (
-    int argc,                 /* I: number of cmd-line args */
-    char *argv[],             /* I: string of cmd-line args */
-    char **xml_infile,        /* I: address of input XML metadata filename  */
-    char **dem_infile,        /* I: address of input DEM filename */
-    char **emissivity_infile, /* I: address of input emissivity filename */
-    bool *use_tape6,          /* O: use the tape6 output */
-    bool *verbose,            /* O: verbose flag */
-    bool *debug               /* O: debug flag */
+    int argc,                /* I: number of cmd-line args */
+    char *argv[],            /* I: string of cmd-line args */
+    char *xml_infile,        /* I: address of input XML metadata filename  */
+    char *dem_infile,        /* I: address of input DEM filename */
+    char *emissivity_infile, /* I: address of input emissivity filename */
+    bool *use_tape6,         /* O: use the tape6 output */
+    bool *verbose,           /* O: verbose flag */
+    bool *debug              /* O: debug flag */
 )
 {
     int c;                         /* current argument index */
@@ -149,15 +149,15 @@ int get_args
                 break;
 
             case 'i':              /* xml infile */
-                *xml_infile = strdup (optarg);
+                snprintf(xml_infile, PATH_MAX, optarg);
                 break;
 
             case 'd':              /* dem infile */
-                *dem_infile = strdup (optarg);
+                snprintf(dem_infile, PATH_MAX, optarg);
                 break;
 
             case 'e':              /* xml infile */
-                *emissivity_infile = strdup (optarg);
+                snprintf(emissivity_infile, PATH_MAX, optarg);
                 break;
 
             case '?':
@@ -170,19 +170,19 @@ int get_args
     }
 
     /* Make sure the infile was specified */
-    if (*xml_infile == NULL)
+    if (strlen(xml_infile) <= 0)
     {
         usage ();
         RETURN_ERROR ("XML input file is a required argument", FUNC_NAME,
                       FAILURE);
     }
-    if (*dem_infile == NULL)
+    if (strlen(dem_infile) <= 0)
     {
         usage ();
         RETURN_ERROR ("DEM input file is a required argument", FUNC_NAME,
                       FAILURE);
     }
-    if (*emissivity_infile == NULL)
+    if (strlen(emissivity_infile) <= 0)
     {
         usage ();
         RETURN_ERROR ("Emissivity input file is a required argument",
@@ -203,9 +203,9 @@ int get_args
 
     if (*verbose)
     {
-        printf ("XML_input_file = %s\n", *xml_infile);
-        printf ("DEM_input_file = %s\n", *dem_infile);
-        printf ("Emissivity_input_file = %s\n", *emissivity_infile);
+        printf ("XML_input_file = %s\n", xml_infile);
+        printf ("DEM_input_file = %s\n", dem_infile);
+        printf ("Emissivity_input_file = %s\n", emissivity_infile);
     }
 
     /* Set the debug flag */
