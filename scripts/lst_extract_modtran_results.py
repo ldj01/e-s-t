@@ -31,6 +31,48 @@ from espa_constants import EXIT_SUCCESS
 
 
 # ============================================================================
+def extract_tpst(tape6_fd):
+    '''
+    Description:
+        Extract the target pixel surface temperature value from the tape6_fd
+        file and return it as a float value.
+    '''
+
+    target_pixel_surface_temp = None
+
+    # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
+    for line in tape6_fd:
+        # Remove all whitespace and newlines
+        line = ' '.join(line.strip().split())
+
+        if line.startswith('TARGET-PIXEL (H2) SURFACE TEMPERATURE [K]'):
+            target_pixel_surface_temp = float(list(reversed(line.split()))[0])
+            break
+
+    return target_pixel_surface_temp
+
+
+# ============================================================================
+def create_output(args, target_pixel_surface_temp, record_count, records):
+    '''
+    Description:
+        Creates the output file.
+    '''
+
+    radiance_dat_filename = '{0}/lst_modtran.dat'.format(args.output_path)
+    radiance_info_filename = '{0}/lst_modtran.info'.format(args.output_path)
+
+    with open(radiance_dat_filename, "w") as radiance_dat_fd:
+        radiance_dat_fd.write(records.getvalue())
+
+    with open(radiance_info_filename, "w") as radiance_info_fd:
+        radiance_info_fd.write("TARGET_PIXEL_SURFACE_TEMPERATURE {0}\n"
+                               .format(target_pixel_surface_temp))
+        radiance_info_fd.write("RADIANCE_RECORD_COUNT {0}\n"
+                               .format(record_count))
+
+
+# ============================================================================
 def process_tape6_results(args):
     '''
     Description:
@@ -40,16 +82,24 @@ def process_tape6_results(args):
 
     logger = logging.getLogger(__name__)
 
-    results_buffer = StringIO()
+    tape6_filename = '{0}/tape6'.format(args.input_path)
+
+    if not os.path.isfile(tape6_filename):
+        raise Exception("Missing tape6 file in input directory")
+
+    target_pixel_surface_temp = None
+    record_count = 0
+    records = StringIO()
 
     # Retrieve the auxillary data and extract it
-    with open(args.tape6_filename, "r") as tape6_fd:
+    with open(tape6_filename, "r") as tape6_fd:
         # Skip the beginning of the data that is not needed
         for line in tape6_fd:
             line = line.strip()
             if line.startswith('RADIANCE(WATTS/CM2-STER-XXX)'):
                 break
 
+        # This is where our data resides
         for line in tape6_fd:
             # Remove all whitespace and newlines
             line = ' '.join(line.strip().split())
@@ -72,13 +122,17 @@ def process_tape6_results(args):
                 break
 
             parts = line.split(' ')
-            results_buffer.write(' '.join([parts[1], parts[12]]))
-            results_buffer.write('\n')
+            if record_count > 0:
+                records.write('\n')
+            records.write(' '.join([parts[1], parts[12]]))
+            record_count += 1
 
-    with open(args.parsed_filename, "w") as parsed_fd:
-        parsed_fd.write(results_buffer.getvalue())
+        # Retreive the value from the tape6 file
+        target_pixel_surface_temp = extract_tpst(tape6_fd)
 
-    results_buffer.close()
+    create_output(args, target_pixel_surface_temp, record_count, records)
+
+    records.close()
 
 
 # ============================================================================
@@ -90,21 +144,39 @@ def process_pltout_results(args):
 
     logger = logging.getLogger(__name__)
 
-    results_buffer = StringIO()
+    tape6_filename = '{0}/tape6'.format(args.input_path)
+    pltout_filename = '{0}/pltout.asc'.format(args.input_path)
+
+    if not os.path.isfile(tape6_filename):
+        raise Exception("Missing tape6 file in input directory")
+
+    if not os.path.isfile(pltout_filename):
+        raise Exception("Missing pltout.asc file in input directory")
+
+    target_pixel_surface_temp = None
+    record_count = 0
+    records = StringIO()
 
     # Retrieve the auxillary data and extract it
-    with open(args.pltout_filename, "r") as pltout_fd:
+    with open(pltout_filename, "r") as pltout_fd:
         for line in pltout_fd:
             # Remove all whitespace and newlines
             line = ' '.join(line.strip().split())
 
-            results_buffer.write(line)
-            results_buffer.write('\n')
+            if len(line) > 0:
+                if record_count > 0:
+                    records.write('\n')
+                records.write(line)
+                record_count += 1
 
-    with open(args.parsed_filename, "w") as parsed_fd:
-        parsed_fd.write(results_buffer.getvalue())
+    # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
+    with open(tape6_filename, "r") as tape6_fd:
+        # Retreive the value from the tape6 file
+        target_pixel_surface_temp = extract_tpst(tape6_fd)
 
-    results_buffer.close()
+    create_output(args, target_pixel_surface_temp, record_count, records)
+
+    records.close()
 
 
 # ============================================================================
@@ -124,18 +196,23 @@ if __name__ == '__main__':
     # ---- Add parameters ----
     # Required parameters
     parser.add_argument('--tape6',
-                        action='store', dest='tape6_filename', required=False,
-                        default=None,
-                        help="The TAPE6 file to process")
+                        action='store_true', dest='tape6', required=False,
+                        default=False,
+                        help="Use the radiance values found in the TAPE6 file")
 
     parser.add_argument('--pltout',
-                        action='store', dest='pltout_filename', required=False,
-                        default=None,
-                        help="The output parsed results file")
+                        action='store_true', dest='pltout', required=False,
+                        default=False,
+                        help=("Use the radiance values found in the pltout"
+                              " file"))
 
-    parser.add_argument('--parsed',
-                        action='store', dest='parsed_filename', required=True,
-                        help="The output parsed results file")
+    parser.add_argument('--input-path',
+                        action='store', dest='input_path', required=True,
+                        help="Where to find the MODTRAN output files.")
+
+    parser.add_argument('--output-path',
+                        action='store', dest='output_path', required=True,
+                        help="Where to place the output files.")
 
     # Parse the command line parameters
     args = parser.parse_args()
@@ -152,24 +229,25 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    try:
-        if not args.pltout_filename:
-            if ((args.tape6_filename is None)
-                    or (args.tape6_filename == '')):
-                logger.fatal("No TAPE6 filename provided.")
-                logger.fatal("Error processing LST MODTRAN results."
-                             "  Processing will terminate.")
-                sys.exit(EXIT_FAILURE)
+    if ((not args.tape6) and (not args.pltout)):
+        logger.fatal("No data source specified.")
+        logger.fatal("Error processing LST MODTRAN results."
+                     "  Processing will terminate.")
+        sys.exit(EXIT_FAILURE)
 
+    if not os.path.isdir(args.input_path):
+        logger.fatal("--input-path directory not found")
+        sys.exit(EXIT_FAILURE)
+
+    if not os.path.isdir(args.output_path):
+        logger.fatal("--output-path directory not found")
+        sys.exit(EXIT_FAILURE)
+
+    try:
+        if args.tape6:
             logger.info("Using TAPE6 results")
             process_tape6_results(args)
         else:
-            if args.pltout_filename == '':
-                logger.fatal("No pltout filename provided.")
-                logger.fatal("Error processing LST MODTRAN results."
-                             "  Processing will terminate.")
-                sys.exit(EXIT_FAILURE)
-
             logger.info("Using pltout.asc results")
             process_pltout_results(args)
 
