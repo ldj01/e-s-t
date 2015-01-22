@@ -38,16 +38,15 @@ int
 main (int argc, char *argv[])
 {
     char FUNC_NAME[] = "main";
-    char msg_str[MAX_STR_LEN];  /* input data scene name */
-    char *xml_name = NULL;      /* input XML filename */
-    char *dem_name = NULL;      /* input DEM filename */
-    char *emissivity_name = NULL;       /* input Emissivity filename */
-    char directory[MAX_STR_LEN];        /* input/output data directory */
-    char extension[MAX_STR_LEN];        /* input TOA file extension */
-    Input_t *input = NULL;      /* input data and meta data */
-    char scene_name[MAX_STR_LEN];       /* input data scene name */
+    char msg_str[MAX_STR_LEN];      /* input data scene name */
+    char xml_name[PATH_MAX];        /* input XML filename */
+    char dem_name[PATH_MAX];        /* input DEM filename */
+    char emissivity_name[PATH_MAX]; /* input Emissivity filename */
+    char directory[PATH_MAX];       /* input/output data directory */
+    char extension[MAX_STR_LEN];    /* input TOA file extension */
+    Input_t *input = NULL;          /* input data and meta data */
+    char scene_name[PATH_MAX];      /* input data scene name */
     char command[PATH_MAX];
-    int status;                 /* return value from function call */
     //    Output_t *output = NULL; /* output structure and metadata */
     bool use_tape6;             /* Use the tape6 output */
     bool verbose;               /* verbose flag for printing messages */
@@ -57,7 +56,7 @@ main (int argc, char *argv[])
     int i;
     int num_points;
     int num_modtran_runs;
-    char **case_list = NULL;
+    CASE_POINT *case_list = NULL;
     char **command_list = NULL;
     float **results = NULL;
     char *tmp_env = NULL;
@@ -70,9 +69,8 @@ main (int argc, char *argv[])
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
-    status = get_args (argc, argv, &xml_name, &dem_name, &emissivity_name,
-                       &use_tape6, &verbose, &debug);
-    if (status != SUCCESS)
+    if (get_args (argc, argv, xml_name, dem_name, emissivity_name,
+                  &use_tape6, &verbose, &debug) != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
     }
@@ -133,10 +131,10 @@ main (int argc, char *argv[])
                 input->meta.acq_date.doy);
         printf ("Fill value is %d\n", input->meta.fill);
         printf ("Thermal Band -->\n");
-        printf ("  therm_satu_value_ref: %d\n",
-                input->meta.therm_satu_value_ref);
-        printf ("  therm_satu_value_max: %d\n",
-                input->meta.therm_satu_value_max);
+//        printf ("  therm_satu_value_ref: %d\n",
+//                input->meta.therm_satu_value_ref);
+//        printf ("  therm_satu_value_max: %d\n",
+//                input->meta.therm_satu_value_max);
         printf ("  therm_gain: %f, therm_bias: %f\n",
                 input->meta.gain_th, input->meta.bias_th);
 
@@ -183,10 +181,9 @@ main (int argc, char *argv[])
 
 
     /* call build_modtran_input to generate tape5 file and commandList */
-    status = build_modtran_input (input, &num_points, &num_modtran_runs,
-                                  &case_list, &command_list,
-                                  verbose, debug);
-    if (status != SUCCESS)
+    if (build_modtran_input (input, &num_points, &num_modtran_runs,
+                             &case_list, &command_list, verbose, debug)
+        != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
@@ -204,8 +201,7 @@ main (int argc, char *argv[])
         snprintf (msg_str, sizeof(msg_str),
                   "Executing MODTRAN [%s]", command_list[i]);
         LOG_MESSAGE (msg_str, FUNC_NAME);
-        status = system (command_list[i]);
-        if (status != SUCCESS)
+        if (system (command_list[i]) != SUCCESS)
         {
             RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
                           EXIT_FAILURE);
@@ -214,8 +210,7 @@ main (int argc, char *argv[])
 #endif
 
     /* Free memory allocation */
-    status = free_2d_array ((void **) command_list);
-    if (status != SUCCESS)
+    if (free_2d_array ((void **) command_list) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
                       EXIT_FAILURE);
@@ -231,29 +226,36 @@ main (int argc, char *argv[])
             /* Use modtran generated tape6 output */
             snprintf (command, sizeof (command),
                       "lst_extract_modtran_results.py"
-                      " --tape6 %s/tape6"
-                      " --parsed %s/parsed",
-                      case_list[i], case_list[i]);
+                      " --tape6"
+                      " --input-path %s"
+                      " --output-path %s",
+                      case_list[i].full_path,
+                      case_list[i].full_path);
         }
         else
         {
             /* Use modtran generated pltout.asc output */
             snprintf (command, sizeof (command),
                       "lst_extract_modtran_results.py"
-                      " --pltout %s/pltout.asc"
-                      " --parsed %s/parsed",
-                      case_list[i], case_list[i]);
+                      " --pltout"
+                      " --input-path %s"
+                      " --output-path %s",
+                      case_list[i].full_path,
+                      case_list[i].full_path);
         }
 
         snprintf (msg_str, sizeof(msg_str),
                   "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
-        status = system (command);
-        if (status != SUCCESS)
+
+#if 0
+// TEMP TAKE THIS OUT TO SAVE TIME
+        if (system (command) != SUCCESS)
         {
             RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
                           FUNC_NAME, EXIT_FAILURE);
         }
+#endif
     }
 
     /* Allocate memory for results */
@@ -264,39 +266,26 @@ main (int argc, char *argv[])
         RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
     }
 
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-    exit (0);
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-// TODO TODO TODO - RDD - stopping here for right now
-
     /* call second_narr to generate parameters for each height and NARR point */
-    status =
-        second_narr (input, num_points, alb, case_list, results, verbose);
-    if (status != SUCCESS)
+    if (second_narr (input, num_points, alb, case_list, results, verbose)
+        != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free memory allocation */
-    status = free_2d_array ((void **) case_list);
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: current_case\n", FUNC_NAME,
-                      EXIT_FAILURE);
-    }
+    free (case_list);
 
+#if 0
+// RDD I commented this for now
     /* call third_pixels_post to generate parameters for each Landsat pixel */
-    status = third_pixels_post (input, num_points, dem_name, emissivity_name,
-                                results, verbose);
-    if (status != SUCCESS)
+    if (third_pixels_post (input, num_points, dem_name, emissivity_name,
+                           results, verbose) != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
+#endif
+
 
 #if 0
     /* Reassign solar azimuth angle for output purpose if south up north 
@@ -364,6 +353,7 @@ main (int argc, char *argv[])
         RETURN_ERROR ("freeing output file structure", FUNC_NAME,
                       EXIT_FAILURE);
     }
+#endif
 
     /* Free the metadata structure */
     free_metadata (&xml_metadata);
@@ -372,58 +362,46 @@ main (int argc, char *argv[])
     CloseInput (input);
     FreeInput (input);
 
-    free (xml_name);
-    printf ("Processing complete.\n");
-#endif
-
-    /* Free memory allocation */
-    status = free_2d_array ((void **) results);
-    if (status != SUCCESS)
+    /* Free memory allocations */
+    if (free_2d_array ((void **) results) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: results\n", FUNC_NAME, EXIT_FAILURE);
     }
 
 #if 0
     /* Delete temporary file */
-    status = system ("rm newHead*");
-    if (status != SUCCESS)
+    if (system ("rm newHead*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting newHead* files\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    status = system ("rm newTail*");
-    if (status != SUCCESS)
+    if (system ("rm newTail*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting newTail* files\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    status = system ("rm tempLayers.txt");
-    if (status != SUCCESS)
+    if (system ("rm tempLayers.txt") != SUCCESS)
     {
         RETURN_ERROR ("Deleting tempLayers file\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Delete temporary directories */
-    status = system ("\rm -r HGT*");
-    if (status != SUCCESS)
+    if (system ("\rm -r HGT*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting HGT* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    status = system ("\rm -r SHUM*");
-    if (status != SUCCESS)
+    if (system ("\rm -r SHUM*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting SHUM* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    status = system ("\rm -r TMP*");
-    if (status != SUCCESS)
+    if (system ("\rm -r TMP*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting TMP* directories\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    status = system ("\rm -r 4?.*_*");
-    if (status != SUCCESS)
+    if (system ("\rm -r 4?.*_*") != SUCCESS)
     {
         RETURN_ERROR ("Deleting temporary directories\n", FUNC_NAME,
                       EXIT_FAILURE);
