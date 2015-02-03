@@ -538,10 +538,6 @@ int calculate_lobs
     float temp_integral;
     float *product;
 
-    printf ("num_entries=%d\n", num_entries);
-    printf ("num_srs=%d\n", num_srs);
-    fflush(stdout);
-
     /* Allocate memory */
     temp_rad = (float *) malloc (num_entries * sizeof (float));
     if (temp_rad == NULL)
