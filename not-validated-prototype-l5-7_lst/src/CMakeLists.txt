@@ -29,6 +29,6 @@ target_link_libraries ( lst ${LibESPA_LIBRARIES}
                             ${LIBLZMA_LIBRARIES}
                             ${Math_Library} )
 
-install ( PROGRAMS lst
+install ( TARGETS lst
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
 

@@ -1,45 +1,55 @@
+#------------------------------------------------------------------------------
+# Makefile
+#
+# For building land-surface-temperature.
+#------------------------------------------------------------------------------
+
 # Set up compile options
-CC    = gcc
-RM    = rm -f
-MV    = mv
-EXTRA = -Wall -g
+CC = gcc
+RM = rm -f
+EXTRA = -Wall -g -O2
 
 # Define the include files
-INC = const.h date.h error.h input.h 2d_array.h scene_based_lst.h output.h 
-INCDIR  = -I. -I$(XML2INC) -I$(ESPAINC)
+INC = const.h utilities.h date.h 2d_array.h input.h output.h lst.h
+INCDIR  = -I. -I$(HDFINC) -I$(HDFEOS_INC) -I$(HDFEOS_GCTPINC) -I$(XML2INC) \
+          -I$(ESPAINC)
 NCFLAGS = $(EXTRA) $(INCDIR)
 
 # Define the source code and object files
-SRC = error.c input.c 2d_array.c scene_based_lst.c first_files.c second_narr.c\
-      third_pixels_post.c date.c split_filename.c misc.c output.c
+SRC = \
+      utilities.c           \
+      2d_array.c            \
+      date.c                \
+      input.c               \
+      output.c              \
+      split_filename.c      \
+      misc.c                \
+      build_modtran_input.c \
+      second_narr.c         \
+      third_pixels_post.c   \
+      lst.c
 OBJ = $(SRC:.c=.o)
 
 # Define the object libraries
-LIB = -L$(ESPALIB) -l_espa_raw_binary -l_espa_common -l_espa_format_conversion \
-      -L$(XML2LIB) -lxml2 -L$(LZMALIB) -lz -lpthread -lrt -lm
+EXLIB = -L$(ESPALIB) -l_espa_raw_binary -l_espa_common \
+        -l_espa_format_conversion -L$(HDFEOS_LIB) -lhdfeos -L$(HDFLIB) \
+        -lmfhdf -ldf -L$(JPEGLIB) -ljpeg -L$(XML2LIB) -lxml2 \
+        -L$(HDFEOS_GCTPLIB) -lGctp -lz
+MATHLIB = -lm
+LOADLIB = $(EXLIB) $(MATHLIB)
 
 # Define the executable
-EXE = scene_based_lst
+EXE = lst
 
 # Target for the executable
 all: $(EXE)
 
-scene_based_lst: $(OBJ) $(INC)
-	$(CC) $(NCFLAGS) -o scene_based_lst $(OBJ) $(LIB)
+lst: $(OBJ) $(INC)
+	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
 
 install:
-	cp $(EXE) $(BIN)
-	cp ../scripts/narr_retrieval.bash $(BIN)
-	cp ../scripts/tape6parser.bash $(BIN)
-	cp ../scripts/script_HGT_generic $(BIN)
-	cp ../scripts/script_SHUM_generic $(BIN)
-	cp ../scripts/script_TMP_generic $(BIN)
-	cp ../scripts/get_grib.pl $(BIN)
-	cp ../scripts/get_inv.pl $(BIN)
-	cp ../scripts/HGT_grb2txt $(BIN)
-	cp ../scripts/SHUM_grb2txt $(BIN)
-	cp ../scripts/TMP_grb2txt $(BIN)
-	cp ../scripts/wgrib $(BIN)
+	install -d $(PREFIX)/bin
+	install -m 755 $(EXE) $(PREFIX)/bin
 
 clean:
 	$(RM) *.o $(EXE)
@@ -47,5 +57,5 @@ clean:
 $(OBJ): $(INC)
 
 .c.o:
-	$(CC) $(NCFLAGS) $(INCDIR) -c $<
+	$(CC) $(NCFLAGS) -c $<
 
