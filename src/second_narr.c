@@ -6,7 +6,7 @@
 #include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
-#include "scene_based_lst.h"
+#include "lst.h"
 
 
 /******************************************************************************

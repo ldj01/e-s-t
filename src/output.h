@@ -5,7 +5,7 @@
 #include <time.h>
 
 
-#include "scene_based_lst.h"
+#include "lst.h"
 #include "input.h"
 
 

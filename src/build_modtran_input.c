@@ -10,7 +10,7 @@
 #include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
-#include "scene_based_lst.h"
+#include "lst.h"
 
 
 #define STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD 9.80665
