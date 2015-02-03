@@ -1,0 +1,20 @@
+#------------------------------------------------------------------------------
+# Makefile
+#
+# Simple makefile for installing the static data.
+#------------------------------------------------------------------------------
+
+# Target for the executable
+all:
+
+install:
+	install -d $(PREFIX)/static_data
+	install -m 644 modtran_head.txt $(PREFIX)/static_data
+	install -m 644 modtran_tail.txt $(PREFIX)/static_data
+	install -m 644 narr_coordinates.txt $(PREFIX)/static_data
+	install -m 644 std_mid_lat_summer_atmos.txt $(PREFIX)/static_data
+	install -m 644 L5_Spectral_Response.rsp $(PREFIX)/static_data
+	install -m 644 L7_Spectral_Response.rsp $(PREFIX)/static_data
+
+clean:
+
