@@ -20,7 +20,7 @@ add_executable ( lst lst.c
                      get_args.c
                      split_filename.c
                      build_modtran_input.c
-                     second_narr.c
+                     calculate_point_atmospheric_parameters.c
                      third_pixels_post.c )
 
 target_link_libraries ( lst ${LibESPA_LIBRARIES}

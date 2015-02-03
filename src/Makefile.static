@@ -25,7 +25,7 @@ SRC = \
       split_filename.c \
       get_args.c \
       build_modtran_input.c \
-      second_narr.c \
+      calculate_point_atmospheric_parameters.c \
       third_pixels_post.c \
       lst.c
 OBJ = $(SRC:.c=.o)
