@@ -10,6 +10,8 @@
 #include "get_args.h"
 #include "input.h"
 #include "output.h"
+#include "build_modtran_input.h"
+#include "calculate_point_atmospheric_parameters.h"
 #include "lst.h"
 
 
@@ -267,8 +269,9 @@ main (int argc, char *argv[])
         RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
     }
 
-    /* call second_narr to generate parameters for each height and NARR point */
-    if (second_narr (input, num_points, alb, case_list, results, verbose)
+    /* Generate parameters for each height and NARR point */
+    if (calculate_point_atmospheric_parameters (input, num_points, alb,
+                                                case_list, results, verbose)
         != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
