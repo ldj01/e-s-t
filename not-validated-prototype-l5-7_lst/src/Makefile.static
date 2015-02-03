@@ -10,7 +10,7 @@ RM = rm -f
 EXTRA = -Wall -static -O2
 
 # Define the include files
-INC = const.h utilities.h date.h 2d_array.h input.h output.h lst.h
+INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h lst.h
 INCDIR  = -I. -I$(HDFINC) -I$(HDFEOS_INC) -I$(HDFEOS_GCTPINC) -I$(XML2INC) \
           -I$(ESPAINC)
 NCFLAGS = $(EXTRA) $(INCDIR)
@@ -23,7 +23,7 @@ SRC = \
       input.c \
       output.c \
       split_filename.c \
-      misc.c \
+      get_args.c \
       build_modtran_input.c \
       second_narr.c \
       third_pixels_post.c \

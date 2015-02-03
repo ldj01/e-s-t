@@ -7,6 +7,7 @@
 #include "const.h"
 #include "2d_array.h"
 #include "utilities.h"
+#include "get_args.h"
 #include "input.h"
 #include "output.h"
 #include "lst.h"

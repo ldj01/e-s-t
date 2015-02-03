@@ -1,5 +1,5 @@
-#ifndef SCENE_BASED_LST_H
-#define SCENE_BASED_LST_H
+#ifndef LST_H
+#define LST_H
 
 
 #include <stdio.h>
@@ -19,19 +19,6 @@ typedef struct
     float longitude;
     float height;
 } CASE_POINT;
-
-
-int get_args
-(
-    int argc,                /* I: number of cmd-line args */
-    char *argv[],            /* I: string of cmd-line args */
-    char *xml_infile,        /* I: address of input XML metadata filename  */
-    char *dem_infile,        /* I: address of input DEM filename */
-    char *emissivity_infile, /* I: address of input emissivity filename */
-    bool *tape_6,            /* O: use the tape6 output */
-    bool *verbose,           /* O: verbose flag */
-    bool *debug              /* O: debug flag */
-);
 
 
 int build_modtran_input
@@ -72,4 +59,4 @@ int third_pixels_post
 );
 
 
-#endif /* SCENE_BASED_LST_H */
+#endif /* LST_H */

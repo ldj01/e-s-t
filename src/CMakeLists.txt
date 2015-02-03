@@ -17,7 +17,7 @@ add_executable ( lst lst.c
                      utilities.c
                      2d_array.c
                      date.c
-                     misc.c
+                     get_args.c
                      split_filename.c
                      build_modtran_input.c
                      second_narr.c
