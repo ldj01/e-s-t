@@ -592,7 +592,7 @@ int calculate_lobs
 
 
 /******************************************************************************
-MODULE:  second_narr
+MODULE:  calculate_point_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
          each height at each NARR point
@@ -605,18 +605,18 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
 ******************************************************************************/
-int second_narr
+int calculate_point_atmospheric_parameters
 (
     Input_t * input,  /*I: input structure */
     int num_points,   /*I: number of narr points */
     float alb,        /*I: albedo */
     CASE_POINT *case_list, /*I: modtran run list */
     float **results,  /*O: atmospheric parameter for modtarn run */
-    bool verbose      /*I: value to indicate if intermediate messages
+    bool verbose      /*I: value to indicate if intermediate messages should
                            be printed */
 )
 {
-    char FUNC_NAME[] = "second_narr";
+    char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
     FILE *fd;
     int i, j, k;
     int entry;
@@ -638,12 +638,12 @@ int second_narr
     float y[2];
     float tau, lu, ld;
     float ems = 1 - alb;
-    char *path = NULL;
+    char *lst_data_dir = NULL;
     char full_path[PATH_MAX];
     int status;
 
-    path = getenv ("LST_DATA_DIR");
-    if (path == NULL)
+    lst_data_dir = getenv ("LST_DATA_DIR");
+    if (lst_data_dir == NULL)
     {
         RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
                       FUNC_NAME, FAILURE);
@@ -664,7 +664,7 @@ int second_narr
         }
 
         snprintf (full_path, sizeof (full_path),
-                  "%s/%s", path, "L5_Spectral_Response.rsp");
+                  "%s/%s", lst_data_dir, "L5_Spectral_Response.rsp");
         fd = fopen (full_path, "r");
         if (fd == NULL)
         {
@@ -696,7 +696,8 @@ int second_narr
                           FUNC_NAME, FAILURE);
         }
 
-        snprintf (full_path, sizeof (full_path), "%s/%s", path, "L7.rsp");
+        snprintf (full_path, sizeof (full_path),
+                  "%s/%s", lst_data_dir, "L7.rsp");
         fd = fopen (full_path, "r");
         if (fd == NULL)
         {
@@ -727,7 +728,7 @@ int second_narr
                           FUNC_NAME, FAILURE);
         }
 
-        snprintf (full_path, sizeof (full_path), "%s/%s", path, "L8_B10.rsp");
+        snprintf (full_path, sizeof (full_path), "%s/%s", lst_data_dir, "L8_B10.rsp");
         fd = fopen (full_path, "r");
         if (fd == NULL)
         {
@@ -749,7 +750,6 @@ int second_narr
         RETURN_ERROR ("invalid instrument type", FUNC_NAME, FAILURE);
     }
 
-    LOG_MESSAGE ("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", FUNC_NAME);
     /* calculate Lt for each temperature */
     if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
     {
@@ -801,14 +801,6 @@ int second_narr
     {
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
-#if 0
-printf("case_list[%d].full_path = %s\n", counter, case_list[counter].full_path);
-printf("case_list[%d].latitude = %f\n", counter, case_list[counter].latitude);
-printf("case_list[%d].longitude = %f\n", counter, case_list[counter].longitude);
-printf("case_list[%d].height = %f\n", counter, case_list[counter].height);
-fflush(stdout);
-#endif
-
             /* put results into results array */
             results[i * NUM_ELEVATIONS + j][0] = case_list[counter].latitude;
             results[i * NUM_ELEVATIONS + j][1] = case_list[counter].longitude;
@@ -821,8 +813,6 @@ fflush(stdout);
                at this point in the code */
             snprintf (current_file, sizeof (current_file),
                       "%s/lst_modtran.info", case_list[counter+2].full_path);
-printf("current_file = [%s]\n", current_file);
-fflush(stdout);
 
             fd = fopen (current_file, "r");
             if (fd == NULL)
@@ -838,8 +828,6 @@ fflush(stdout);
                               " reading TARGET_PIXEL_SURFACE_TEMPERATURE",
                               FUNC_NAME, FAILURE);
             }
-printf ("zero_temp = [%f]\n", zero_temp);
-fflush(stdout);
             /* determine number of entries in current file */
             if (fscanf (fd, "%*s %d%*c", &num_entries) != 1)
             {
@@ -848,8 +836,6 @@ fflush(stdout);
                               FUNC_NAME, FAILURE);
             }
             fclose (fd);
-printf("num_entries = [%d]\n", num_entries);
-fflush(stdout);
 
             /* for each height, read in radiance inforomation for three
                modtran runs, columns of array are organized:
@@ -876,8 +862,6 @@ fflush(stdout);
                 /* define current file */
                 snprintf (current_file, sizeof (current_file),
                           "%s/lst_modtran.dat", case_list[counter].full_path);
-printf("current_file = [%s]\n", current_file);
-fflush(stdout);
 
                 fd = fopen (current_file, "r");
                 if (fd == NULL)
@@ -893,12 +877,6 @@ fflush(stdout);
                         RETURN_ERROR ("Failed reading lst_modtran.dat lines",
                                       FUNC_NAME, FAILURE);
                     }
-if (entry == 1)
-{
-printf ("value 0 = %f\n", temp1[entry][0]);
-printf ("value 1 = %f\n", temp1[entry][1]);
-fflush(stdout);
-}
                 }
                 fclose (fd);
 
@@ -925,11 +903,13 @@ fflush(stdout);
                 index++;
             }
 
+#if 0
             printf ("num_srs = %d\n", num_srs);
             printf ("num_entries = %d\n", num_entries);
             printf ("temp_radiance_273 = %f\n", temp_radiance_273);
             printf ("temp_radiance_300 = %f\n", temp_radiance_300);
-fflush(stdout);
+            fflush(stdout);
+#endif
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
             x[0] = temp_radiance_273;
@@ -998,11 +978,12 @@ fflush(stdout);
         RETURN_ERROR ("Freeing memory: spectral_response\n", FUNC_NAME,
                       FAILURE);
     }
-#if 0
 
     /* write results to a file */
-    sprintf (full_path, "%s/%s", path, "atmosphericParameters.txt");
-    fd = fopen (full_path, "w");
+    snprintf (current_file, sizeof (current_file),
+              "atmosphericParameters.txt");
+    printf ("Creating Atmospheric Parameters File = [%s]\n", current_file);
+    fd = fopen (current_file, "w");
     if (fd == NULL)
     {
         RETURN_ERROR ("Can't open atmosphericParameters.txt file",
@@ -1011,11 +992,10 @@ fflush(stdout);
     for (k = 0; k < num_points * NUM_ELEVATIONS; k++)
     {
         fprintf (fd, "%f,%f,%f,%f,%f,%f\n",
-                 results[0][k], results[1][k], results[2][k],
-                 results[3][k], results[4][k], results[5][k]);
+                 results[k][0], results[k][1], results[k][2],
+                 results[k][3], results[k][4], results[k][5]);
     }
     fclose (fd);
-#endif
 
     return SUCCESS;
 }
