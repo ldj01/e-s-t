@@ -28,6 +28,7 @@ Team Unique Header:
 
 *****************************************************************************/
 {
+    char FUNC_NAME[] = "OpenInput";
     Input_t *this = NULL;
     char *error_string = NULL;
 
@@ -35,7 +36,7 @@ Team Unique Header:
     this = (Input_t *) malloc (sizeof (Input_t));
     if (this == NULL)
     {
-        RETURN_ERROR ("allocating Input data structure", "OpenInput", NULL);
+        RETURN_ERROR ("allocating Input data structure", FUNC_NAME, NULL);
     }
 
     /* Initialize and get input from header file */
@@ -43,7 +44,7 @@ Team Unique Header:
     {
         free (this);
         this = NULL;
-        RETURN_ERROR ("getting input from header file", "OpenInput", NULL);
+        RETURN_ERROR ("getting input from header file", FUNC_NAME, NULL);
     }
 
     printf ("this->file_name_th=%s\n", this->file_name_th);
@@ -72,7 +73,7 @@ Team Unique Header:
         this->open_th = false;
         free (this);
         this = NULL;
-        RETURN_ERROR (error_string, "OpenInput", NULL);
+        RETURN_ERROR (error_string, FUNC_NAME, NULL);
     }
 
     return this;
@@ -86,23 +87,24 @@ GetInputThermLine
     int iline
 )
 {
+    char FUNC_NAME[] = "GetInputThermLine";
     void *buf = NULL;
-    long loc;                   /* pointer location in the raw binary file */
+    long loc;         /* pointer location in the raw binary file */
 
     /* Check the parameters */
     if (this == (Input_t *) NULL)
     {
-        RETURN_ERROR ("invalid input structure", "GetIntputThermLine", false);
+        RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
     }
 
     if (!this->open_th)
     {
-        RETURN_ERROR ("file not open", "GetInputThermLine", false);
+        RETURN_ERROR ("file not open", FUNC_NAME, false);
     }
 
     if (iline < 0 || iline >= this->size_th.l)
     {
-        RETURN_ERROR ("invalid line number", "GetInputThermLine", false);
+        RETURN_ERROR ("invalid line number", FUNC_NAME, false);
     }
 
     /* Read the data */
@@ -113,15 +115,15 @@ GetInputThermLine
         if (fseek (this->fp_bin_th, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
-                          "GetInputThermLine", false);
+                          FUNC_NAME, false);
         }
 
-        if (read_raw_binary
-            (this->fp_bin_th, 1, this->size_th.s, sizeof (int16_t),
-             buf) != SUCCESS)
+        if (read_raw_binary (this->fp_bin_th, 1, this->size_th.s,
+                             sizeof (int16_t), buf)
+            != SUCCESS)
         {
             RETURN_ERROR ("error reading thermal line (binary)",
-                          "GetInputThermLine", false);
+                          FUNC_NAME, false);
         }
     }
     else
@@ -130,8 +132,7 @@ GetInputThermLine
         line = malloc (this->size_th.s * sizeof (uint8_t));
         if (line == NULL)
         {
-            RETURN_ERROR ("error allocating memory", "GetInputThermLine",
-                          false);
+            RETURN_ERROR ("error allocating memory", FUNC_NAME, false);
         }
 
         buf = (void *) line;
@@ -139,15 +140,15 @@ GetInputThermLine
         if (fseek (this->fp_bin_th, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
-                          "GetInputThermLine", false);
+                          FUNC_NAME, false);
         }
 
-        if (read_raw_binary
-            (this->fp_bin_th, 1, this->size_th.s, sizeof (uint8_t),
-             buf) != SUCCESS)
+        if (read_raw_binary (this->fp_bin_th, 1, this->size_th.s,
+                             sizeof (uint8_t), buf)
+            != SUCCESS)
         {
             RETURN_ERROR ("error reading thermal line (binary)",
-                          "GetInputThermLine", false);
+                          FUNC_NAME, false);
         }
 
         memcpy (this->therm_buf, line, sizeof (int16_t));
@@ -176,9 +177,11 @@ Output Parameters:
 
 *****************************************************************************/
 {
+    char FUNC_NAME[] = "CloseInput";
+
     if (this == NULL)
     {
-        RETURN_ERROR ("invalid input structure", "CloseInput", false);
+        RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
     }
 
     /*** now close the thermal file ***/
@@ -217,9 +220,11 @@ Output Parameters:
     return true;
 }
 
+
 #define DATE_STRING_LEN (50)
 #define TIME_STRING_LEN (50)
 #define INVALID_INSTRUMENT_COMBO ("invalid insturment/satellite combination")
+
 
 bool
 GetXMLInput (Input_t * this, Espa_internal_meta_t * metadata)
@@ -241,10 +246,11 @@ Design Notes:
        from the XML file instead of the HDF and MTL files.
 *****************************************************************************/
 {
+    char FUNC_NAME[] = "GetXMLInput";
     char acq_date[DATE_STRING_LEN + 1];
 //    char prod_date[DATE_STRING_LEN + 1];
     char acq_time[TIME_STRING_LEN + 1];
-    char temp[MAX_STR_LEN + 1];
+    char temp[MAX_STR_LEN];
     int th_indx; /* band index in XML file for the thermal band */
     Espa_global_meta_t *gmeta = &metadata->global; /* pointer to global meta */
 
@@ -289,8 +295,9 @@ Design Notes:
         this->meta.sat = SAT_LANDSAT_8;
     else
     {
-        sprintf (temp, "invalid satellite; value = %s", gmeta->satellite);
-        RETURN_ERROR (temp, "GetXMLInput", true);
+        snprintf (temp, sizeof (temp),
+                  "invalid satellite; value = %s", gmeta->satellite);
+        RETURN_ERROR (temp, FUNC_NAME, true);
     }
 
     if (!strcmp (gmeta->instrument, "TM"))
@@ -301,8 +308,9 @@ Design Notes:
         this->meta.inst = INST_ETM;
     else
     {
-        sprintf (temp, "invalid instrument; value = %s", gmeta->instrument);
-        RETURN_ERROR (temp, "GetXMLInput", true);
+        snprintf (temp, sizeof (temp),
+                  "invalid instrument; value = %s", gmeta->instrument);
+        RETURN_ERROR (temp, FUNC_NAME, true);
     }
 
     strcpy (acq_date, gmeta->acquisition_date);
@@ -319,14 +327,14 @@ Design Notes:
     this->meta.sun_zen = gmeta->solar_zenith;
     if (this->meta.sun_zen < -90.0 || this->meta.sun_zen > 90.0)
     {
-        RETURN_ERROR ("solar zenith angle out of range", "GetXMLInput", true);
+        RETURN_ERROR ("solar zenith angle out of range", FUNC_NAME, true);
     }
     this->meta.sun_zen *= RAD;  /* convert to radians */
 
     this->meta.sun_az = gmeta->solar_azimuth;
     if (this->meta.sun_az < -360.0 || this->meta.sun_az > 360.0)
     {
-        RETURN_ERROR ("solar azimuth angle out of range", "GetXMLInput", true);
+        RETURN_ERROR ("solar azimuth angle out of range", FUNC_NAME, true);
     }
     this->meta.sun_az *= RAD;   /* convert to radians */
 
@@ -339,12 +347,35 @@ Design Notes:
             this->meta.wrs_sys = WRS_2;
             break;
         default:
-            sprintf (temp, "invalid WRS system; value = %d", gmeta->wrs_system);
-            RETURN_ERROR (temp, "GetXMLInput", true);
+            snprintf (temp, sizeof (temp),
+                      "invalid WRS system; value = %d", gmeta->wrs_system);
+            RETURN_ERROR (temp, FUNC_NAME, true);
     }
     this->meta.ipath = gmeta->wrs_path;
     this->meta.irow = gmeta->wrs_row;
 
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
     if (this->meta.inst == INST_TM || this->meta.inst == INST_ETM)
     {
         this->nband_th = 1; /* number of thermal bands; only use 6L for ETM */
@@ -364,6 +395,28 @@ Design Notes:
         this->meta.bias_th = metadata->band[th_indx].toa_bias;
         this->file_name_th = strdup (metadata->band[th_indx].file_name);
     }
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
+/* TODO TODO TODO - This is not a guarantee recode using an index */
 
     /* Pull the reflectance info from thermal in the XML file */
     this->size_th.s = metadata->band[th_indx].nsamps;
@@ -377,31 +430,27 @@ Design Notes:
     {
         if (this->meta.ipath > 251)
         {
-            RETURN_ERROR ("WRS path number out of range", "GetHeaderInput",
-                          true);
+            RETURN_ERROR ("WRS path number out of range", FUNC_NAME, true);
         }
         else if (this->meta.irow > 248)
         {
-            RETURN_ERROR ("WRS row number out of range", "GetHeaderInput",
-                          true);
+            RETURN_ERROR ("WRS row number out of range", FUNC_NAME, true);
         }
     }
     else if (this->meta.wrs_sys == WRS_2)
     {
         if (this->meta.ipath > 233)
         {
-            RETURN_ERROR ("WRS path number out of range", "GetHeaderInput",
-                          true);
+            RETURN_ERROR ("WRS path number out of range", FUNC_NAME, true);
         }
         else if (this->meta.irow > 248)
         {
-            RETURN_ERROR ("WRS row number out of range", "GetHeaderInput",
-                          true);
+            RETURN_ERROR ("WRS row number out of range", FUNC_NAME, true);
         }
     }
     else
     {
-        RETURN_ERROR ("invalid WRS system", "GetHeaderInput", true);
+        RETURN_ERROR ("invalid WRS system", FUNC_NAME, true);
     }
 
     /* Check satellite/instrument combination */
@@ -413,7 +462,7 @@ Design Notes:
             this->meta.sat != SAT_LANDSAT_4 &&
             this->meta.sat != SAT_LANDSAT_5)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, "GetHeaderInput", true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
         }
     }
     else if (this->meta.inst == INST_TM)
@@ -421,26 +470,26 @@ Design Notes:
         if (this->meta.sat != SAT_LANDSAT_4 &&
             this->meta.sat != SAT_LANDSAT_5)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, "GetHeaderInput", true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
         }
     }
     else if (this->meta.inst == INST_ETM)
     {
         if (this->meta.sat != SAT_LANDSAT_7)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, "GetHeaderInput", true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
         }
     }
     else if (this->meta.inst == INST_OLI_TIRS)
     {
         if (this->meta.sat != SAT_LANDSAT_8)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, "GetHeaderInput", true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
         }
     }
     else
     {
-        RETURN_ERROR ("invalid instrument type", "GetHeaderInput", true);
+        RETURN_ERROR ("invalid instrument type", FUNC_NAME, true);
     }
 
 #if 0
@@ -472,11 +521,11 @@ Design Notes:
     this->meta.lr_geo_corner.is_fill = true;
 
     /* Convert the acquisition date/time values */
-    sprintf (temp, "%sT%s", acq_date, acq_time);
+    snprintf (temp, sizeof (temp),
+              "%sT%s", acq_date, acq_time);
     if (!DateInit (&this->meta.acq_date, temp, DATE_FORMAT_DATEA_TIME))
     {
-        RETURN_ERROR ("converting acquisition date/time", "GetHeaderInput",
-                      false);
+        RETURN_ERROR ("converting acquisition date/time", FUNC_NAME, false);
     }
 
     return true;
