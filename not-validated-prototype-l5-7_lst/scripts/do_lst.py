@@ -157,7 +157,7 @@ def process_lst(args):
 
     # ------------------------------------------------------------------------
     # Call the scene based lst
-    cmd = ['scene_based_lst',
+    cmd = ['lst',
            '--xml', args.xml_filename,
            '--dem', dem_filename,
            '--emi', emi_filename,
