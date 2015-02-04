@@ -114,27 +114,9 @@ def process_lst(args):
     # filenames
     product_id = os.path.splitext(args.xml_filename)[0]
     mtl_filename = '{0}_MTL.txt'.format(product_id)
+    # ESPA creates the DEM for us
     dem_filename = '{0}_dem.img'.format(product_id)
     emi_filename = '{0}_emissivity.img'.format(product_id)
-
-    # ------------------------------------------------------------------------
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    # TODO TODO TODO - Get the DEM myself or does ESPA do that???
-    cmd = ['do_create_dem.py',
-           '--mtl', mtl_filename,
-           '--dem', dem_filename]
-    cmd = ' '.join(cmd)
-    output = ''
-    try:
-        logger.info("Calling [{0}]".format(cmd))
-        output = execute_cmd(cmd)
-    except Exception, e:
-        logger.error("Failed creating DEM")
-        raise e
-    finally:
-        if len(output) > 0:
-            logger.info(output)
 
     # ------------------------------------------------------------------------
     # TODO TODO TODO - The emnissivity data needs to be retrieved here and
