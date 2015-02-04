@@ -622,16 +622,18 @@ int calculate_point_atmospheric_parameters
     float temp_radiance_273;
     float temp_radiance_300;
     int counter = 0;
-    int place = 0;
     int index;
     int num_entries;
     int num_srs;
+    int result_loc;
     char current_file[PATH_MAX];
     float **temp1;
     float zero_temp;
     float **current_data;
-    float x[2];
-    float y[2];
+    float x_0;
+    float x_1;
+    float y_0;
+    float y_1;
     float tau, lu, ld;
     float ems = 1 - alb;
     char *lst_data_dir = NULL;
@@ -724,7 +726,8 @@ int calculate_point_atmospheric_parameters
                           FUNC_NAME, FAILURE);
         }
 
-        snprintf (full_path, sizeof (full_path), "%s/%s", lst_data_dir, "L8_B10.rsp");
+        snprintf (full_path, sizeof (full_path),
+                  "%s/%s", lst_data_dir, "L8_B10.rsp");
         fd = fopen (full_path, "r");
         if (fd == NULL)
         {
@@ -792,15 +795,19 @@ int calculate_point_atmospheric_parameters
         RETURN_ERROR ("invalid instrument type", FUNC_NAME, FAILURE);
     }
 
-    /* iterate through all points in the scene and all heights in one point */
+    x_0 = temp_radiance_273;
+    x_1 = temp_radiance_300;
+
+    /* iterate through all points and heights */
     for (i = 0; i < num_points; i++)
     {
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
+            result_loc = i * NUM_ELEVATIONS + j;
             /* put results into results array */
-            results[i * NUM_ELEVATIONS + j][0] = case_list[counter].latitude;
-            results[i * NUM_ELEVATIONS + j][1] = case_list[counter].longitude;
-            results[i * NUM_ELEVATIONS + j][2] = case_list[counter].height;
+            results[result_loc][LST_LATITUDE] = case_list[counter].latitude;
+            results[result_loc][LST_LONGITUDE] = case_list[counter].longitude;
+            results[result_loc][LST_HEIGHT] = case_list[counter].height;
 
             /* Read the lst_modtran.info file for the 000 execution
                We read the zero_temp from this file, and also the record count
@@ -908,16 +915,14 @@ int calculate_point_atmospheric_parameters
 #endif
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
-            x[0] = temp_radiance_273;
-            x[1] = temp_radiance_300;
             status = calculate_lobs (current_data, spectral_response,
-                                     num_entries, num_srs, 1, &y[0]);
+                                     num_entries, num_srs, 1, &y_0);
             if (status != SUCCESS)
             {
                 RETURN_ERROR ("Calling calculate_lob 1", FUNC_NAME, FAILURE);
             }
             status = calculate_lobs (current_data, spectral_response,
-                                     num_entries, num_srs, 2, &y[1]);
+                                     num_entries, num_srs, 2, &y_1);
             if (status != SUCCESS)
             {
                 RETURN_ERROR ("Calling calculate_lob 2", FUNC_NAME, FAILURE);
@@ -930,8 +935,8 @@ int calculate_point_atmospheric_parameters
 
             /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
                Note: I slove the two equations analytically */
-            tau = (y[0] - y[1]) / (x[0] - x[1]);
-            lu = (x[1] * y[0] - x[0] * y[1]) / (x[0] - x[1]);
+            tau = (y_0 - y_1) / (x_0 - x_1);
+            lu = (x_1 * y_0 - x_0 * y_1) / (x_0 - x_1);
 
             /* determine Lobs and Lt when
                modtran was run at 0K - calculate downwelled */
@@ -957,14 +962,13 @@ int calculate_point_atmospheric_parameters
             }
 
             /* Ld = (((Lobs-Lu)/tau) - (Lt*ems))/(1-ems) */
-            ld = (((obs_radiance_0 - lu) / tau) -
-                  (temp_radiance_0 * ems)) / (1 - ems);
+            ld = (((obs_radiance_0 - lu) / tau)
+                  - (temp_radiance_0 * ems)) / (1 - ems);
 
             /* put remaining results into results array */
-            results[i * NUM_ELEVATIONS + j][3] = tau;
-            results[i * NUM_ELEVATIONS + j][4] = lu;
-            results[i * NUM_ELEVATIONS + j][5] = ld;
-            place++;
+            results[result_loc][LST_TAU] = tau;
+            results[result_loc][LST_UPWELLED_RADIANCE] = lu;
+            results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
         } /* END - NUM_ELEVATIONS loop */
     } /* END - num_points loop */
 

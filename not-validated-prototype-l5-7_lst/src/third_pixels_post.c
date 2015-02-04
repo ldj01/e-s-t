@@ -704,7 +704,7 @@ int third_pixels_post
 
     /* Allocate memory for current_location */
     current_location =
-        (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
+        (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, LST_NUM_ELEMENTS,
                                       sizeof (float));
     if (current_location == NULL)
     {
@@ -924,7 +924,7 @@ int third_pixels_post
                     current_index = indices[g] * NUM_ELEVATIONS;
                     /* extract atmospheric parameters for all heights at current
                        location */
-                    for (n = 0; n < 6; n++)
+                    for (n = 0; n < LST_NUM_ELEMENTS; n++)
                     {
                         for (k = current_index; k < current_index +
                              NUM_ELEVATIONS - 1; k++)
@@ -936,11 +936,11 @@ int third_pixels_post
 
                     /* interpolate three atmospheric parameters to current
                        height */
-                    interpolate_to_height (current_location[2],
-                                           current_location[3],
-                                           current_location[4],
-                                           current_location[5], dem[col],
-                                           at_height[g]);
+                    interpolate_to_height (current_location[LST_HEIGHT],
+                        current_location[LST_TAU],
+                        current_location[LST_UPWELLED_RADIANCE],
+                        current_location[LST_DOWNWELLED_RADIANCE],
+                        dem[col], at_height[g]);
                 }
 
                 /* interpolate parameters at appropriate height to location of

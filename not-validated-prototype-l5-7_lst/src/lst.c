@@ -262,8 +262,8 @@ main (int argc, char *argv[])
     }
 
     /* Allocate memory for results */
-    results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS, 6,
-                                            sizeof (float));
+    results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS,
+                                            LST_NUM_ELEMENTS, sizeof (float));
     if (results == NULL)
     {
         RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
