@@ -19,6 +19,11 @@
 #define EQUATORIAL_RADIUS_IN_KM 6378.137
 
 
+#define P_LAYER 29
+#define STAN_LAYER 30
+#define MAX_MODTRAN_LAYER 150
+
+
 /*****************************************************************************
 MODULE:  convert_geopotential_geometric
 

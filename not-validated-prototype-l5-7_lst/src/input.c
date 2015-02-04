@@ -1,4 +1,5 @@
 
+#include <stdint.h>
 #include <stdbool.h>
 
 #include "const.h"
@@ -108,7 +109,7 @@ GetInputThermLine
     if (this->meta.inst == INST_OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
     {
         buf = (void *) this->therm_buf;
-        loc = (long) (iline * this->size_th.s * sizeof (int16));
+        loc = (long) (iline * this->size_th.s * sizeof (int16_t));
         if (fseek (this->fp_bin_th, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
@@ -116,7 +117,7 @@ GetInputThermLine
         }
 
         if (read_raw_binary
-            (this->fp_bin_th, 1, this->size_th.s, sizeof (int16),
+            (this->fp_bin_th, 1, this->size_th.s, sizeof (int16_t),
              buf) != SUCCESS)
         {
             RETURN_ERROR ("error reading thermal line (binary)",
@@ -125,8 +126,8 @@ GetInputThermLine
     }
     else
     {
-        uint8 *line;
-        line = malloc (this->size_th.s * sizeof (uint8));
+        uint8_t *line;
+        line = malloc (this->size_th.s * sizeof (uint8_t));
         if (line == NULL)
         {
             RETURN_ERROR ("error allocating memory", "GetInputThermLine",
@@ -134,7 +135,7 @@ GetInputThermLine
         }
 
         buf = (void *) line;
-        loc = (long) (iline * this->size_th.s * sizeof (uint8));
+        loc = (long) (iline * this->size_th.s * sizeof (uint8_t));
         if (fseek (this->fp_bin_th, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
@@ -142,14 +143,14 @@ GetInputThermLine
         }
 
         if (read_raw_binary
-            (this->fp_bin_th, 1, this->size_th.s, sizeof (uint8),
+            (this->fp_bin_th, 1, this->size_th.s, sizeof (uint8_t),
              buf) != SUCCESS)
         {
             RETURN_ERROR ("error reading thermal line (binary)",
                           "GetInputThermLine", false);
         }
 
-        memcpy (this->therm_buf, line, sizeof (int16));
+        memcpy (this->therm_buf, line, sizeof (int16_t));
         free (line);
     }
 

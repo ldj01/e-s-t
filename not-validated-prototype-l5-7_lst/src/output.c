@@ -21,6 +21,8 @@ Design Notes:
     WriteOutput - Write a line of data to the output product file.
 *****************************************************************************/
 
+
+#include "const.h"
 #include "utilities.h"
 #include "output.h"
 

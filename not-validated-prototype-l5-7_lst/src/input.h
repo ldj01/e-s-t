@@ -4,6 +4,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <ctype.h>
 
 
@@ -21,17 +23,6 @@
 #define WRS_FILL (-1)
 #define GAIN_BIAS_FILL (-999.0)
 #define NBAND_THM_MAX 2
-#define LST_VERSION "1.0.0"
-#define NUM_ELEVATIONS 9
-#define NARR_ROW 349
-#define NARR_COL 277
-#define P_LAYER 29
-#define STAN_LAYER 30
-#define MAX_MODTRAN_LAYER 150
-
-
-typedef signed short int16;
-typedef unsigned char uint8;
 
 
 typedef enum
@@ -145,7 +136,7 @@ typedef struct
     char *file_name_th;         /* Name of the thermal input image files */
     bool open_th;               /* thermal open flag */
     FILE *fp_bin_th;            /* File pointer for thermal binary file */
-    int16 *therm_buf;           /* Input data buf (one line of therm data) */
+    int16_t *therm_buf;         /* Input data buf (one line of therm data) */
 } Input_t;
 
 

@@ -5,12 +5,20 @@
 #include <math.h>
 
 
+#define LST_VERSION "1.0.0"
+
+
 #define TWO_PI (2.0 * PI)
 #define HALF_PI (PI / 2.0)
 
 
 #define DEG (180.0 / PI)
 #define RAD (PI / 180.0)
+
+
+#define NUM_ELEVATIONS 9
+#define NARR_ROW 349
+#define NARR_COL 277
 
 
 #ifndef SUCCESS

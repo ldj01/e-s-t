@@ -208,13 +208,13 @@ void dn_to_radiance (Input_t * input)
         }
         else
         {
-            input->therm_buf[pix] = (int16) (input->meta.gain_th *
+            input->therm_buf[pix] = (int16_t) (input->meta.gain_th *
                                              (float) input->therm_buf[pix] +
                                              input->meta.bias_th);
         }
         if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
         {
-            input->therm_buf[pix] = (int16) (input->therm_buf[pix] + 0.044);
+            input->therm_buf[pix] = (int16_t) (input->therm_buf[pix] + 0.044);
         }
     }
 }
@@ -381,7 +381,7 @@ int third_pixels_post
 )
 {
     int row, col;
-    int16 *dem = NULL;          /* input DEM data (meters) */
+    int16_t *dem = NULL;          /* input DEM data (meters) */
     int offset;                 /* offset in the raw binary DEM file to seek to
                                    to begin reading the window in the DEM */
     FILE *dem_fptr = NULL;      /* input scene-based DEM file pointer */
@@ -642,7 +642,7 @@ int third_pixels_post
     }
 
     /* Allocate memory for the DEM */
-    dem = (int16 *) calloc (input->size_th.s, sizeof (int16));
+    dem = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
     if (dem == NULL)
     {
         ERROR_MESSAGE ("Error allocating memory for the DEM data",
@@ -736,9 +736,9 @@ int third_pixels_post
         dn_to_radiance (input);
 
         /* Start reading DEM from the start_line */
-        offset = sizeof (int16) * row * input->size_th.s;
+        offset = sizeof (int16_t) * row * input->size_th.s;
         fseek (dem_fptr, offset, SEEK_SET);
-        if (fread (dem, sizeof (int16), input->size_th.s, dem_fptr)
+        if (fread (dem, sizeof (int16_t), input->size_th.s, dem_fptr)
             != input->size_th.s)
         {
             sprintf (errstr, "Error reading values from the DEM file "
@@ -959,7 +959,7 @@ int third_pixels_post
 
         /* Write out the temporary binary output files
            Note: needs to be deleted before release */
-        status = fwrite (&input->therm_buf[0], sizeof (int16),
+        status = fwrite (&input->therm_buf[0], sizeof (int16_t),
                          input->size_th.s, therm_fptr);
         if (status != input->size_th.s)
         {
