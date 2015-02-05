@@ -937,7 +937,7 @@ int third_pixels_post
                     /* interpolate three atmospheric parameters to current
                        height */
                     interpolate_to_height (current_location[LST_HEIGHT],
-                        current_location[LST_TAU],
+                        current_location[LST_TRANSMISSION],
                         current_location[LST_UPWELLED_RADIANCE],
                         current_location[LST_DOWNWELLED_RADIANCE],
                         dem[col], at_height[g]);

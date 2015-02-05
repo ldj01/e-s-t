@@ -115,16 +115,37 @@ int spline
         RETURN_ERROR ("Can't allocate memory", FUNC_NAME, FAILURE);
     }
 
-    if ((yp1 - 0.99e30) > MINSIGMA)
+    /* Set the lower boundary */
+    if (yp1 > 0.99e30)
     {
-        y2[0] = u[0] = 0.0;
+        /* To be "natural" */
+        y2[0] = 0.0;
+        u[0] = 0.0;
     }
     else
     {
+        /* To have a specified first derivative */
         y2[0] = -0.5;
-        u[0] = (3.0 / (x[1] - x[0])) * ((y[1] - y[0]) / (x[1] - x[0]) - yp1);
+        u[0] = (3.0 / (x[1] - x[0]))
+               * ((y[1] - y[0]) / (x[1] - x[0]) - yp1);
     }
 
+    /* Set the upper boundary */
+    if (ypn > 0.99e30)
+    {
+        /* To be "natural" */
+        qn = 0.0;
+        un = 0.0;
+    }
+    else
+    {
+        /* To have a specified first derivative */
+        qn = 0.5;
+        un = (3.0 / (x[n - 1] - x[n - 2]))
+             * (ypn - (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]));
+    }
+
+    /* Perform decomposition of the tridiagonal algorithm */
     for (i = 1; i <= n - 2; i++)
     {
         sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
@@ -138,21 +159,9 @@ int spline
 
         u[i] = (6.0 * u[i] / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
     }
-
-    if ((ypn - 0.99e30) > MINSIGMA)
-    {
-        qn = un = 0.0;
-    }
-    else
-    {
-        qn = 0.5;
-
-        un = (3.0 / (x[n - 1] - x[n - 2]))
-             * (ypn - (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]));
-    }
-
     y2[n - 1] = (un - qn * u[n - 2]) / (qn * y2[n - 2] + 1.0);
 
+    /* Perform the backsubstitution of the tridiagonal algorithm */
     for (i = n - 2; i >= 0; i--)
     {
         y2[i] = y2[i] * y2[i + 1] + u[i];
@@ -168,7 +177,7 @@ int spline
 MODULE:  splint
 
 PURPOSE: splint uses the cubic spline generated with spline to interpolate
-         values in the XY  table
+         values in the XY table
 
 RETURN: SUCCESS
         FAILURE
@@ -180,6 +189,7 @@ Date        Programmer       Reason
 ******************************************************************************/
 static int klo = -1;
 static int khi = -1;
+static double one_sixth = (1.0 / 6.0); /* To remove a division */
 void splint
 (
     float *xa,
@@ -222,7 +232,7 @@ void splint
 
     if (h == 0.0)
     {
-        *y = 0.0;;
+        *y = 0.0;
     }
     else
     {
@@ -233,7 +243,7 @@ void splint
         *y = a * ya[klo]
              + b * ya[khi]
              + ((a * a * a - a) * y2a[klo]
-                + (b * b * b - b) * y2a[khi]) * (h * h) / 6.0;
+                + (b * b * b - b) * y2a[khi]) * (h * h) * one_sixth;
     }
 }
 
@@ -591,7 +601,7 @@ int calculate_lobs
 MODULE:  calculate_point_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
-         each height at each NARR point
+         each height for each NARR point that is used.
 
 RETURN: SUCCESS
         FAILURE
@@ -603,13 +613,13 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_point_atmospheric_parameters
 (
-    Input_t * input,  /*I: input structure */
-    int num_points,   /*I: number of narr points */
-    float alb,        /*I: albedo */
-    CASE_POINT *case_list, /*I: modtran run list */
-    float **results,  /*O: atmospheric parameter for modtarn run */
-    bool verbose      /*I: value to indicate if intermediate messages should
-                           be printed */
+    Input_t * input,       /*I: input structure */
+    int num_points,        /*I: number of narr points */
+    float albedo,          /*I: albedo */
+    POINT_INFO *case_list, /*I: modtran run list */
+    float **results,       /*O: atmospheric parameter for modtarn run */
+    bool verbose           /*I: value to indicate if intermediate messages
+                                should be printed */
 )
 {
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
@@ -624,7 +634,7 @@ int calculate_point_atmospheric_parameters
     int counter = 0;
     int index;
     int num_entries;
-    int num_srs;
+    int num_srs;       /* Number of spectral response values available */
     int result_loc;
     char current_file[PATH_MAX];
     float **temp1;
@@ -632,10 +642,19 @@ int calculate_point_atmospheric_parameters
     float **current_data;
     float x_0;
     float x_1;
+    float inv_xx_diff; /* To save divisions */
     float y_0;
     float y_1;
-    float tau, lu, ld;
-    float ems = 1 - alb;
+    float tau; /* Transmission */
+    float lu;  /* Upwelled Radiance */
+    float ld;  /* Downwelled Radiance */
+    /* TODO TODO TODO - This emissivity/albedo is just for water which is all
+                        that has been implemented.  But the goal is to be
+                        doing LAND, so integration aith the Aster data and
+                        JPL conversion code will probably be needed before
+                        execution of this routine, and then utilized here. */
+    double emissivity = 1.0 - albedo;
+    double inv_albedo = 1.0 / albedo;
     char *lst_data_dir = NULL;
     char full_path[PATH_MAX];
     int status;
@@ -695,11 +714,12 @@ int calculate_point_atmospheric_parameters
         }
 
         snprintf (full_path, sizeof (full_path),
-                  "%s/%s", lst_data_dir, "L7.rsp");
+                  "%s/%s", lst_data_dir, "L7_Spectral_Response.rsp");
         fd = fopen (full_path, "r");
         if (fd == NULL)
         {
-            RETURN_ERROR ("Can't open L7.rsp file", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Can't open L7_Spectral_Response.rsp file",
+                          FUNC_NAME, FAILURE);
         }
 
         for (i = 0; i < num_srs; i++)
@@ -707,7 +727,8 @@ int calculate_point_atmospheric_parameters
             if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
                         &spectral_response[1][i]) != 2)
             {
-                RETURN_ERROR ("Failed reading L7.rsp", FUNC_NAME, FAILURE);
+                RETURN_ERROR ("Failed reading L7_Spectral_Response.rsp",
+                              FUNC_NAME, FAILURE);
             }
         }
         fclose (fd);
@@ -797,6 +818,7 @@ int calculate_point_atmospheric_parameters
 
     x_0 = temp_radiance_273;
     x_1 = temp_radiance_300;
+    inv_xx_diff = 1.0F / (x_0 - x_1);
 
     /* iterate through all points and heights */
     for (i = 0; i < num_points; i++)
@@ -935,8 +957,8 @@ int calculate_point_atmospheric_parameters
 
             /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
                Note: I slove the two equations analytically */
-            tau = (y_0 - y_1) / (x_0 - x_1);
-            lu = (x_1 * y_0 - x_0 * y_1) / (x_0 - x_1);
+            tau = (y_0 - y_1) * inv_xx_diff;
+            lu = (x_1 * y_0 - x_0 * y_1) * inv_xx_diff;
 
             /* determine Lobs and Lt when
                modtran was run at 0K - calculate downwelled */
@@ -961,12 +983,14 @@ int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
 
-            /* Ld = (((Lobs-Lu)/tau) - (Lt*ems))/(1-ems) */
+            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/(1.0-emissivity) */
+            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/abledo */
+            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))*inv_albedo */
             ld = (((obs_radiance_0 - lu) / tau)
-                  - (temp_radiance_0 * ems)) / (1 - ems);
+                  - (temp_radiance_0 * emissivity)) * inv_albedo;
 
             /* put remaining results into results array */
-            results[result_loc][LST_TAU] = tau;
+            results[result_loc][LST_TRANSMISSION] = tau;
             results[result_loc][LST_UPWELLED_RADIANCE] = lu;
             results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
         } /* END - NUM_ELEVATIONS loop */
@@ -992,8 +1016,12 @@ int calculate_point_atmospheric_parameters
     for (k = 0; k < num_points * NUM_ELEVATIONS; k++)
     {
         fprintf (fd, "%f,%f,%f,%f,%f,%f\n",
-                 results[k][0], results[k][1], results[k][2],
-                 results[k][3], results[k][4], results[k][5]);
+                 results[k][LST_LATITUDE],
+                 results[k][LST_LONGITUDE],
+                 results[k][LST_HEIGHT],
+                 results[k][LST_TRANSMISSION],
+                 results[k][LST_UPWELLED_RADIANCE],
+                 results[k][LST_DOWNWELLED_RADIANCE]);
     }
     fclose (fd);
 

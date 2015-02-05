@@ -508,7 +508,7 @@ int build_modtran_input
     Input_t *input,       /* I: input structure */
     int *num_pts,         /* O: number of NARR points */
     int *num_runs,        /* O: number of MODTRAN runs */
-    CASE_POINT **case_list, /* O: case list information (allocated here) */
+    POINT_INFO **case_list, /* O: case list information (allocated here) */
     char ***command_list, /* O: command list information (allocated here) */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 should be printed */
@@ -1177,7 +1177,7 @@ int build_modtran_input
         RETURN_ERROR ("Allocating counter memory", FUNC_NAME, FAILURE);
     }
 
-    *case_list = (CASE_POINT *) malloc (num_modtran_runs * sizeof (CASE_POINT));
+    *case_list = (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
     if (*case_list == NULL)
     {
         RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, FAILURE);

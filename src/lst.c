@@ -59,7 +59,7 @@ main (int argc, char *argv[])
     int i;
     int num_points;
     int num_modtran_runs;
-    CASE_POINT *case_list = NULL;
+    POINT_INFO *case_list = NULL;
     char **command_list = NULL;
     float **results = NULL;
     char *tmp_env = NULL;

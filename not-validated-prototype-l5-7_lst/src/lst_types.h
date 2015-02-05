@@ -11,7 +11,7 @@ typedef struct
     float latitude;
     float longitude;
     float height;
-} CASE_POINT;
+} POINT_INFO;
 
 
 #endif /* LST_TYPES_H */
