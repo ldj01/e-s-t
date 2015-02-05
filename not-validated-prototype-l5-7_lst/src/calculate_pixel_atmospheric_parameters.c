@@ -11,7 +11,12 @@
 #include "lst.h"
 
 
-int partition (float arr[], int left, int right)
+int partition
+(
+    float arr[],
+    int left,
+    int right
+)
 {
     int i = left, j = right;
     int tmp;
@@ -37,7 +42,12 @@ int partition (float arr[], int left, int right)
 }
 
 
-void quick_sort (float arr[], int left, int right)
+void quick_sort
+(
+    float arr[],
+    int left,
+    int right
+)
 {
     int index = partition (arr, left, right);
 
@@ -60,7 +70,14 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 10/10/2014   Song Guo         Original Development
 ******************************************************************************/
-void distance_in_utm (float e1, float n1, float e2, float n2, float *dis)
+void distance_in_utm
+(
+    float e1,
+    float n1,
+    float e2,
+    float n2,
+    float *distance
+)
 {
     float s = 0.9996;           /* scale factor */
     float r = 6378137;          /* earth radius */
@@ -73,7 +90,7 @@ void distance_in_utm (float e1, float n1, float e2, float n2, float *dis)
 
     edist = ((e2 - e1) / 6.0) * (sr1 + 4 * sr2 + sr3);
 
-    *dis = sqrt (edist * edist + (n2 - n1) * (n2 - n1));
+    *distance = sqrt (edist * edist + (n2 - n1) * (n2 - n1));
 }
 
 
@@ -91,8 +108,13 @@ Date        Programmer       Reason
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
 void convert_ll_utm
-    (Input_t * input,
-     float *lat, float *lon, int num_points, float **narr_utm)
+(
+    Input_t *input,
+    float *lat,
+    float *lon,
+    int num_points,
+    float **narr_utm
+)
 {
     int i;
     float a = 6378137.0;        /* equatorial radius */
@@ -197,7 +219,10 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
-void dn_to_radiance (Input_t * input)
+void dn_to_radiance
+(
+    Input_t *input
+)
 {
     int pix;
     for (pix = 0; pix < input->size_th.s; pix++)
@@ -356,7 +381,7 @@ void interpolate_to_location
 
 
 /******************************************************************************
-MODULE:  third_pixels_post
+MODULE:  calculate_pixel_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
          each Landsat pixel
@@ -369,7 +394,7 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 10/8/2014   Song Guo         Original Development
 ******************************************************************************/
-int third_pixels_post
+int calculate_pixel_atmospheric_parameters
 (
     Input_t * input,         /*I: input structure */
     int num_points,          /*I: number of narr points */
@@ -380,6 +405,7 @@ int third_pixels_post
                                   be printed */
 )
 {
+    char FUNC_NAME[] = "calculate_pixel_atmospheric_parameters";
     int row, col;
     int16_t *dem = NULL;          /* input DEM data (meters) */
     int offset;                 /* offset in the raw binary DEM file to seek to
@@ -438,46 +464,47 @@ int third_pixels_post
     float **landsat_results;
     char errstr[MAX_STR_LEN];
     char full_path[MAX_STR_LEN];
-    char *lst_path = NULL;
+    char *last_data_dir = NULL;
     int status;
 
     /* Dynamic allocate the 2d memory */
     eye = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (eye == NULL)
     {
-        ERROR_MESSAGE ("Allocating eye memory", "third_pixels_post");
+        RETURN_ERROR ("Allocating eye memory", FUNC_NAME, FAILURE);
     }
 
     jay = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
     if (jay == NULL)
     {
-        ERROR_MESSAGE ("Allocating jay memory", "third_pixels_post");
+        RETURN_ERROR ("Allocating jay memory", FUNC_NAME, FAILURE);
     }
 
     lat = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lat == NULL)
     {
-        ERROR_MESSAGE ("Allocating lat memory", "third_pixels_post");
+        RETURN_ERROR ("Allocating lat memory", FUNC_NAME, FAILURE);
     }
 
     lon = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
     if (lon == NULL)
     {
-        ERROR_MESSAGE ("Allocating lon memory", "third_pixels_post");
+        RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
     }
 
-    lst_path = getenv ("LST_DATA");
-    if (lst_path == NULL)
+    last_data_dir = getenv ("LST_DATA_DIR");
+    if (last_data_dir == NULL)
     {
-        ERROR_MESSAGE ("LST_DATA environment variable is not set",
-                       "third_pixels_post");
+        RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
+                      FUNC_NAME, FAILURE);
     }
 
-    sprintf (full_path, "%s/%s", lst_path, "coordinates.txt");
+    sprintf (full_path, "%s/%s", last_data_dir, "narr_coordinates.txt");
     fd = fopen (full_path, "r");
     if (fd == NULL)
     {
-        ERROR_MESSAGE ("Can't open coordinates.txt file", "third_pixels_post");
+        RETURN_ERROR ("Can't open narr_coordinates.txt file", FUNC_NAME,
+                      FAILURE);
     }
 
     for (j = 0; j < NARR_COL; j++)
@@ -488,7 +515,7 @@ int third_pixels_post
                         &lon[i][j]) == EOF)
             {
                 ERROR_MESSAGE ("End of file (EOF) is met before"
-                               " NARR_ROW * NARR_COL lines", "firstfile");
+                               " NARR_ROW * NARR_COL lines", FUNC_NAME);
             }
 
             /* adjust longitude range to [-180, 180] */
@@ -543,31 +570,31 @@ int third_pixels_post
     narr_eye = (float *) malloc (num_points * sizeof (float));
     if (narr_eye == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_eye memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_eye memory", FUNC_NAME);
     }
 
     narr_jay = (float *) malloc (num_points * sizeof (float));
     if (narr_jay == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_jay memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_jay memory", FUNC_NAME);
     }
 
     narr_lat = (float *) malloc (num_points * sizeof (float));
     if (narr_lat == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_lat memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_lat memory", FUNC_NAME);
     }
 
     narr_lon = (float *) malloc (num_points * sizeof (float));
     if (narr_lon == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_lon memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_lon memory", FUNC_NAME);
     }
 
     narr_utm = (float **) allocate_2d_array (num_points, 2, sizeof (float));
     if (narr_utm == NULL)
     {
-        ERROR_MESSAGE ("Allocating narr_utm memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating narr_utm memory", FUNC_NAME);
     }
 
     /* extract coordinates within the NARR rectangle */
@@ -586,25 +613,25 @@ int third_pixels_post
     status = free_2d_array ((void **) eye);
     if (status != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: eye\n", "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: eye\n", FUNC_NAME, FAILURE);
     }
 
     status = free_2d_array ((void **) jay);
     if (status != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: jay\n", "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: jay\n", FUNC_NAME, FAILURE);
     }
 
     status = free_2d_array ((void **) lat);
     if (status != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: lat\n", "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: lat\n", FUNC_NAME, FAILURE);
     }
 
     status = free_2d_array ((void **) lon);
     if (status != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: lon\n", "third_pixels_post", FAILURE);
+        RETURN_ERROR ("Freeing memory: lon\n", FUNC_NAME, FAILURE);
     }
 
     /* Convert NARR lat/lon to UTM */
@@ -615,14 +642,14 @@ int third_pixels_post
                                               sizeof (float));
     if (east_grid == NULL)
     {
-        ERROR_MESSAGE ("Allocating east_grid memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating east_grid memory", FUNC_NAME);
     }
 
     north_grid = (float **) allocate_2d_array (num_eyes, num_jays,
                                                sizeof (float));
     if (north_grid == NULL)
     {
-        ERROR_MESSAGE ("Allocating north_grid memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating north_grid memory", FUNC_NAME);
     }
 
     for (j = 0; j < num_jays; j++)
@@ -638,15 +665,14 @@ int third_pixels_post
     dem_fptr = fopen (dem_infile, "rb");
     if (dem_fptr == NULL)
     {
-        ERROR_MESSAGE ("Error opening the DEM file", "third_pixels_post");
+        ERROR_MESSAGE ("Error opening the DEM file", FUNC_NAME);
     }
 
     /* Allocate memory for the DEM */
     dem = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
     if (dem == NULL)
     {
-        ERROR_MESSAGE ("Error allocating memory for the DEM data",
-                       "third_pixels_post");
+        ERROR_MESSAGE ("Error allocating memory for the DEM data", FUNC_NAME);
     }
 
     /* Open the intermediate binary files for writing
@@ -655,28 +681,28 @@ int third_pixels_post
     if (therm_fptr == NULL)
     {
         sprintf (errstr, "Opening report file: %s", therm_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     trans_fptr = fopen (trans_fname, "wb");
     if (trans_fptr == NULL)
     {
         sprintf (errstr, "Opening report file: %s", trans_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     up_fptr = fopen (up_fname, "wb");
     if (up_fptr == NULL)
     {
         sprintf (errstr, "Opening report file: %s", up_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     down_fptr = fopen (down_fname, "wb");
     if (down_fptr == NULL)
     {
         sprintf (errstr, "Opening report file: %s", down_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     /* Allocate memory for landsat_results */
@@ -684,22 +710,21 @@ int third_pixels_post
                                                     sizeof (float));
     if (landsat_results == NULL)
     {
-        ERROR_MESSAGE ("Allocating landsat_results memory",
-                       "third_pixels_post");
+        ERROR_MESSAGE ("Allocating landsat_results memory", FUNC_NAME);
     }
 
     /* Allocate memory for coordinates */
     coordinates = (float **) allocate_2d_array (4, 2, sizeof (float));
     if (coordinates == NULL)
     {
-        ERROR_MESSAGE ("Allocating coordinates memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating coordinates memory", FUNC_NAME);
     }
 
     /* Allocate memory for at_height */
     at_height = (float **) allocate_2d_array (4, 3, sizeof (float));
     if (at_height == NULL)
     {
-        ERROR_MESSAGE ("Allocating at_height memory", "third_pixels_post");
+        ERROR_MESSAGE ("Allocating at_height memory", FUNC_NAME);
     }
 
     /* Allocate memory for current_location */
@@ -708,8 +733,7 @@ int third_pixels_post
                                       sizeof (float));
     if (current_location == NULL)
     {
-        ERROR_MESSAGE ("Allocating current_location memory",
-                       "third_pixels_post");
+        ERROR_MESSAGE ("Allocating current_location memory", FUNC_NAME);
     }
 
     if (verbose)
@@ -731,7 +755,7 @@ int third_pixels_post
         if (!GetInputThermLine (input, row))
         {
             sprintf (errstr, "Reading input thermal data for line %d", row);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
         dn_to_radiance (input);
 
@@ -743,7 +767,7 @@ int third_pixels_post
         {
             sprintf (errstr, "Error reading values from the DEM file "
                              "starting at line %d.", row);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
 
         /* Can also read in one line of DEM data here */
@@ -771,13 +795,13 @@ int third_pixels_post
                     if (distances == NULL)
                     {
                         ERROR_MESSAGE ("Allocating distances memory",
-                                       "third_pixels_post");
+                                       FUNC_NAME);
                     }
                     distance_copy = malloc (num_points * sizeof (float));
                     if (distances == NULL)
                     {
                         ERROR_MESSAGE ("Allocating distance_copy memory",
-                                       "third_pixels_post");
+                                       FUNC_NAME);
                     }
                     for (g = 0; g < num_points; g++)
                     {
@@ -964,7 +988,7 @@ int third_pixels_post
         if (status != input->size_th.s)
         {
             sprintf (errstr, "Writing to %s", therm_fname);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[0][0], sizeof (float),
@@ -972,7 +996,7 @@ int third_pixels_post
         if (status != input->size_th.s)
         {
             sprintf (errstr, "Writing to %s", trans_fname);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[1][0], sizeof (float),
@@ -980,7 +1004,7 @@ int third_pixels_post
         if (status != input->size_th.s)
         {
             sprintf (errstr, "Writing to %s", up_fname);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[2][0], sizeof (float),
@@ -988,7 +1012,7 @@ int third_pixels_post
         if (status != input->size_th.s)
         {
             sprintf (errstr, "Writing to %s", down_fname);
-            ERROR_MESSAGE (errstr, "third_pixels_post");
+            ERROR_MESSAGE (errstr, FUNC_NAME);
         }
     }
 
@@ -1000,40 +1024,39 @@ int third_pixels_post
     status = free_2d_array ((void **) current_location);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: at_height\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
     }
     status = free_2d_array ((void **) at_height);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: at_height\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
     }
     status = free_2d_array ((void **) coordinates);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: coordinates\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: coordinates\n", FUNC_NAME);
     }
     status = free_2d_array ((void **) east_grid);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: east_grid\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: east_grid\n", FUNC_NAME);
     }
     status = free_2d_array ((void **) north_grid);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: north_grid\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: north_grid\n", FUNC_NAME);
     }
 
     status = free_2d_array ((void **) narr_utm);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: narr_utm\n", "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: narr_utm\n", FUNC_NAME);
     }
 
     status = free_2d_array ((void **) landsat_results);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: landsat_results\n",
-                       "third_pixels_post");
+        ERROR_MESSAGE ("Freeing memory: landsat_results\n", FUNC_NAME);
     }
 
     /* Close the intermediate binary files
@@ -1042,28 +1065,28 @@ int third_pixels_post
     if (status)
     {
         sprintf (errstr, "Closing file %s", therm_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     status = fclose (trans_fptr);
     if (status)
     {
         sprintf (errstr, "Closing file %s", trans_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     status = fclose (up_fptr);
     if (status)
     {
         sprintf (errstr, "Closing file %s", up_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     status = fclose (down_fptr);
     if (status)
     {
         sprintf (errstr, "Closing file %s", down_fname);
-        ERROR_MESSAGE (errstr, "third_pixels_post");
+        ERROR_MESSAGE (errstr, FUNC_NAME);
     }
 
     return SUCCESS;
