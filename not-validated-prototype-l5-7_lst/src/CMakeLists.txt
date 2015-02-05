@@ -19,9 +19,10 @@ add_executable ( lst lst.c
                      date.c
                      get_args.c
                      split_filename.c
+                     read_narr_coordinates.c
                      build_modtran_input.c
                      calculate_point_atmospheric_parameters.c
-                     third_pixels_post.c )
+                     calculate_pixel_atmospheric_parameters.c )
 
 target_link_libraries ( lst ${LibESPA_LIBRARIES}
                             ${LIBXML2_LIBRARIES}

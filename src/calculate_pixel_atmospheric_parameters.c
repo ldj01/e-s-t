@@ -8,7 +8,7 @@
 #include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
-#include "lst.h"
+#include "lst_types.h"
 
 
 int partition

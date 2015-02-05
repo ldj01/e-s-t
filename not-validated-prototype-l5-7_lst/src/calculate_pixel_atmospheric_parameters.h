@@ -1,5 +1,5 @@
-#ifndef LST_H
-#define LST_H
+#ifndef CALCULATE_PIXEL_ATMOSPHERIC_PARAMETERS_H
+#define CALCULATE_PIXEL_ATMOSPHERIC_PARAMETERS_H
 
 
 #include <stdbool.h>
@@ -9,7 +9,7 @@
 #include "input.h"
 
 
-int third_pixels_post
+int calculate_pixel_atmospheric_parameters
 (
     Input_t *input,          /* I: input structure */
     int num_points,          /* I: number of narr points */
@@ -21,4 +21,4 @@ int third_pixels_post
 );
 
 
-#endif /* LST_H */
+#endif /* CALCULATE_PIXEL_ATMOSPHERIC_PARAMETERS_H */

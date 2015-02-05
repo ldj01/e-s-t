@@ -12,7 +12,7 @@
 #include "output.h"
 #include "build_modtran_input.h"
 #include "calculate_point_atmospheric_parameters.h"
-#include "lst.h"
+#include "calculate_pixel_atmospheric_parameters.h"
 
 
 /******************************************************************************
@@ -280,15 +280,14 @@ main (int argc, char *argv[])
     /* Free memory allocation */
     free (case_list);
 
-#if 0
-// RDD I commented this for now
     /* call third_pixels_post to generate parameters for each Landsat pixel */
-    if (third_pixels_post (input, num_points, dem_name, emissivity_name,
-                           results, verbose) != SUCCESS)
+    if (calculate_pixel_atmospheric_parameters (input, num_points, dem_name,
+                                                emissivity_name, results,
+                                                verbose)
+        != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
-#endif
 
 
 #if 0

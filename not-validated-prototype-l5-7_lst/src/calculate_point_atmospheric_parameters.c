@@ -6,7 +6,7 @@
 #include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
-#include "lst.h"
+#include "lst_types.h"
 
 
 /******************************************************************************
@@ -943,6 +943,7 @@ int calculate_point_atmospheric_parameters
             {
                 RETURN_ERROR ("Calling calculate_lob 1", FUNC_NAME, FAILURE);
             }
+
             status = calculate_lobs (current_data, spectral_response,
                                      num_entries, num_srs, 2, &y_1);
             if (status != SUCCESS)

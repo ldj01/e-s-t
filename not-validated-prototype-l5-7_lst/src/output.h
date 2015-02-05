@@ -5,7 +5,6 @@
 #include <time.h>
 
 
-#include "lst.h"
 #include "input.h"
 
 
