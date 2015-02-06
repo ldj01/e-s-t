@@ -12,8 +12,8 @@
 /******************************************************************************
 MODULE:  planck_eq
 
-PURPOSE: using planck's equaiton to calculate radiance at each wavelength for
-         current temperature
+PURPOSE: Using Planck's equaiton to calculate radiance at each wavelength for
+         current temperature.
 
 RETURN: SUCCESS
         FAILURE
@@ -358,6 +358,7 @@ printf("ii[%d] = %d\n", i, ii[i]);
     return SUCCESS;
 }
 
+
 /******************************************************************************
 MODULE:  calculate_lt
 
@@ -443,7 +444,7 @@ int calculate_lt
 /******************************************************************************
 MODULE:  interpol
 
-PURPOSE: Simulate IDL interpol function for lst purpose
+PURPOSE: Simulate IDL interpol function for LST purpose.
 
 RETURN: SUCCESS
         FAILURE
@@ -520,8 +521,8 @@ void interpol
 /******************************************************************************
 MODULE:  calculate_lobs
 
-PURPOSE: Calculate observed radiance from modtran results and the spectral
-         reponse function
+PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
+         reponse function.
 
 RETURN: SUCCESS
         FAILURE
@@ -533,7 +534,7 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_lobs
 (
-    float **modtran,           /*I: modtran results with wavelengths */
+    float **modtran,           /*I: MODTRAN results with wavelengths */
     float **spectral_response, /*I: spectral response function */
     int num_entries,           /*I: number of MODTRAN points */
     int num_srs,               /*I: number of spectral response points */
@@ -611,14 +612,18 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
 ******************************************************************************/
+#define L5_TM_SRS_COUNT (171)
+#define L7_TM_SRS_COUNT (47)
+#define L8_OLITIRS_SRS_COUNT (101)
+#define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
 int calculate_point_atmospheric_parameters
 (
-    Input_t * input,       /*I: input structure */
+    Input_t * input,           /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    float albedo,          /*I: albedo */
-    float **results,       /*O: atmospheric parameter for modtarn run */
-    bool verbose           /*I: value to indicate if intermediate messages
-                                should be printed */
+    float albedo,              /* I: albedo */
+    float **results,           /* O: atmospheric parameter for modtarn run */
+    bool verbose               /* I: value to indicate if intermediate
+                                     messages should be printed */
 )
 {
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
@@ -630,13 +635,14 @@ int calculate_point_atmospheric_parameters
     float obs_radiance_0;
     float temp_radiance_273;
     float temp_radiance_300;
-    int counter = 0;
+    int counter;
     int index;
     int num_entries;
     int num_srs;       /* Number of spectral response values available */
     int result_loc;
     char current_file[PATH_MAX];
-    float **temp1;
+    float modtran_wavelength;
+    float modtran_radiance;
     float zero_temp;
     float **current_data;
     float x_0;
@@ -649,14 +655,15 @@ int calculate_point_atmospheric_parameters
     float ld;  /* Downwelled Radiance */
     /* TODO TODO TODO - This emissivity/albedo is just for water which is all
                         that has been implemented.  But the goal is to be
-                        doing LAND, so integration aith the Aster data and
+                        doing LAND, so integration with the Aster data and
                         JPL conversion code will probably be needed before
                         execution of this routine, and then utilized here. */
     double emissivity = 1.0 - albedo;
     double inv_albedo = 1.0 / albedo;
     char *lst_data_dir = NULL;
-    char full_path[PATH_MAX];
-    int status;
+    char srs_file_path[PATH_MAX];
+    char msg[PATH_MAX];
+
 
     lst_data_dir = getenv ("LST_DATA_DIR");
     if (lst_data_dir == NULL)
@@ -665,161 +672,81 @@ int calculate_point_atmospheric_parameters
                       FUNC_NAME, FAILURE);
     }
 
-    LOG_MESSAGE ("Reading spectral response file", FUNC_NAME);
+    /* Allocate memory for maximum spectral response count */
+    spectral_response =
+        (float **) allocate_2d_array (2, MAX_SRS_COUNT, sizeof (float));
+    if (spectral_response == NULL)
+    {
+        RETURN_ERROR ("Allocating spectral_response memory",
+                      FUNC_NAME, FAILURE);
+    }
+
+    /* Determine the spectral response file to read */
     if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
     {
-        num_srs = 171;
+        num_srs = L5_TM_SRS_COUNT;
 
-        /* Dynamic allocate the 2d memory */
-        spectral_response =
-            (float **) allocate_2d_array (2, num_srs, sizeof (float));
-        if (spectral_response == NULL)
-        {
-            RETURN_ERROR ("Allocating spectral_response memory",
-                          FUNC_NAME, FAILURE);
-        }
-
-        snprintf (full_path, sizeof (full_path),
+        snprintf (srs_file_path, sizeof (srs_file_path),
                   "%s/%s", lst_data_dir, "L5_Spectral_Response.rsp");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            RETURN_ERROR ("Can't open L5_Spectral_Response.rsp file",
-                          FUNC_NAME, FAILURE);
-        }
-
-        for (i = 0; i < num_srs; i++)
-        {
-            if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
-                        &spectral_response[1][i]) != 2)
-            {
-                RETURN_ERROR ("Failed reading L5_Spectral_Response.rsp",
-                              FUNC_NAME, FAILURE);
-            }
-        }
-        fclose (fd);
     }
     else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
     {
-        num_srs = 47;
+        num_srs = L7_TM_SRS_COUNT;
 
-        /* Dynamic allocate the 2d memory */
-        spectral_response =
-            (float **) allocate_2d_array (2, num_srs, sizeof (float));
-        if (spectral_response == NULL)
-        {
-            RETURN_ERROR ("Allocating spectral_response memory",
-                          FUNC_NAME, FAILURE);
-        }
-
-        snprintf (full_path, sizeof (full_path),
+        snprintf (srs_file_path, sizeof (srs_file_path),
                   "%s/%s", lst_data_dir, "L7_Spectral_Response.rsp");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            RETURN_ERROR ("Can't open L7_Spectral_Response.rsp file",
-                          FUNC_NAME, FAILURE);
-        }
-
-        for (i = 0; i < num_srs; i++)
-        {
-            if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
-                        &spectral_response[1][i]) != 2)
-            {
-                RETURN_ERROR ("Failed reading L7_Spectral_Response.rsp",
-                              FUNC_NAME, FAILURE);
-            }
-        }
-        fclose (fd);
     }
     else if (input->meta.inst == INST_OLI_TIRS
              && input->meta.sat == SAT_LANDSAT_8)
     {
-        num_srs = 101;
+        num_srs = L8_OLITIRS_SRS_COUNT;
 
-        /* Dynamic allocate the 2d memory */
-        spectral_response =
-            (float **) allocate_2d_array (2, num_srs, sizeof (float));
-        if (spectral_response == NULL)
-        {
-            RETURN_ERROR ("Allocating spectral_response memory",
-                          FUNC_NAME, FAILURE);
-        }
-
-        snprintf (full_path, sizeof (full_path),
+        snprintf (srs_file_path, sizeof (srs_file_path),
                   "%s/%s", lst_data_dir, "L8_B10.rsp");
-        fd = fopen (full_path, "r");
-        if (fd == NULL)
-        {
-            RETURN_ERROR ("Can't open L8_B10.rsp file", FUNC_NAME, FAILURE);
-        }
-
-        for (i = 0; i < num_srs; i++)
-        {
-            if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
-                        &spectral_response[1][i]) == EOF)
-            {
-                RETURN_ERROR ("Failed reading L8_B10.rsp", FUNC_NAME, FAILURE);
-            }
-        }
-        fclose (fd);
     }
     else
     {
         RETURN_ERROR ("invalid instrument type", FUNC_NAME, FAILURE);
     }
 
-    /* calculate Lt for each temperature */
-    if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
+    snprintf (msg, sizeof (msg),
+              "Reading Spectral Response File [%s]", srs_file_path);
+    LOG_MESSAGE (msg, FUNC_NAME);
+    fd = fopen (srs_file_path, "r");
+    if (fd == NULL)
     {
-        if (calculate_lt (273, spectral_response, num_srs, &temp_radiance_273)
-            != SUCCESS)
+        RETURN_ERROR ("Can't open Spectral Response file", FUNC_NAME, FAILURE);
+    }
+
+    for (i = 0; i < num_srs; i++)
+    {
+        if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
+                    &spectral_response[1][i]) == EOF)
         {
-            RETURN_ERROR ("Calling calculate_lt for 273K", FUNC_NAME, FAILURE);
-        }
-        if (calculate_lt (300, spectral_response, num_srs, &temp_radiance_300)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("Calling calculate_lt for 300K", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Failed reading spectral response file",
+                          FUNC_NAME, FAILURE);
         }
     }
-    else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
+    fclose (fd);
+
+    /* Calculate Lt for each specific temperature */
+    if (calculate_lt (273, spectral_response, num_srs, &temp_radiance_273)
+        != SUCCESS)
     {
-        if (calculate_lt (273, spectral_response, num_srs, &temp_radiance_273)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("Calling calculate_lt for 273K", FUNC_NAME, FAILURE);
-        }
-        if (calculate_lt (300, spectral_response, num_srs, &temp_radiance_300)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("Calling calculate_lt for 300K", FUNC_NAME, FAILURE);
-        }
+        RETURN_ERROR ("Calling calculate_lt for 273K", FUNC_NAME, FAILURE);
     }
-    else if (input->meta.inst == INST_OLI_TIRS
-             && input->meta.sat == SAT_LANDSAT_8)
+    if (calculate_lt (300, spectral_response, num_srs, &temp_radiance_300)
+        != SUCCESS)
     {
-        if (calculate_lt (273, spectral_response, num_srs, &temp_radiance_273)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("Calling calculate_lt for 273K", FUNC_NAME, FAILURE);
-        }
-        if (calculate_lt (300, spectral_response, num_srs, &temp_radiance_300)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("Calling calculate_lt for 300K", FUNC_NAME, FAILURE);
-        }
-    }
-    else
-    {
-        RETURN_ERROR ("invalid instrument type", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Calling calculate_lt for 300K", FUNC_NAME, FAILURE);
     }
 
     x_0 = temp_radiance_273;
     x_1 = temp_radiance_300;
     inv_xx_diff = 1.0F / (x_0 - x_1);
 
-    /* iterate through all points and heights */
+    /* Iterate through all points and heights */
+    counter = 0;
     for (i = 0; i < points->num_points; i++)
     {
         for (j = 0; j < NUM_ELEVATIONS; j++)
@@ -834,6 +761,7 @@ int calculate_point_atmospheric_parameters
                 points->modtran_runs[counter].height;
 
             /* Read the lst_modtran.info file for the 000 execution
+               (when MODTRAN is run at 0K)
                We read the zero_temp from this file, and also the record count
                The record count is the same for all three associated runs */
             /* The 000 file is always the "counter+2" element in the array
@@ -848,8 +776,7 @@ int calculate_point_atmospheric_parameters
                 RETURN_ERROR ("Can't open current_file file",
                               FUNC_NAME, FAILURE);
             }
-            /* determine temperature at lowest atmospheric layer
-               (when MODTRAN is run at 0K) */
+            /* Retrieve the temperature from this lowest atmospheric layer */
             if (fscanf (fd, "%*s %f%*c", &zero_temp) != 1)
             {
                 RETURN_ERROR ("End of file (EOF) is met before"
@@ -876,16 +803,8 @@ int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
 
-            temp1 =
-                (float **) allocate_2d_array (num_entries, 2, sizeof (float));
-            if (temp1 == NULL)
-            {
-                RETURN_ERROR ("Allocating temp1 memory", FUNC_NAME, FAILURE);
-            }
-
-            index = 0;
-            /* iterate through three pairs of parameters */
-            for (k = 0; k < 3; k++)
+            /* iterate through the three pairs of parameters */
+            for (index = 1; index < 4; index++)
             {
                 /* define current file */
                 snprintf (current_file, sizeof (current_file),
@@ -900,36 +819,28 @@ int calculate_point_atmospheric_parameters
                 }
                 for (entry = 0; entry < num_entries; entry++)
                 {
-                    if (fscanf (fd, "%f %f%*c", &temp1[entry][0],
-                                &temp1[entry][1]) != 2)
+                    if (fscanf (fd, "%f %f%*c",
+                                &modtran_wavelength, &modtran_radiance)
+                        != 2)
                     {
                         RETURN_ERROR ("Failed reading lst_modtran.dat lines",
                                       FUNC_NAME, FAILURE);
                     }
+
+                    /* If we are on the first file set the wavelength value
+                       for the data array */
+                    if (index == 1)
+                    {
+                        current_data[entry][0] = modtran_wavelength;
+                    }
+                    /* Place radiance into data array for current point at
+                       current height */
+                    current_data[entry][index] = modtran_radiance;
+
                 }
                 fclose (fd);
 
-                /* put arrays into data array for current point at current
-                   height */
-                if (index == 0)
-                {
-                    for (entry = 0; entry < num_entries; entry++)
-                    {
-                        current_data[entry][0] = temp1[entry][0];
-                        current_data[entry][1] = temp1[entry][1];
-                    }
-                    index++;
-                }
-                else
-                {
-                    for (entry = 0; entry < num_entries; entry++)
-                    {
-                        current_data[entry][index] = temp1[entry][1];
-                    }
-                }
-
                 counter++;
-                index++;
             }
 
 #if 0
@@ -941,23 +852,20 @@ int calculate_point_atmospheric_parameters
 #endif
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
-            status = calculate_lobs (current_data, spectral_response,
-                                     num_entries, num_srs, 1, &y_0);
-            if (status != SUCCESS)
+            if (calculate_lobs (current_data, spectral_response,
+                                num_entries, num_srs, 1, &y_0)
+                != SUCCESS)
             {
-                RETURN_ERROR ("Calling calculate_lob 1", FUNC_NAME, FAILURE);
+                RETURN_ERROR ("Calling calculate_lobs for height y_0",
+                              FUNC_NAME, FAILURE);
             }
 
-            status = calculate_lobs (current_data, spectral_response,
-                                     num_entries, num_srs, 2, &y_1);
-            if (status != SUCCESS)
+            if (calculate_lobs (current_data, spectral_response,
+                                num_entries, num_srs, 2, &y_1)
+                != SUCCESS)
             {
-                RETURN_ERROR ("Calling calculate_lob 2", FUNC_NAME, FAILURE);
-            }
-
-            if (free_2d_array ((void **) temp1) != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: temp\n", FUNC_NAME, FAILURE);
+                RETURN_ERROR ("Calling calculate_lobs for height y_1",
+                              FUNC_NAME, FAILURE);
             }
 
             /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
@@ -970,7 +878,7 @@ int calculate_point_atmospheric_parameters
             if (calculate_lt (zero_temp, spectral_response, num_srs,
                               &temp_radiance_0) != SUCCESS)
             {
-                RETURN_ERROR ("Calling calculate_lt for 0K",
+                RETURN_ERROR ("Calling calculate_lt for zero temp (0Kelvin)",
                               FUNC_NAME, FAILURE);
             }
 
@@ -978,7 +886,8 @@ int calculate_point_atmospheric_parameters
                                 num_entries, num_srs, 3, &obs_radiance_0)
                 != SUCCESS)
             {
-                RETURN_ERROR ("Calling calculate_lob 2", FUNC_NAME, FAILURE);
+                RETURN_ERROR ("Calling calculate_lobs for (0Kelvin)",
+                              FUNC_NAME, FAILURE);
             }
 
             /* Free the allocated memory in the loop */
@@ -987,6 +896,7 @@ int calculate_point_atmospheric_parameters
                 RETURN_ERROR ("Freeing memory: current_data\n",
                               FUNC_NAME, FAILURE);
             }
+            current_data = NULL;
 
             /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/(1.0-emissivity) */
             /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/abledo */
@@ -994,7 +904,7 @@ int calculate_point_atmospheric_parameters
             ld = (((obs_radiance_0 - lu) / tau)
                   - (temp_radiance_0 * emissivity)) * inv_albedo;
 
-            /* put remaining results into results array */
+            /* Place results into results array */
             results[result_loc][LST_TRANSMISSION] = tau;
             results[result_loc][LST_UPWELLED_RADIANCE] = lu;
             results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
@@ -1007,8 +917,9 @@ int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Freeing memory: spectral_response\n", FUNC_NAME,
                       FAILURE);
     }
+    spectral_response = NULL;
 
-    /* write results to a file */
+    /* Output the results to a file */
     snprintf (current_file, sizeof (current_file),
               "atmosphericParameters.txt");
     printf ("Creating Atmospheric Parameters File = [%s]\n", current_file);
