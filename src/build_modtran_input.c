@@ -12,7 +12,7 @@
 #include "utilities.h"
 #include "input.h"
 #include "lst_types.h"
-#include "read_narr_coordinates.h"
+#include "build_points.h"
 
 
 #define STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD 9.80665
@@ -21,7 +21,7 @@
 
 
 #define P_LAYER 29
-#define STAN_LAYER 30
+#define STANDARD_LAYERS 30
 #define MAX_MODTRAN_LAYER 150
 
 
@@ -311,13 +311,13 @@ int read_std_mid_lat_summer_atmos
                       FUNC_NAME, FAILURE);
     }
 
-    for (i = 0; i < STAN_LAYER; i++)
+    for (i = 0; i < STANDARD_LAYERS; i++)
     {
         if (fscanf (fd, "%f %f %f %f", &stan_height[i], &stan_pre[i],
                     &stan_temp[i], &stan_rh[i]) == EOF)
         {
-            RETURN_ERROR ("End of file (EOF) is met before STAN_LAYER lines",
-                          FUNC_NAME, FAILURE);
+            RETURN_ERROR ("End of file (EOF) is met before STANDARD_LAYERS"
+                          " lines", FUNC_NAME, FAILURE);
         }
     }
 
@@ -424,9 +424,7 @@ Date        Programmer       Reason
 int build_modtran_input
 (
     Input_t *input,       /* I: input structure */
-    int *num_pts,         /* O: number of NARR points */
-    int *num_runs,        /* O: number of MODTRAN runs */
-    POINT_INFO **case_list, /* O: case list information (allocated here) */
+    REANALYSIS_POINTS *points, /* I/O: The coordinate points */
     char ***command_list, /* O: command list information (allocated here) */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 should be printed */
@@ -435,18 +433,12 @@ int build_modtran_input
 )
 {
     char FUNC_NAME[] = "build_modtran_input";
-    int **eye;
-    int **jay;
-    float **lat;
-    float **lon;
     float **hgt1;
     float **spfh1;
     float **tmp1;
     float **hgt2;
     float **spfh2;
     float **tmp2;
-    float *narr_lat;
-    float *narr_lon;
     float **narr_hgt1;
     float **narr_spfh1;
     float **narr_tmp1;
@@ -467,17 +459,6 @@ int build_modtran_input
                             550, 500, 450, 400, 350,
                             300, 275, 250, 225, 200,
                             175, 150, 125, 100 };
-    int num_points;
-    float buffered_ul_lat;
-    float buffered_ul_lon;
-    float buffered_lr_lat;
-    float buffered_lr_lon;
-    int max_eye;
-    int min_eye;
-    int max_jay;
-    int min_jay;
-    int num_eyes;
-    int num_jays;
     float **pressure;
     int rem1;
     int rem2;
@@ -513,7 +494,7 @@ int build_modtran_input
     float new_temp;
     float new_rh;
     int curr_layer, std_layer;
-    int *counter;
+    int counter[STANDARD_LAYERS];
     char temp_strs[3][4] = { "273\0", "310\0", "000\0" };
     float alb[3] = { 0.0, 0.0, 0.1 };
     char *lst_data_dir = NULL;
@@ -524,30 +505,14 @@ int build_modtran_input
     char lon_str[7]; /* 6 plus the string termination character */
     char msg_str[MAX_STR_LEN];
 
-    /* Dynamic allocate the 2d memory for the coordinates */
-    eye = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
-    if (eye == NULL)
-    {
-        RETURN_ERROR ("Allocating eye memory", FUNC_NAME, FAILURE);
-    }
 
-    jay = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
-    if (jay == NULL)
-    {
-        RETURN_ERROR ("Allocating jay memory", FUNC_NAME, FAILURE);
-    }
-
-    lat = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
-    if (lat == NULL)
-    {
-        RETURN_ERROR ("Allocating lat memory", FUNC_NAME, FAILURE);
-    }
-
-    lon = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
-    if (lon == NULL)
-    {
-        RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
-    }
+    /* Use local variables for cleaner code */
+    int min_eye = points->min_eye;
+    int max_eye = points->max_eye;
+    int min_jay = points->min_jay;
+    int max_jay = points->max_jay;
+    int num_eyes = points->num_eyes;
+    int num_points = points->num_points;
 
     /* Grab the environment path to the LST_DATA_DIR */
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -556,72 +521,6 @@ int build_modtran_input
         RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
                       FUNC_NAME, FAILURE);
     }
-
-    /* Read the coordinates into memory */
-    if (read_narr_coordinates (lst_data_dir, eye, jay, lat, lon) != SUCCESS)
-    {
-        RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
-    }
-
-    /* expand range to include NARR points outside image for edge pixels */
-    /* TODO - 0.5deg at higher latitudes will not be sufficient for the
-              longitudinal test, since at lat(72deg) 1deg lon = 34504.22meters
-              and the NARR data is 34k between points.
-
-              This is probably only a CONUS quick and dirty solution.
-
-       NOTE - MERRA is even farther apart so this will not work for that. */
-    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
-    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
-    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
-    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
-
-    /* determine what points in the NARR dataset fall within our buffered
-       Landsat area using logical operators lessThanLat and greaterThanLat
-       are values where the NARR values are less than or greater than the
-       edges of the Landsat corners values respectively pixels that are true
-       in both fall within the Landsat scene the same thing is done with
-       longitude values */
-    max_eye = 0;
-    min_eye = 1000;
-    max_jay = 0;
-    min_jay = 1000;
-    for (i = 0; i < NARR_ROW - 1; i++)
-    {
-        for (j = 0; j < NARR_COL - 1; j++)
-        {
-            if ((buffered_ul_lat > lat[i][j])
-                && (buffered_lr_lat < lat[i][j])
-                && (buffered_ul_lon < lon[i][j])
-                && (buffered_lr_lon > lon[i][j]))
-            {
-                max_eye = max (max_eye, eye[i][j]);
-                min_eye = min (min_eye, eye[i][j]);
-                max_jay = max (max_jay, jay[i][j]);
-                min_jay = min (min_jay, jay[i][j]);
-            }
-        }
-    }
-    max_eye--;
-    min_eye--;
-    max_jay--;
-    min_jay--;
-    num_eyes = max_eye - min_eye + 1;
-    num_jays = max_jay - min_jay + 1;
-    num_points = num_eyes * num_jays;
-
-    /* Free eye and jay memory since they are not used anymore */
-    if (free_2d_array ((void **) eye) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: eye\n", FUNC_NAME, FAILURE);
-    }
-    eye = NULL;
-
-    if (free_2d_array ((void **) jay) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: jay\n", FUNC_NAME, FAILURE);
-    }
-    jay = NULL;
 
     /* ==================================================================== */
 
@@ -707,19 +606,6 @@ int build_modtran_input
 
     /* ==================================================================== */
 
-    /* Allocate memory for height of NARR points within the rectangular */
-    narr_lat = (float *) malloc (num_points * sizeof (float));
-    if (narr_lat == NULL)
-    {
-        RETURN_ERROR ("Allocating narr_lat memory", FUNC_NAME, FAILURE);
-    }
-
-    narr_lon = (float *) malloc (num_points * sizeof (float));
-    if (narr_lon == NULL)
-    {
-        RETURN_ERROR ("Allocating narr_lon memory", FUNC_NAME, FAILURE);
-    }
-
     narr_hgt1 = (float **) allocate_2d_array (P_LAYER, num_points,
                                               sizeof (float));
     if (narr_hgt1 == NULL)
@@ -764,50 +650,30 @@ int build_modtran_input
         RETURN_ERROR ("Allocating narr_tmp2 memory", FUNC_NAME, FAILURE);
     }
 
-    /* extract coordinates within the NARR rectangle */
-    for (j = min_jay; j <= max_jay; j++)
-    {
-        for (i = min_eye; i <= max_eye; i++)
-        {
-            narr_lat[(j - min_jay) * num_eyes + (i - min_eye)] = lat[i][j];
-            narr_lon[(j - min_jay) * num_eyes + (i - min_eye)] = lon[i][j];
-        }
-    }
+    /* ==================================================================== */
+
+    int index;
     for (k = 0; k < P_LAYER; k++)
     {
         for (j = min_jay; j <= max_jay; j++)
         {
             for (i = min_eye; i <= max_eye; i++)
             {
-                narr_hgt1[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = hgt1[k][j * NARR_ROW + i];
-                narr_spfh1[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = spfh1[k][j * NARR_ROW + i];
-                narr_tmp1[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = tmp1[k][j * NARR_ROW + i];
-                narr_hgt2[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = hgt2[k][j * NARR_ROW + i];
-                narr_spfh2[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = spfh2[k][j * NARR_ROW + i];
-                narr_tmp2[k][(j - min_jay) * num_eyes + (i - min_eye)]
-                    = tmp2[k][j * NARR_ROW + i];
+                index = (j - min_jay) * num_eyes + (i - min_eye);
+
+                narr_hgt1[k][index] = hgt1[k][j * NARR_ROW + i];
+                narr_spfh1[k][index] = spfh1[k][j * NARR_ROW + i];
+                narr_tmp1[k][index] = tmp1[k][j * NARR_ROW + i];
+                narr_hgt2[k][index] = hgt2[k][j * NARR_ROW + i];
+                narr_spfh2[k][index] = spfh2[k][j * NARR_ROW + i];
+                narr_tmp2[k][index] = tmp2[k][j * NARR_ROW + i];
             }
         }
     }
 
+    /* ==================================================================== */
+
     /* Release memory */
-    if (free_2d_array ((void **) lat) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: lat\n", FUNC_NAME, FAILURE);
-    }
-    lat = NULL;
-
-    if (free_2d_array ((void **) lon) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: lon\n", FUNC_NAME, FAILURE);
-    }
-    lon = NULL;
-
     if (free_2d_array ((void **) hgt1) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: hgt1\n", FUNC_NAME, FAILURE);
@@ -892,34 +758,38 @@ int build_modtran_input
         RETURN_ERROR ("Allocating narr_rh2 memory", FUNC_NAME, FAILURE);
     }
 
+    /* ==================================================================== */
+
     /* convert grib data to variables to be input to MODTRAN */
-    if (convert_geopotential_geometric (num_points, narr_lat,
+    if (convert_geopotential_geometric (num_points, points->lat,
                                         narr_hgt1, narr_height1) != SUCCESS)
     {
         RETURN_ERROR ("Calling convert_geopotential_geometric for height 1",
                       FUNC_NAME, FAILURE);
     }
 
-    if (convert_geopotential_geometric (num_points, narr_lat,
+    if (convert_geopotential_geometric (num_points, points->lat,
                                         narr_hgt2, narr_height2) != SUCCESS)
     {
         RETURN_ERROR ("Calling convert_geopotential_geometric for height 2",
                       FUNC_NAME, FAILURE);
     }
 
-    if (convert_sh_rh (num_points, narr_lat, narr_spfh1, narr_tmp1,
+    if (convert_sh_rh (num_points, points->lat, narr_spfh1, narr_tmp1,
                        pressure, narr_rh1) != SUCCESS)
     {
         RETURN_ERROR ("Calling convert_sh_rh for temp 1", FUNC_NAME,
                       FAILURE);
     }
 
-    if (convert_sh_rh (num_points, narr_lat, narr_spfh2, narr_tmp2,
+    if (convert_sh_rh (num_points, points->lat, narr_spfh2, narr_tmp2,
                        pressure, narr_rh2) != SUCCESS)
     {
         RETURN_ERROR ("Calling convert_sh_rh for temp 2", FUNC_NAME,
                       FAILURE);
     }
+
+    /* ==================================================================== */
 
     /* free allocated memory */
     if (free_2d_array ((void **) narr_hgt1) != SUCCESS)
@@ -1053,25 +923,25 @@ int build_modtran_input
     /************************** Build tape 5 files **************************/
 
     /* Allocate memory */
-    stan_height = (float *) malloc (STAN_LAYER * sizeof (float));
+    stan_height = (float *) malloc (STANDARD_LAYERS * sizeof (float));
     if (stan_height == NULL)
     {
         RETURN_ERROR ("Allocating stan_height memory", FUNC_NAME, FAILURE);
     }
 
-    stan_pre = (float *) malloc (STAN_LAYER * sizeof (float));
+    stan_pre = (float *) malloc (STANDARD_LAYERS * sizeof (float));
     if (stan_pre == NULL)
     {
         RETURN_ERROR ("Allocating stan_pre memory", FUNC_NAME, FAILURE);
     }
 
-    stan_temp = (float *) malloc (STAN_LAYER * sizeof (float));
+    stan_temp = (float *) malloc (STANDARD_LAYERS * sizeof (float));
     if (stan_temp == NULL)
     {
         RETURN_ERROR ("Allocating stan_temp memory", FUNC_NAME, FAILURE);
     }
 
-    stan_rh = (float *) malloc (STAN_LAYER * sizeof (float));
+    stan_rh = (float *) malloc (STANDARD_LAYERS * sizeof (float));
     if (stan_rh == NULL)
     {
         RETURN_ERROR ("Allocating stan_rh memory", FUNC_NAME, FAILURE);
@@ -1087,18 +957,13 @@ int build_modtran_input
 
     /* determine number of MODTRAN runs */
     num_modtran_runs = num_points * NUM_ELEVATIONS * 3;
+    points->num_modtran_runs = num_modtran_runs;
 
     /* Allocate memory */
-    counter = (int *) malloc (STAN_LAYER * sizeof (int));
-    if (counter == NULL)
+    points->modtran_runs = (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
+    if (points->modtran_runs == NULL)
     {
-        RETURN_ERROR ("Allocating counter memory", FUNC_NAME, FAILURE);
-    }
-
-    *case_list = (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
-    if (*case_list == NULL)
-    {
-        RETURN_ERROR ("Allocating case_list memory", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Allocating modtran_runs memory", FUNC_NAME, FAILURE);
     }
 
     *command_list = (char **) allocate_2d_array (num_modtran_runs, PATH_MAX,
@@ -1158,13 +1023,13 @@ int build_modtran_input
            The following logic fixes the longitude to be for MODTRAN and we
            also use those values for generating the output directory names.
            **************************************************************** */
-        if (narr_lon[i] < 0)
+        if (points->lon[i] < 0)
         {
             /* We are a west longitude value so negate it to the positive
                equivalent value.
                i.e.   W40 normally represented as -40 would be changed to a
                       positive 40 value. */
-            narr_lon[i] = -narr_lon[i];
+            points->lon[i] = -points->lon[i];
         }
         else
         {
@@ -1172,19 +1037,19 @@ int build_modtran_input
                180 west.
                i.e.   E10 would be turned into W350, and be positive 350 not
                       negative.  */
-            narr_lon[i] = 360.0 - narr_lon[i];
+            points->lon[i] = 360.0 - points->lon[i];
         }
 
         /* Figure out the lat and lon strings to use */
-        if (narr_lat[i] < 100.0)
-            snprintf (lat_str, sizeof (lat_str), "%6.3f", narr_lat[i]);
+        if (points->lat[i] < 100.0)
+            snprintf (lat_str, sizeof (lat_str), "%6.3f", points->lat[i]);
         else
-            snprintf (lat_str, sizeof (lat_str), "%6.2f", narr_lat[i]);
+            snprintf (lat_str, sizeof (lat_str), "%6.2f", points->lat[i]);
 
-        if (narr_lon[i] < 100.0)
-            snprintf (lon_str, sizeof (lon_str), "%6.3f", narr_lon[i]);
+        if (points->lon[i] < 100.0)
+            snprintf (lon_str, sizeof (lon_str), "%6.3f", points->lon[i]);
         else
-            snprintf (lon_str, sizeof (lon_str), "%6.2f", narr_lon[i]);
+            snprintf (lon_str, sizeof (lon_str), "%6.2f", points->lon[i]);
 
         /* Create the name of the directory for the current NARR point */
         snprintf (current_point, sizeof (current_point),
@@ -1332,7 +1197,7 @@ int build_modtran_input
             /* determine maximum height of NARR layers and where the standard 
                atmosphere is greater than this */
             std_layer = 0;
-            for (k = 0; k < STAN_LAYER; k++)
+            for (k = 0; k < STANDARD_LAYERS; k++)
             {
                 if (stan_height[k] > narr_height[P_LAYER - 1][i])
                 {
@@ -1495,17 +1360,16 @@ int build_modtran_input
 
                    iterate entry count */
                 case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
-                snprintf ((*case_list)[case_counter].full_path, PATH_MAX,
-                          "%s/%s",
-                          curr_path, current_alb);
+                snprintf (points->modtran_runs[case_counter].path, PATH_MAX,
+                          "%s", current_alb);
                 snprintf ((*command_list)[case_counter], PATH_MAX,
                           "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
-                          (*case_list)[case_counter].full_path,
+                          points->modtran_runs[case_counter].path,
                           modtran_data_dir, modtran_path);
 
-                (*case_list)[case_counter].latitude = narr_lat[i];
-                (*case_list)[case_counter].longitude = narr_lon[i];
-                (*case_list)[case_counter].height = gndalt[j];
+                points->modtran_runs[case_counter].latitude = points->lat[i];
+                points->modtran_runs[case_counter].longitude = points->lon[i];
+                points->modtran_runs[case_counter].height = gndalt[j];
             } /* END - Tempurature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
@@ -1530,9 +1394,6 @@ int build_modtran_input
     stan_temp = NULL;
     stan_rh = NULL;
 
-    free(counter);
-    counter = NULL;
-
     if (debug)
     {
         /* write caseList to a file */
@@ -1545,7 +1406,7 @@ int build_modtran_input
         /* Write out the caseList file */
         for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
         {
-            fprintf (fd, "%s\n", (*case_list)[k].full_path);
+            fprintf (fd, "%s\n", points->modtran_runs[k].path);
         }
 
         /* Close the caseList file */
@@ -1576,9 +1437,6 @@ int build_modtran_input
     }
 
     /* Free remaining memory allocations */
-    free(narr_lat);
-    free(narr_lon);
-
     if (free_2d_array ((void **) pressure) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: pressure\n", FUNC_NAME, FAILURE);
@@ -1602,10 +1460,6 @@ int build_modtran_input
         RETURN_ERROR ("Freeing memory: narr_tmp\n", FUNC_NAME, FAILURE);
     }
     narr_tmp = NULL;
-
-    /* Assign to the output variables */
-    *num_pts = num_points;
-    *num_runs = num_modtran_runs;
 
     return SUCCESS;
 }

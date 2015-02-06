@@ -11,7 +11,7 @@ EXTRA = -Wall -g -O2
 
 # Define the include files
 INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h \
-      read_narr_coordinates.h build_modtran_input.h \
+      build_points.h build_modtran_input.h \
       calculate_point_atmospheric_parameters.h \
       calculate_pixel_atmospheric_parameters.h
 INCDIR  = -I. -I$(HDFINC) -I$(HDFEOS_INC) -I$(HDFEOS_GCTPINC) -I$(XML2INC) \
@@ -27,7 +27,7 @@ SRC = \
       output.c                \
       split_filename.c        \
       get_args.c              \
-      read_narr_coordinates.c \
+      build_points.c \
       build_modtran_input.c   \
       calculate_point_atmospheric_parameters.c \
       calculate_pixel_atmospheric_parameters.c \

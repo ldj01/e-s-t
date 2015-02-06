@@ -19,7 +19,7 @@ add_executable ( lst lst.c
                      date.c
                      get_args.c
                      split_filename.c
-                     read_narr_coordinates.c
+                     build_points.c
                      build_modtran_input.c
                      calculate_point_atmospheric_parameters.c
                      calculate_pixel_atmospheric_parameters.c )

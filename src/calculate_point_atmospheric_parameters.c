@@ -614,9 +614,8 @@ Date        Programmer       Reason
 int calculate_point_atmospheric_parameters
 (
     Input_t * input,       /*I: input structure */
-    int num_points,        /*I: number of narr points */
+    REANALYSIS_POINTS *points, /* I: The coordinate points */
     float albedo,          /*I: albedo */
-    POINT_INFO *case_list, /*I: modtran run list */
     float **results,       /*O: atmospheric parameter for modtarn run */
     bool verbose           /*I: value to indicate if intermediate messages
                                 should be printed */
@@ -821,15 +820,18 @@ int calculate_point_atmospheric_parameters
     inv_xx_diff = 1.0F / (x_0 - x_1);
 
     /* iterate through all points and heights */
-    for (i = 0; i < num_points; i++)
+    for (i = 0; i < points->num_points; i++)
     {
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
             result_loc = i * NUM_ELEVATIONS + j;
             /* put results into results array */
-            results[result_loc][LST_LATITUDE] = case_list[counter].latitude;
-            results[result_loc][LST_LONGITUDE] = case_list[counter].longitude;
-            results[result_loc][LST_HEIGHT] = case_list[counter].height;
+            results[result_loc][LST_LATITUDE] =
+                points->modtran_runs[counter].latitude;
+            results[result_loc][LST_LONGITUDE] =
+                points->modtran_runs[counter].longitude;
+            results[result_loc][LST_HEIGHT] =
+                points->modtran_runs[counter].height;
 
             /* Read the lst_modtran.info file for the 000 execution
                We read the zero_temp from this file, and also the record count
@@ -837,7 +839,8 @@ int calculate_point_atmospheric_parameters
             /* The 000 file is always the "counter+2" element in the array
                at this point in the code */
             snprintf (current_file, sizeof (current_file),
-                      "%s/lst_modtran.info", case_list[counter+2].full_path);
+                      "%s/lst_modtran.info",
+                      points->modtran_runs[counter+2].path);
 
             fd = fopen (current_file, "r");
             if (fd == NULL)
@@ -886,7 +889,8 @@ int calculate_point_atmospheric_parameters
             {
                 /* define current file */
                 snprintf (current_file, sizeof (current_file),
-                          "%s/lst_modtran.dat", case_list[counter].full_path);
+                          "%s/lst_modtran.dat",
+                          points->modtran_runs[counter].path);
 
                 fd = fopen (current_file, "r");
                 if (fd == NULL)
@@ -1014,7 +1018,7 @@ int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Can't open atmosphericParameters.txt file",
                       FUNC_NAME, FAILURE);
     }
-    for (k = 0; k < num_points * NUM_ELEVATIONS; k++)
+    for (k = 0; k < points->num_points * NUM_ELEVATIONS; k++)
     {
         fprintf (fd, "%f,%f,%f,%f,%f,%f\n",
                  results[k][LST_LATITUDE],

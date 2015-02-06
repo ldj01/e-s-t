@@ -9,6 +9,7 @@
 #include "utilities.h"
 #include "input.h"
 #include "lst_types.h"
+#include "build_points.h"
 
 
 int partition
@@ -460,11 +461,9 @@ int calculate_pixel_atmospheric_parameters
     FILE *trans_fptr = NULL;
     FILE *up_fptr = NULL;
     FILE *down_fptr = NULL;
-    FILE *fd = NULL;
     float **landsat_results;
     char errstr[MAX_STR_LEN];
-    char full_path[MAX_STR_LEN];
-    char *last_data_dir = NULL;
+    char *lst_data_dir = NULL;
     int status;
 
     /* Dynamic allocate the 2d memory */
@@ -492,40 +491,19 @@ int calculate_pixel_atmospheric_parameters
         RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
     }
 
-    last_data_dir = getenv ("LST_DATA_DIR");
-    if (last_data_dir == NULL)
+    /* Grab the environment path to the LST_DATA_DIR */
+    lst_data_dir = getenv ("LST_DATA_DIR");
+    if (lst_data_dir == NULL)
     {
         RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
                       FUNC_NAME, FAILURE);
     }
 
-    sprintf (full_path, "%s/%s", last_data_dir, "narr_coordinates.txt");
-    fd = fopen (full_path, "r");
-    if (fd == NULL)
-    {
-        RETURN_ERROR ("Can't open narr_coordinates.txt file", FUNC_NAME,
-                      FAILURE);
-    }
-
-    for (j = 0; j < NARR_COL; j++)
-    {
-        for (i = 0; i < NARR_ROW; i++)
-        {
-            if (fscanf (fd, "%d %d %f %f", &eye[i][j], &jay[i][j], &lat[i][j],
-                        &lon[i][j]) == EOF)
-            {
-                ERROR_MESSAGE ("End of file (EOF) is met before"
-                               " NARR_ROW * NARR_COL lines", FUNC_NAME);
-            }
-
-            /* adjust longitude range to [-180, 180] */
-            if ((lon[i][j] - 180.0) > MINSIGMA)
-                lon[i][j] = 360.0 - lon[i][j];
-            else
-                lon[i][j] = -lon[i][j];
-        }
-    }
-    fclose (fd);
+    /* Read the coordinates into memory */
+//    if (read_narr_coordinates (lst_data_dir, eye, jay, lat, lon) != SUCCESS)
+//    {
+//        RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
+//    }
 
     /* expand range to include NARR points outside image for edge pixels */
     narr_ul_lat = input->meta.ul_geo_corner.lat + 0.5;

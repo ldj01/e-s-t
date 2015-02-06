@@ -10,6 +10,7 @@
 #include "get_args.h"
 #include "input.h"
 #include "output.h"
+#include "build_points.h"
 #include "build_modtran_input.h"
 #include "calculate_point_atmospheric_parameters.h"
 #include "calculate_pixel_atmospheric_parameters.h"
@@ -57,12 +58,11 @@ main (int argc, char *argv[])
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
     int i;
-    int num_points;
-    int num_modtran_runs;
-    POINT_INFO *case_list = NULL;
     char **command_list = NULL;
     float **results = NULL;
     char *tmp_env = NULL;
+
+    REANALYSIS_POINTS points;
 
     time_t now;
     time (&now);
@@ -183,36 +183,42 @@ main (int argc, char *argv[])
 #endif
 
 
+    /* Build the points that will be used */
+    if (build_points (input, &points) != SUCCESS)
+    {
+        RETURN_ERROR ("Building POINTS input\n", FUNC_NAME, EXIT_FAILURE);
+    }
+
+    if (verbose)
+    {
+        printf ("Number of Points: %d\n", points.num_points);
+    }
+
     /* call build_modtran_input to generate tape5 file and commandList */
-    if (build_modtran_input (input, &num_points, &num_modtran_runs,
-                             &case_list, &command_list, verbose, debug)
+    if (build_modtran_input (input, &points, &command_list,
+                             verbose, debug)
         != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    if (verbose)
-    {
-        printf ("Number of Points: %d\n", num_points);
-    }
-
-#if 0
-// TEMP TAKE THIS OUT TO SAVE TIME
     /* perform modtran runs by calling command_list */
-    for (i = 0; i < num_modtran_runs; i++)
+    for (i = 0; i < points.num_modtran_runs; i++)
     {
         snprintf (msg_str, sizeof(msg_str),
                   "Executing MODTRAN [%s]", command_list[i]);
         LOG_MESSAGE (msg_str, FUNC_NAME);
+
+#if 0
+// TEMP TAKE THIS OUT TO SAVE TIME
         if (system (command_list[i]) != SUCCESS)
         {
             RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
                           EXIT_FAILURE);
         }
-    }
 #endif
+    }
 
-    /* Free memory allocation */
     if (free_2d_array ((void **) command_list) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
@@ -222,7 +228,7 @@ main (int argc, char *argv[])
     /* PARSING MODTRAN RESULTS:
        for each case in caseList (for each modtran run),
        parse wavelength and total radiance from tape6 file into parsed */
-    for (i = 0; i < num_modtran_runs; i++)
+    for (i = 0; i < points.num_modtran_runs; i++)
     {
         if (use_tape6)
         {
@@ -232,8 +238,8 @@ main (int argc, char *argv[])
                       " --tape6"
                       " --input-path %s"
                       " --output-path %s",
-                      case_list[i].full_path,
-                      case_list[i].full_path);
+                      points.modtran_runs[i].path,
+                      points.modtran_runs[i].path);
         }
         else
         {
@@ -243,8 +249,8 @@ main (int argc, char *argv[])
                       " --pltout"
                       " --input-path %s"
                       " --output-path %s",
-                      case_list[i].full_path,
-                      case_list[i].full_path);
+                      points.modtran_runs[i].path,
+                      points.modtran_runs[i].path);
         }
 
         snprintf (msg_str, sizeof(msg_str),
@@ -262,7 +268,7 @@ main (int argc, char *argv[])
     }
 
     /* Allocate memory for results */
-    results = (float **) allocate_2d_array (num_points * NUM_ELEVATIONS,
+    results = (float **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
                                             LST_NUM_ELEMENTS, sizeof (float));
     if (results == NULL)
     {
@@ -270,24 +276,27 @@ main (int argc, char *argv[])
     }
 
     /* Generate parameters for each height and NARR point */
-    if (calculate_point_atmospheric_parameters (input, num_points, alb,
-                                                case_list, results, verbose)
+    if (calculate_point_atmospheric_parameters (input, &points, alb,
+                                                results, verbose)
         != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free memory allocation */
-    free (case_list);
+    free_points_memory (&points);
 
+#if 0
+// TEMP BECAUSE OF REMOVING DUPLICATED CODE
     /* call third_pixels_post to generate parameters for each Landsat pixel */
-    if (calculate_pixel_atmospheric_parameters (input, num_points, dem_name,
-                                                emissivity_name, results,
-                                                verbose)
+    if (calculate_pixel_atmospheric_parameters (input, points.num_points,
+                                                dem_name, emissivity_name,
+                                                results, verbose)
         != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
+#endif
 
 
 #if 0
