@@ -425,7 +425,6 @@ int build_modtran_input
 (
     Input_t *input,       /* I: input structure */
     REANALYSIS_POINTS *points, /* I/O: The coordinate points */
-    char ***command_list, /* O: command list information (allocated here) */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 should be printed */
     bool debug            /* I: value to indicate if debug should be
@@ -476,9 +475,8 @@ int build_modtran_input
     float *temp_pressure;
     float *temp_temp;
     float *temp_rh;
-    float gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1, 2.6,
-        3.1, 3.6, 4.05
-    };
+    float gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1,
+                                     2.6, 3.1, 3.6, 4.05 };
     float inv_height_diff;
     int num_modtran_runs;
     char command[PATH_MAX];
@@ -960,17 +958,11 @@ int build_modtran_input
     points->num_modtran_runs = num_modtran_runs;
 
     /* Allocate memory */
-    points->modtran_runs = (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
+    points->modtran_runs =
+        (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
     if (points->modtran_runs == NULL)
     {
         RETURN_ERROR ("Allocating modtran_runs memory", FUNC_NAME, FAILURE);
-    }
-
-    *command_list = (char **) allocate_2d_array (num_modtran_runs, PATH_MAX,
-                                                 sizeof (char));
-    if (*command_list == NULL)
-    {
-        RETURN_ERROR ("Allocating command_list memory", FUNC_NAME, FAILURE);
     }
 
     modtran_path = getenv ("MODTRAN_PATH");
@@ -1362,7 +1354,7 @@ int build_modtran_input
                 case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
                 snprintf (points->modtran_runs[case_counter].path, PATH_MAX,
                           "%s", current_alb);
-                snprintf ((*command_list)[case_counter], PATH_MAX,
+                snprintf (points->modtran_runs[case_counter].command, PATH_MAX,
                           "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
                           points->modtran_runs[case_counter].path,
                           modtran_data_dir, modtran_path);
@@ -1423,9 +1415,9 @@ int build_modtran_input
         }
 
         /* Write out the commandList file */
-        for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
+        for (k = 0; k < num_modtran_runs; k++)
         {
-            fprintf (fd, "%s\n", (*command_list)[k]);
+            fprintf (fd, "%s\n", points->modtran_runs[k].command);
         }
 
         /* Close the commandList file */

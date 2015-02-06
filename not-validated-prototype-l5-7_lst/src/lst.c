@@ -58,7 +58,6 @@ main (int argc, char *argv[])
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
     int i;
-    char **command_list = NULL;
     float **results = NULL;
     char *tmp_env = NULL;
 
@@ -194,35 +193,29 @@ main (int argc, char *argv[])
         printf ("Number of Points: %d\n", points.num_points);
     }
 
-    /* call build_modtran_input to generate tape5 file and commandList */
-    if (build_modtran_input (input, &points, &command_list,
-                             verbose, debug)
+    /* Call build_modtran_input to generate the tape5 file input and
+       the MODTRAN commands for each point and height */
+    if (build_modtran_input (input, &points, verbose, debug)
         != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    /* perform modtran runs by calling command_list */
+    /* Perform MODTRAN runs by calling each command */
     for (i = 0; i < points.num_modtran_runs; i++)
     {
         snprintf (msg_str, sizeof(msg_str),
-                  "Executing MODTRAN [%s]", command_list[i]);
+                  "Executing MODTRAN [%s]", points.modtran_runs[i].command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
 #if 0
 // TEMP TAKE THIS OUT TO SAVE TIME
-        if (system (command_list[i]) != SUCCESS)
+        if (system (points.modtran_runs[i].command) != SUCCESS)
         {
             RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
                           EXIT_FAILURE);
         }
 #endif
-    }
-
-    if (free_2d_array ((void **) command_list) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: command_list\n", FUNC_NAME,
-                      EXIT_FAILURE);
     }
 
     /* PARSING MODTRAN RESULTS:
