@@ -377,20 +377,20 @@ int read_narr_parameter_values
         }
 
         /* Read the number of rows and columns and verify them */
-        fscanf (fd, "%d %d", &file_rows, &file_cols);
-        if (file_rows != NARR_ROW || file_cols != NARR_COL)
+        fscanf (fd, "%d %d", &file_cols, &file_rows);
+        if (file_rows != NARR_ROWS || file_cols != NARR_COLS)
         {
             RETURN_ERROR ("Parameter file contains invalid number of rows and"
                           " columns", FUNC_NAME, FAILURE);
         }
 
         /* Read the values into memory */
-        for (j = 0; j < NARR_ROW * NARR_COL; j++)
+        for (j = 0; j < NARR_ROWS * NARR_COLS; j++)
         {
             if (fscanf (fd, "%f", &output_2d_array[i][j]) == EOF)
             {
                 RETURN_ERROR ("End of file (EOF) is met before "
-                              "NARR_ROW * NARR_COL lines",
+                              "NARR_ROWS * NARR_COLS lines",
                                FUNC_NAME, FAILURE);
             }
         }
@@ -451,7 +451,12 @@ int build_modtran_input
     float **narr_rh1;
     float **narr_rh2;
     float **narr_tmp;
-    int i, j, k;
+    int row;
+    int col;
+    int layer;
+    int point;
+    int elevation;
+    int temperature;
     int layers[P_LAYER] = { 1000, 975, 950, 925, 900,
                             875, 850, 825, 800, 775,
                             750, 725, 700, 650, 600,
@@ -505,11 +510,11 @@ int build_modtran_input
 
 
     /* Use local variables for cleaner code */
-    int min_eye = points->min_eye;
-    int max_eye = points->max_eye;
-    int min_jay = points->min_jay;
-    int max_jay = points->max_jay;
-    int num_eyes = points->num_eyes;
+    int min_row = points->min_row;
+    int max_row = points->max_row;
+    int min_col = points->min_col;
+    int max_col = points->max_col;
+    int num_cols = points->num_cols;
     int num_points = points->num_points;
 
     /* Grab the environment path to the LST_DATA_DIR */
@@ -523,21 +528,21 @@ int build_modtran_input
     /* ==================================================================== */
 
     /* Dynamic allocate the 2d memory for time before Landsat Acq. */
-    hgt1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    hgt1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                          sizeof (float));
     if (hgt1 == NULL)
     {
         RETURN_ERROR ("Allocating HGT_1 memory", FUNC_NAME, FAILURE);
     }
 
-    spfh1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    spfh1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                           sizeof (float));
     if (spfh1 == NULL)
     {
         RETURN_ERROR ("Allocating SPFH_1 memory", FUNC_NAME, FAILURE);
     }
 
-    tmp1 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    tmp1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                          sizeof (float));
     if (tmp1 == NULL)
     {
@@ -545,21 +550,21 @@ int build_modtran_input
     }
 
     /* Dynamic allocate the 2d memory for time after Landsat Acq. */
-    hgt2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    hgt2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                          sizeof (float));
     if (hgt2 == NULL)
     {
         RETURN_ERROR ("Allocating HGT_2 memory", FUNC_NAME, FAILURE);
     }
 
-    spfh2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    spfh2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                           sizeof (float));
     if (spfh2 == NULL)
     {
         RETURN_ERROR ("Allocating SPFH_2 memory", FUNC_NAME, FAILURE);
     }
 
-    tmp2 = (float **) allocate_2d_array (P_LAYER, NARR_ROW * NARR_COL,
+    tmp2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
                                          sizeof (float));
     if (tmp2 == NULL)
     {
@@ -651,20 +656,20 @@ int build_modtran_input
     /* ==================================================================== */
 
     int index;
-    for (k = 0; k < P_LAYER; k++)
+    for (layer = 0; layer < P_LAYER; layer++)
     {
-        for (j = min_jay; j <= max_jay; j++)
+        for (row = min_row; row <= max_row; row++)
         {
-            for (i = min_eye; i <= max_eye; i++)
+            for (col = min_col; col <= max_col; col++)
             {
-                index = (j - min_jay) * num_eyes + (i - min_eye);
+                index = (row - min_row) * num_cols + (col - min_col);
 
-                narr_hgt1[k][index] = hgt1[k][j * NARR_ROW + i];
-                narr_spfh1[k][index] = spfh1[k][j * NARR_ROW + i];
-                narr_tmp1[k][index] = tmp1[k][j * NARR_ROW + i];
-                narr_hgt2[k][index] = hgt2[k][j * NARR_ROW + i];
-                narr_spfh2[k][index] = spfh2[k][j * NARR_ROW + i];
-                narr_tmp2[k][index] = tmp2[k][j * NARR_ROW + i];
+                narr_hgt1[layer][index] = hgt1[layer][row * NARR_COLS + col];
+                narr_spfh1[layer][index] = spfh1[layer][row * NARR_COLS + col];
+                narr_tmp1[layer][index] = tmp1[layer][row * NARR_COLS + col];
+                narr_hgt2[layer][index] = hgt2[layer][row * NARR_COLS + col];
+                narr_spfh2[layer][index] = spfh2[layer][row * NARR_COLS + col];
+                narr_tmp2[layer][index] = tmp2[layer][row * NARR_COLS + col];
             }
         }
     }
@@ -718,11 +723,11 @@ int build_modtran_input
         RETURN_ERROR ("Allocating pressure memory", FUNC_NAME, FAILURE);
     }
 
-    for (i = 0; i < P_LAYER; i++)
+    for (layer = 0; layer < P_LAYER; layer++)
     {
-        for (j = 0; j < num_points; j++)
+        for (point = 0; point < num_points; point++)
         {
-            pressure[i][j] = layers[i];
+            pressure[layer][point] = layers[layer];
         }
     }
 
@@ -865,19 +870,22 @@ int build_modtran_input
        temperature for NARR points within Landsat scene this is the NARR data
        corresponding to the acquisition time of the Landsat image converted to
        appropriated variable for MODTRAN input */
-    for (i = 0; i < P_LAYER; i++)
+    for (layer = 0; layer < P_LAYER; layer++)
     {
-        for (j = 0; j < num_points; j++)
+        for (point = 0; point < num_points; point++)
         {
-            narr_height[i][j] = narr_height1[i][j] + time_diff
-                                * ((narr_height2[i][j] - narr_height1[i][j])
-                                   * inv_hour_diff);
-            narr_rh[i][j] = narr_rh1[i][j] + time_diff
-                            * ((narr_rh2[i][j] - narr_rh1[i][j])
-                               * inv_hour_diff);
-            narr_tmp[i][j] = narr_tmp1[i][j] + time_diff
-                             * ((narr_tmp2[i][j] - narr_tmp1[i][j])
-                                * inv_hour_diff);
+            narr_height[layer][point] =
+                narr_height1[layer][point] + time_diff
+                * ((narr_height2[layer][point] - narr_height1[layer][point])
+                   * inv_hour_diff);
+            narr_rh[layer][point] =
+                narr_rh1[layer][point] + time_diff
+                * ((narr_rh2[layer][point] - narr_rh1[layer][point])
+                   * inv_hour_diff);
+            narr_tmp[layer][point] =
+                narr_tmp1[layer][point] + time_diff
+                * ((narr_tmp2[layer][point] - narr_tmp1[layer][point])
+                   * inv_hour_diff);
         }
     }
 
@@ -1006,7 +1014,7 @@ int build_modtran_input
         RETURN_ERROR ("Allocating temp_rh memory", FUNC_NAME, FAILURE);
     }
 
-    for (i = 0; i < num_points; i++)
+    for (point = 0; point < num_points; point++)
     {
         /* ****************************************************************
            MODTRAN uses longitudinal degree values from 0 to 360 starting at
@@ -1015,13 +1023,13 @@ int build_modtran_input
            The following logic fixes the longitude to be for MODTRAN and we
            also use those values for generating the output directory names.
            **************************************************************** */
-        if (points->lon[i] < 0)
+        if (points->lon[point] < 0)
         {
             /* We are a west longitude value so negate it to the positive
                equivalent value.
                i.e.   W40 normally represented as -40 would be changed to a
                       positive 40 value. */
-            points->lon[i] = -points->lon[i];
+            points->lon[point] = -points->lon[point];
         }
         else
         {
@@ -1029,19 +1037,19 @@ int build_modtran_input
                180 west.
                i.e.   E10 would be turned into W350, and be positive 350 not
                       negative.  */
-            points->lon[i] = 360.0 - points->lon[i];
+            points->lon[point] = 360.0 - points->lon[point];
         }
 
         /* Figure out the lat and lon strings to use */
-        if (points->lat[i] < 100.0)
-            snprintf (lat_str, sizeof (lat_str), "%6.3f", points->lat[i]);
+        if (points->lat[point] < 100.0)
+            snprintf (lat_str, sizeof (lat_str), "%6.3f", points->lat[point]);
         else
-            snprintf (lat_str, sizeof (lat_str), "%6.2f", points->lat[i]);
+            snprintf (lat_str, sizeof (lat_str), "%6.2f", points->lat[point]);
 
-        if (points->lon[i] < 100.0)
-            snprintf (lon_str, sizeof (lon_str), "%6.3f", points->lon[i]);
+        if (points->lon[point] < 100.0)
+            snprintf (lon_str, sizeof (lon_str), "%6.3f", points->lon[point]);
         else
-            snprintf (lon_str, sizeof (lon_str), "%6.2f", points->lon[i]);
+            snprintf (lon_str, sizeof (lon_str), "%6.2f", points->lon[point]);
 
         /* Create the name of the directory for the current NARR point */
         snprintf (current_point, sizeof (current_point),
@@ -1077,27 +1085,27 @@ int build_modtran_input
         }
 
         /* Clear the temp memory */
-        for (j = 0; j < MAX_MODTRAN_LAYER; j++)
+        for (layer = 0; layer < MAX_MODTRAN_LAYER; layer++)
         {
-            temp_height[j] = 0.0;
-            temp_pressure[j] = 0.0;
-            temp_temp[j] = 0.0;
-            temp_rh[j] = 0.0;
+            temp_height[layer] = 0.0;
+            temp_pressure[layer] = 0.0;
+            temp_temp[layer] = 0.0;
+            temp_rh[layer] = 0.0;
         }
 
         /* set lowest altitude is the first geometric height at that NARR
            point (if positive) and (if negative set to zero) */
-        if (narr_height[0][i] < 0)
+        if (narr_height[0][point] < 0)
             gndalt[0] = 0.0;
         else
-            gndalt[0] = narr_height[0][i];
+            gndalt[0] = narr_height[0][point];
 
         /* iterate through all ground altitudes at which MODTRAN is run */
-        for (j = 0; j < NUM_ELEVATIONS; j++)
+        for (elevation = 0; elevation < NUM_ELEVATIONS; elevation++)
         {
             /* create a directory for the current height */
             snprintf (current_gdalt, sizeof (current_gdalt),
-                      "%s/%5.3f", current_point, gndalt[j]);
+                      "%s/%5.3f", current_point, gndalt[elevation]);
 
             /* Create the directory */
             snprintf (msg_str, sizeof (msg_str),
@@ -1115,12 +1123,12 @@ int build_modtran_input
 
             /* determine layers below current gndalt and closest layer
                above and below */
-            for (k = 0; k < P_LAYER; k++)
+            for (layer = 0; layer < P_LAYER; layer++)
             {
-                if ((narr_height[k][i] - gndalt[j]) >= MINSIGMA)
+                if ((narr_height[layer][point] - gndalt[elevation]) >= MINSIGMA)
                 {
-                    layer_below = k - 1;
-                    layer_above = k;
+                    layer_below = layer - 1;
+                    layer_above = layer;
                     break;
                 }
             }
@@ -1132,40 +1140,40 @@ int build_modtran_input
             }
 
             /* To save divisions */
-            inv_height_diff = 1.0 / (narr_height[layer_above][i]
-                                     - narr_height[layer_below][i]);
+            inv_height_diff = 1.0 / (narr_height[layer_above][point]
+                                     - narr_height[layer_below][point]);
 
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
-            new_pressure = pressure[layer_below][i]
-                           + (gndalt[j] - narr_height[layer_below][i])
-                           * ((pressure[layer_above][i]
-                               - pressure[layer_below][i])
+            new_pressure = pressure[layer_below][point]
+                           + (gndalt[elevation] - narr_height[layer_below][point])
+                           * ((pressure[layer_above][point]
+                               - pressure[layer_below][point])
                               * inv_height_diff);
-            new_temp = narr_tmp[layer_below][i]
-                       + (gndalt[j] - narr_height[layer_below][i])
-                       * ((narr_tmp[layer_above][i] - narr_tmp[layer_below][i])
+            new_temp = narr_tmp[layer_below][point]
+                       + (gndalt[elevation] - narr_height[layer_below][point])
+                       * ((narr_tmp[layer_above][point] - narr_tmp[layer_below][point])
                           * inv_height_diff);
-            new_rh = narr_rh[layer_below][i]
-                     + (gndalt[j] - narr_height[layer_below][i])
-                     * ((narr_rh[layer_above][i] - narr_rh[layer_below][i])
+            new_rh = narr_rh[layer_below][point]
+                     + (gndalt[elevation] - narr_height[layer_below][point])
+                     * ((narr_rh[layer_above][point] - narr_rh[layer_below][point])
                         * inv_height_diff);
 
             /* create arrays containing only layers to be included in current
                tape5 file */
             curr_layer = 0;
-            temp_height[curr_layer] = gndalt[j];
+            temp_height[curr_layer] = gndalt[elevation];
             temp_pressure[curr_layer] = new_pressure;
             temp_temp[curr_layer] = new_temp;
             temp_rh[curr_layer] = new_rh;
             curr_layer++;
 
-            for (k = layer_above; k < P_LAYER; k++)
+            for (layer = layer_above; layer < P_LAYER; layer++)
             {
-                temp_height[curr_layer] = narr_height[k][i];
-                temp_pressure[curr_layer] = pressure[k][i];
-                temp_temp[curr_layer] = narr_tmp[k][i];
-                temp_rh[curr_layer] = narr_rh[k][i];
+                temp_height[curr_layer] = narr_height[layer][point];
+                temp_pressure[curr_layer] = pressure[layer][point];
+                temp_temp[curr_layer] = narr_tmp[layer][point];
+                temp_rh[curr_layer] = narr_rh[layer][point];
                 curr_layer++;
             }
 
@@ -1173,15 +1181,15 @@ int build_modtran_input
             /* MODTRAN throws an error when there are two identical layers in
                the tape5 file, if the current ground altitude and the next
                highest layer are close enough, eliminate interpolated layer */
-            if (fabs (gndalt[j] - narr_height[layer_above][i]) < 0.001)
+            if (fabs (gndalt[elevation] - narr_height[layer_above][point]) < 0.001)
             {
                 curr_layer = 0;
-                for (k = layer_above; k < P_LAYER; k++)
+                for (layer = layer_above; layer < P_LAYER; layer++)
                 {
-                    temp_height[curr_layer] = narr_height[k][i];
-                    temp_pressure[curr_layer] = pressure[k][i];
-                    temp_temp[curr_layer] = narr_tmp[k][i];
-                    temp_rh[curr_layer] = narr_rh[k][i];
+                    temp_height[curr_layer] = narr_height[layer][point];
+                    temp_pressure[curr_layer] = pressure[layer][point];
+                    temp_temp[curr_layer] = narr_tmp[layer][point];
+                    temp_rh[curr_layer] = narr_rh[layer][point];
                     curr_layer++;
                 }
             }
@@ -1189,11 +1197,11 @@ int build_modtran_input
             /* determine maximum height of NARR layers and where the standard 
                atmosphere is greater than this */
             std_layer = 0;
-            for (k = 0; k < STANDARD_LAYERS; k++)
+            for (layer = 0; layer < STANDARD_LAYERS; layer++)
             {
-                if (stan_height[k] > narr_height[P_LAYER - 1][i])
+                if (stan_height[layer] > narr_height[P_LAYER - 1][point])
                 {
-                    counter[std_layer] = k;
+                    counter[std_layer] = layer;
                     std_layer++;
                 }
             }
@@ -1241,12 +1249,12 @@ int build_modtran_input
             }
 
             /* Add the remaining standard atmosphere layers */
-            for (k = 2; k < std_layer; k++)
+            for (layer = 2; layer < std_layer; layer++)
             {
-                temp_height[curr_layer] = stan_height[counter[k]];
-                temp_pressure[curr_layer] = stan_pre[counter[k]];
-                temp_temp[curr_layer] = stan_temp[counter[k]];
-                temp_rh[curr_layer] = stan_rh[counter[k]];
+                temp_height[curr_layer] = stan_height[counter[layer]];
+                temp_pressure[curr_layer] = stan_pre[counter[layer]];
+                temp_temp[curr_layer] = stan_temp[counter[layer]];
+                temp_rh[curr_layer] = stan_rh[counter[layer]];
                 curr_layer++;
             }
 
@@ -1260,11 +1268,11 @@ int build_modtran_input
             }
 
             /* Write out the intermediate file */
-            for (k = 0; k < curr_layer; k++)
+            for (layer = 0; layer < curr_layer; layer++)
             {
                 fprintf (fd, "%10.3f%10.3e%10.3e%10.3e%10.3e%10.3e%16s\n",
-                         temp_height[k], temp_pressure[k], temp_temp[k],
-                         temp_rh[k], 0.0, 0.0, "AAH             ");
+                         temp_height[layer], temp_pressure[layer], temp_temp[layer],
+                         temp_rh[layer], 0.0, 0.0, "AAH             ");
             }
 
             /* Close the intermediate file */
@@ -1282,7 +1290,7 @@ int build_modtran_input
                       " | sed 's/nml/%d/'"
                       " | sed 's/gdalt/%5.3f/'"
                       " > baseHead.txt",
-                      lst_data_dir, curr_layer, gndalt[j]);
+                      lst_data_dir, curr_layer, gndalt[elevation]);
             if (system (command) != SUCCESS)
             {
                 RETURN_ERROR ("Failed creating tempHead.txt", FUNC_NAME,
@@ -1291,11 +1299,11 @@ int build_modtran_input
 
             /* iterate through [temperature,albedo] pairs at which to run
                MODTRAN */
-            for (k = 0; k <= 2; k++)
+            for (temperature = 0; temperature <= 2; temperature++)
             {
                 /* create directory for the current temperature */
                 snprintf (current_temp, sizeof (current_temp),
-                          "%s/%s", current_gdalt, temp_strs[k]);
+                          "%s/%s", current_gdalt, temp_strs[temperature]);
                 snprintf (msg_str, sizeof (msg_str),
                           "Creating directory [%s]", current_temp);
                 LOG_MESSAGE (msg_str, FUNC_NAME);
@@ -1312,7 +1320,7 @@ int build_modtran_input
 
                 /* create directory for the current albedo */
                 snprintf (current_alb, sizeof (current_alb),
-                          "%s/%3.1f", current_temp, alb[k]);
+                          "%s/%3.1f", current_temp, alb[temperature]);
                 snprintf (msg_str, sizeof (msg_str),
                           "Creating directory [%s]", current_alb);
                 LOG_MESSAGE (msg_str, FUNC_NAME);
@@ -1338,7 +1346,7 @@ int build_modtran_input
                           " | sed 's/tmp/%s/'"
                           " | sed 's/alb/%4.2f/'"
                           " > %s/tape5",
-                          temp_strs[k], alb[k], current_alb);
+                          temp_strs[temperature], alb[temperature], current_alb);
                 if (system (command) != SUCCESS)
                 {
                     RETURN_ERROR ("Failed creating tape5", FUNC_NAME, FAILURE);
@@ -1351,7 +1359,7 @@ int build_modtran_input
                    the MODTRAN run
 
                    iterate entry count */
-                case_counter = i * NUM_ELEVATIONS * 3 + j * 3 + k;
+                case_counter = point * NUM_ELEVATIONS * 3 + elevation * 3 + temperature;
                 snprintf (points->modtran_runs[case_counter].path, PATH_MAX,
                           "%s", current_alb);
                 snprintf (points->modtran_runs[case_counter].command, PATH_MAX,
@@ -1359,9 +1367,9 @@ int build_modtran_input
                           points->modtran_runs[case_counter].path,
                           modtran_data_dir, modtran_path);
 
-                points->modtran_runs[case_counter].latitude = points->lat[i];
-                points->modtran_runs[case_counter].longitude = points->lon[i];
-                points->modtran_runs[case_counter].height = gndalt[j];
+                points->modtran_runs[case_counter].latitude = points->lat[point];
+                points->modtran_runs[case_counter].longitude = points->lon[point];
+                points->modtran_runs[case_counter].height = gndalt[elevation];
             } /* END - Tempurature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
@@ -1396,9 +1404,9 @@ int build_modtran_input
         }
 
         /* Write out the caseList file */
-        for (k = 0; k < num_points * NUM_ELEVATIONS * 3; k++)
+        for (index = 0; index < num_points * NUM_ELEVATIONS * 3; index++)
         {
-            fprintf (fd, "%s\n", points->modtran_runs[k].path);
+            fprintf (fd, "%s\n", points->modtran_runs[index].path);
         }
 
         /* Close the caseList file */
@@ -1415,9 +1423,9 @@ int build_modtran_input
         }
 
         /* Write out the commandList file */
-        for (k = 0; k < num_modtran_runs; k++)
+        for (index = 0; index < num_modtran_runs; index++)
         {
-            fprintf (fd, "%s\n", points->modtran_runs[k].command);
+            fprintf (fd, "%s\n", points->modtran_runs[index].command);
         }
 
         /* Close the commandList file */

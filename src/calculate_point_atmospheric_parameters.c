@@ -844,11 +844,19 @@ int calculate_point_atmospheric_parameters
             }
 
 #if 0
-            printf ("num_srs = %d\n", num_srs);
-            printf ("num_entries = %d\n", num_entries);
-            printf ("temp_radiance_273 = %f\n", temp_radiance_273);
-            printf ("temp_radiance_300 = %f\n", temp_radiance_300);
-            fflush(stdout);
+            snprintf (msg, sizeof (msg), "num_srs = %d\n", num_srs);
+            LOG_MESSAGE (msg, FUNC_NAME);
+
+            snprintf (msg, sizeof (msg), "num_entries = %d\n", num_entries);
+            LOG_MESSAGE (msg, FUNC_NAME);
+
+            snprintf (msg, sizeof (msg),
+                      "temp_radiance_273 = %f\n", temp_radiance_273);
+            LOG_MESSAGE (msg, FUNC_NAME);
+
+            snprintf (msg, sizeof (msg),
+                      "temp_radiance_300 = %f\n", temp_radiance_300);
+            LOG_MESSAGE (msg, FUNC_NAME);
 #endif
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
@@ -922,7 +930,9 @@ int calculate_point_atmospheric_parameters
     /* Output the results to a file */
     snprintf (current_file, sizeof (current_file),
               "atmosphericParameters.txt");
-    printf ("Creating Atmospheric Parameters File = [%s]\n", current_file);
+    snprintf (msg, sizeof (msg),
+              "Creating Atmospheric Parameters File = [%s]\n", current_file);
+    LOG_MESSAGE (msg, FUNC_NAME);
     fd = fopen (current_file, "w");
     if (fd == NULL)
     {

@@ -27,8 +27,8 @@
 
 
 #define NUM_ELEVATIONS 9
-#define NARR_ROW 349
-#define NARR_COL 277
+#define NARR_ROWS 277
+#define NARR_COLS 349
 
 
 #define MINSIGMA 1e-5

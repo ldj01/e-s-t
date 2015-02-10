@@ -22,20 +22,20 @@ typedef struct
     float lr_lat;
     float lr_lon;
 
-    int min_eye;
-    int max_eye;
-    int min_jay;
-    int max_jay;
+    int min_row;
+    int max_row;
+    int min_col;
+    int max_col;
 
-    int num_eyes;
-    int num_jays;
+    int num_rows;
+    int num_cols;
     int num_points;
     int num_modtran_runs;
 
     POINT_INFO *modtran_runs;
 
-    float *eye;
-    float *jay;
+    float *row;
+    float *col;
     float *lat;
     float *lon;
     float *utm_easting;

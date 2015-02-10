@@ -22,15 +22,18 @@ RETURN: SUCCESS
 int read_narr_coordinates
 (
     char *lst_data_dir,
-    int **grid_i,
-    int **grid_j,
     float **lat,
     float **lon
 )
 {
     char FUNC_NAME[] = "read_narr_coordinates";
-    int i, j;
+    int row;
+    int col;
     int count;
+    int grid_row;
+    int grid_col;
+    float grid_lat;
+    float grid_lon;
     char coord_file[PATH_MAX];
     FILE *fd = NULL;
 
@@ -52,21 +55,23 @@ int read_narr_coordinates
     }
 
     /* Read each value from the file */
-    for (j = 0; j < NARR_COL; j++)
+    for (row = 0; row < NARR_ROWS; row++)
     {
-        for (i = 0; i < NARR_ROW; i++)
+        for (col = 0; col < NARR_COLS; col++)
         {
             /* File Format:
                Grid_I Grid_J Latitude Longitude
              */
             if (fscanf (fd, "%d %d %f %f",
-                        &grid_i[i][j], &grid_j[i][j],
-                        &lat[i][j], &lon[i][j]) == EOF)
+                        &grid_col, &grid_row, &grid_lat, &grid_lon)
+                == EOF)
             {
                 RETURN_ERROR ("End of file (EOF) is met before"
-                              " NARR_ROW * NARR_COL lines",
+                              " NARR_ROWS * NARR_COLS lines",
                               FUNC_NAME, FAILURE);
             }
+
+            lat[row][col] = grid_lat;
 
             /* TODO - Should think about fixing the input file, so that this
                       confusing conversion is not needed.
@@ -77,10 +82,10 @@ int read_narr_coordinates
                       left, hence the need for the following conversion.
                NOTE - If this is changed here, the else-where in the code will
                       break. */
-            if ((lon[i][j] - 180.0) > MINSIGMA)
-                lon[i][j] = 360.0 - lon[i][j];
+            if (grid_lon > 180.0)
+                lon[row][col] = 360.0 - grid_lon;
             else
-                lon[i][j] = -lon[i][j];
+                lon[row][col] = -grid_lon;
         }
     }
 
@@ -114,12 +119,12 @@ void convert_ll_to_utm
     REANALYSIS_POINTS *points /* I/O: The coordinate points to be used */
 )
 {
-    int i;
+    int point;
     float a = 6378137.0;        /* equatorial radius */
-    float b = 6356752.3;        /* polar radius */
+    float b = 6356752.3142;     /* polar radius */
     float k0 = 0.9996;          /* scale factor */
     float ecc;                  /* eccentricity */
-    float eprimesqrd;
+    float ecc_prime_sqrd;
     float n;
 //    float rho;
     float nu;
@@ -135,50 +140,50 @@ void convert_ll_to_utm
     float kv;
     float zone_cm;
 //    float zone_cm_rad;
-    float delta_lon;
     float p;
     float lat_rad;
 //    float lon_rad;
     float s;
 
     /* calculate zone central meridian in degrees and radians */
-    zone_cm = (float) (6 * input->meta.zone - 183);
+    zone_cm = (6.0 * input->meta.zone) - 183.0;
 //    zone_cm_rad =  zone_cm * PI / 180.0;
 
-    ecc = sqrt (1.0 - pow (b / a, 2));
-    eprimesqrd = ecc * ecc / (1.0 - ecc * ecc);
+    ecc = sqrt (1.0 - ((b / a) * (b / a)));
+    ecc_prime_sqrd = (ecc * ecc) / (1.0 - ecc * ecc);
     n = (a - b) / (a + b);
 
     /* calculate meridional arc length */
     a0 = a * (1.0 - n
               + (5.0 * n * n / 4.0) * (1.0 - n)
-              + (81.0 * (float) pow (n, 4) / 64.0) * (1.0 - n));
+              + (81.0 * pow (n, 4) / 64.0) * (1.0 - n));
 
     b0 = (3.0 * a * n / 2.0) * (1.0 - n
                                 - (7.0 * n * n / 8.0) * (1.0 - n)
-                                + 55.0 * (float) pow (n, 4) / 64.0);
+                                + 55.0 * pow (n, 4) / 64.0);
 
     c0 = (15.0 * a * n * n / 16.0) * (1.0 - n
                                       + (3.0 * n * n / 4.0) * (1.0 - n));
 
-    d0 = (35 * a * (float) pow (n, 3) / 48.0) * (1.0 - n
-                                                 + 11.0 * n * n / 16.0);
+    d0 = (35 * a * pow (n, 3) / 48.0) * (1.0 - n
+                                         + 11.0 * n * n / 16.0);
 
-    e0 = (315.0 * a * (float) pow (n, 4) / 51.0) * (1.0 - n);
+    e0 = (315.0 * a * pow (n, 4) / 51.0) * (1.0 - n);
 
-    for (i = 0; i < points->num_points; i++)
+    for (point = 0; point < points->num_points; point++)
     {
-        delta_lon = points->lon[i] - zone_cm;
-        p = delta_lon * PI / 180.0;
+        p = (points->lon[point] - zone_cm) * PI / 180.0;
 
         /* convert lat and lon points from decimal degrees to radians */
-        lat_rad = points->lat[i] * PI / 180.0;
+        lat_rad = points->lat[point] * PI / 180.0;
 //        lon_rad = lon[i]*PI/180.0;
 
 //        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
 //              (3.0/2.0)));
-        nu = a / pow ((1.0 - (ecc * sin (lat_rad)) * (ecc * sin (lat_rad))),
-                      (1.0 / 2.0));
+//        nu = a / pow ((1.0 - (ecc * sin (lat_rad)) * (ecc * sin (lat_rad))),
+//                      (1.0 / 2.0));
+        nu = a / sqrt (1.0 - (ecc * sin (lat_rad))
+                             * (ecc * sin (lat_rad)));
 
 
         s = a0 * lat_rad
@@ -192,22 +197,24 @@ void convert_ll_to_utm
 
         kii = nu * sin (lat_rad) * cos (lat_rad) * k0 / 2.0;
 
-        kiii = (pow (nu * sin (lat_rad) * cos (lat_rad), 3) / 24.0)
-               * pow ((5 - tan (lat_rad)), 2)
-               + 9.0 * eprimesqrd * pow (cos (lat_rad), 2)
-               + 4.0 * eprimesqrd * eprimesqrd * pow (cos (lat_rad), 4) * k0;
+        kiii = (nu * sin (lat_rad) * pow (cos (lat_rad), 3) / 24.0)
+               * (5.0 - tan (lat_rad) * tan (lat_rad)
+                  + 9.0 * ecc_prime_sqrd * pow (cos (lat_rad), 2)
+                  + 4.0 * ecc_prime_sqrd * ecc_prime_sqrd
+                    * pow (cos (lat_rad), 4))
+               * k0;
 
         kiv = nu * cos (lat_rad) * k0;
 
         kv = pow (cos (lat_rad), 3)
              * (nu / 6.0)
-             * (1 - tan (lat_rad) * tan (lat_rad)
-                + eprimesqrd * cos (lat_rad) * cos (lat_rad))
+             * (1.0 - tan (lat_rad) * tan (lat_rad)
+                + ecc_prime_sqrd * cos (lat_rad) * cos (lat_rad))
              * k0;
 
         /* calculate UTM coordinates */
-        points->utm_easting[i] = 500000.0 + (kiv * p + kv * pow (p, 3));
-        points->utm_northing[i] = (ki + kii * p * p + kiii * pow (p, 4));
+        points->utm_easting[point] = 500000.0 + (kiv * p + kv * pow (p, 3));
+        points->utm_northing[point] = (ki + kii * p * p + kiii * pow (p, 4));
     }
 }
 
@@ -220,18 +227,17 @@ int build_points
 {
     char FUNC_NAME[] = "build_points";
     char *lst_data_dir = NULL;
+    char msg[PATH_MAX];
 
-    int **eye;
-    int **jay;
     float **lat;
     float **lon;
 
-    int i;
-    int j;
-    int min_eye;
-    int max_eye;
-    int min_jay;
-    int max_jay;
+    int row;
+    int col;
+    int min_row;
+    int max_row;
+    int min_col;
+    int max_col;
 
     int num_bytes;
     int index;
@@ -250,32 +256,20 @@ int build_points
     }
 
     /* Dynamic allocate the 2d memory for the coordinates */
-    eye = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
-    if (eye == NULL)
-    {
-        RETURN_ERROR ("Allocating eye memory", FUNC_NAME, FAILURE);
-    }
-
-    jay = (int **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (int));
-    if (jay == NULL)
-    {
-        RETURN_ERROR ("Allocating jay memory", FUNC_NAME, FAILURE);
-    }
-
-    lat = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
+    lat = (float **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (float));
     if (lat == NULL)
     {
         RETURN_ERROR ("Allocating lat memory", FUNC_NAME, FAILURE);
     }
 
-    lon = (float **) allocate_2d_array (NARR_ROW, NARR_COL, sizeof (float));
+    lon = (float **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (float));
     if (lon == NULL)
     {
         RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
     }
 
     /* Read the coordinates into memory */
-    if (read_narr_coordinates (lst_data_dir, eye, jay, lat, lon) != SUCCESS)
+    if (read_narr_coordinates (lst_data_dir, lat, lon) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
     }
@@ -299,54 +293,79 @@ int build_points
        edges of the Landsat corners values respectively pixels that are true
        in both fall within the Landsat scene the same thing is done with
        longitude values */
-    max_eye = 0;
-    min_eye = 1000;
-    max_jay = 0;
-    min_jay = 1000;
-    for (i = 0; i < NARR_ROW - 1; i++)
+    min_row = 1000;
+    max_row = 0;
+    min_col = 1000;
+    max_col = 0;
+    for (row = 0; row < NARR_ROWS; row++)
     {
-        for (j = 0; j < NARR_COL - 1; j++)
+        for (col = 0; col < NARR_COLS; col++)
         {
-            if ((buffered_ul_lat > lat[i][j])
-                && (buffered_lr_lat < lat[i][j])
-                && (buffered_ul_lon < lon[i][j])
-                && (buffered_lr_lon > lon[i][j]))
+            if ((buffered_ul_lat > lat[row][col])
+                && (buffered_lr_lat < lat[row][col])
+                && (buffered_ul_lon < lon[row][col])
+                && (buffered_lr_lon > lon[row][col]))
             {
-                max_eye = max (max_eye, eye[i][j]);
-                min_eye = min (min_eye, eye[i][j]);
-                max_jay = max (max_jay, jay[i][j]);
-                min_jay = min (min_jay, jay[i][j]);
+                min_row = min (min_row, row);
+                max_row = max (max_row, row);
+                min_col = min (min_col, col);
+                max_col = max (max_col, col);
             }
         }
     }
-    max_eye--;
-    min_eye--;
-    max_jay--;
-    min_jay--;
+//    min_row--;
+//    max_row--;
+//    min_col--;
+//    max_col--;
 
     /* Save these in the points structure */
-    points->min_eye = min_eye;
-    points->max_eye = max_eye;
-    points->min_jay = min_jay;
-    points->max_jay = max_jay;
-    points->num_eyes = max_eye - min_eye + 1;
-    points->num_jays = max_jay - min_jay + 1;
-    points->num_points = points->num_eyes * points->num_jays;
+    points->ul_lat = buffered_ul_lat;
+    points->ul_lon = buffered_ul_lon;
+    points->lr_lat = buffered_lr_lat;
+    points->lr_lon = buffered_lr_lon;
+    points->min_row = min_row;
+    points->max_row = max_row;
+    points->min_col = min_col;
+    points->max_col = max_col;
+    points->num_rows = max_row - min_row + 1;
+    points->num_cols = max_col - min_col + 1;
+    points->num_points = points->num_rows * points->num_cols;
+
+    snprintf (msg, sizeof (msg), "min_row = %d\n", points->min_row);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "max_row = %d\n", points->max_row);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "min_col = %d\n", points->min_col);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "max_col = %d\n", points->max_col);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "num_rows = %d\n", points->num_rows);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "num_cols = %d\n", points->num_cols);
+    LOG_MESSAGE (msg, FUNC_NAME);
+
+    snprintf (msg, sizeof (msg), "num_points = %d\n", points->num_points);
+    LOG_MESSAGE (msg, FUNC_NAME);
 
     /* Determine the number of byte for the memory allocations */
     num_bytes = points->num_points * sizeof (float);
 
     /* Allocate memory for points within the rectangle */
-    points->eye = (float *) malloc (num_bytes);
-    if (points->eye == NULL)
+    points->row = (float *) malloc (num_bytes);
+    if (points->row == NULL)
     {
-        RETURN_ERROR ("Allocating points eye memory", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Allocating points row memory", FUNC_NAME, FAILURE);
     }
 
-    points->jay = (float *) malloc (num_bytes);
-    if (points->jay == NULL)
+    points->col = (float *) malloc (num_bytes);
+    if (points->col == NULL)
     {
-        RETURN_ERROR ("Allocating points jay memory", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Allocating points col memory", FUNC_NAME, FAILURE);
     }
 
     points->lat = (float *) malloc (num_bytes);
@@ -376,16 +395,16 @@ int build_points
     }
 
     /* Retain only the points within the rectangle */
-    for (j = min_jay; j <= max_jay; j++)
+    for (row = min_row; row <= max_row; row++)
     {
-        for (i = min_eye; i <= max_eye; i++)
+        for (col = min_col; col <= max_col; col++)
         {
-            index = (j - min_jay) * points->num_eyes + (i - min_eye);
+            index = (row - min_row) * points->num_cols + (col - min_col);
 
-            points->eye[index] = eye[i][j];
-            points->jay[index] = jay[i][j];
-            points->lat[index] = lat[i][j];
-            points->lon[index] = lon[i][j];
+            points->row[index] = row;
+            points->col[index] = col;
+            points->lat[index] = lat[row][col];
+            points->lon[index] = lon[row][col];
 
             points->utm_easting[index] = 0.0;
             points->utm_northing[index] = 0.0;
@@ -395,19 +414,15 @@ int build_points
     /* Convert lat/lon to UTM northing/easting*/
     convert_ll_to_utm (input, points);
 
+    for (row = min_row; row <= max_row; row++)
+    {
+        for (col = min_col; col <= max_col; col++)
+        {
+            index = (row - min_row) * points->num_cols + (col - min_col);
+        }
+    }
+
     /* Free memory only used locally */
-    if (free_2d_array ((void **) eye) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: eye\n", FUNC_NAME, FAILURE);
-    }
-    eye = NULL;
-
-    if (free_2d_array ((void **) jay) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: jay\n", FUNC_NAME, FAILURE);
-    }
-    jay = NULL;
-
     if (free_2d_array ((void **) lat) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: lat\n", FUNC_NAME, FAILURE);
@@ -430,16 +445,16 @@ void free_points_memory
 )
 {
     free(points->modtran_runs);
-    free(points->eye);
-    free(points->jay);
+    free(points->row);
+    free(points->col);
     free(points->lat);
     free(points->lon);
     free(points->utm_easting);
     free(points->utm_northing);
 
     points->modtran_runs = NULL;
-    points->eye = NULL;
-    points->jay = NULL;
+    points->row = NULL;
+    points->col = NULL;
     points->lat = NULL;
     points->lon = NULL;
     points->utm_easting = NULL;

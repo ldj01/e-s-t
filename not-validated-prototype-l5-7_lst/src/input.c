@@ -90,6 +90,7 @@ GetInputThermLine
     char FUNC_NAME[] = "GetInputThermLine";
     void *buf = NULL;
     long loc;         /* pointer location in the raw binary file */
+    int sample;
 
     /* Check the parameters */
     if (this == (Input_t *) NULL)
@@ -151,7 +152,13 @@ GetInputThermLine
                           FUNC_NAME, false);
         }
 
-        memcpy (this->therm_buf, line, sizeof (int16_t));
+        /* Copy the line to the buffer manually,
+           since we are going from uint8 to int16 */
+        for (sample = 0; sample < this->size_th.s; sample++)
+        {
+            this->therm_buf[sample] = line[sample];
+        }
+
         free (line);
     }
 
@@ -323,6 +330,8 @@ Design Notes:
        characters long.  If the time is longer than that, just chop it off. */
     if (strlen (acq_time) > 16)
         sprintf (&acq_time[15], "Z");
+
+    this->meta.zone = gmeta->proj_info.utm_zone;
 
     this->meta.sun_zen = gmeta->solar_zenith;
     if (this->meta.sun_zen < -90.0 || this->meta.sun_zen > 90.0)

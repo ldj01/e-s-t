@@ -276,21 +276,17 @@ main (int argc, char *argv[])
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    /* Free memory allocation */
-    free_points_memory (&points);
-
-#if 0
-// TEMP BECAUSE OF REMOVING DUPLICATED CODE
     /* call third_pixels_post to generate parameters for each Landsat pixel */
-    if (calculate_pixel_atmospheric_parameters (input, points.num_points,
+    if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 dem_name, emissivity_name,
                                                 results, verbose)
         != SUCCESS)
     {
         RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
     }
-#endif
 
+    /* Free memory allocation */
+    free_points_memory (&points);
 
 #if 0
     /* Reassign solar azimuth angle for output purpose if south up north 
