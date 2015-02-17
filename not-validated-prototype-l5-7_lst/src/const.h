@@ -6,6 +6,7 @@
 
 
 #define LST_VERSION "1.0.0"
+#define LST_FILL_VALUE (-9999.0)
 
 
 #define TWO_PI (2.0 * PI)
@@ -35,6 +36,12 @@
 
 
 #define MAX_STR_LEN 512
+
+
+#define UTM_SCALE_FACTOR 0.9996
+#define UTM_EQUATORIAL_RADIUS 6378137.0
+#define UTM_POLAR_RADIUS 6356752.3142
+#define UTM_FALSE_EASTING 500000.0
 
 
 /* Provides for the element size of the LST point result records, along with
