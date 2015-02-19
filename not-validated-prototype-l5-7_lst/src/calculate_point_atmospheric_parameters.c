@@ -23,6 +23,13 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
+/* Planck Const hecht pg, 585 ## units: Js */
+#define PLANCK_CONST (6.6260755 * 10e-34)
+/* Boltzmann Gas Const halliday et 2001 ## units: J/K */
+#define BOLTZMANN_GAS_CONST (1.3806503 * 10e-23)
+/* Speed of Light ## units: m/s */
+#define SPEED_OF_LIGHT (299792458.0)
+#define SPEED_OF_LIGHT_SQRD (SPEED_OF_LIGHT * SPEED_OF_LIGHT)
 int planck_eq
 (
     float *wavelength,
@@ -33,42 +40,32 @@ int planck_eq
 {
     char FUNC_NAME[] = "planck_eq";
     int i;
-    float *lambda;
-    float h;
-    float k;
-    float c;
+    double *lambda;
 
     /* Allocate memory */
-    lambda = (float *) malloc (num_srs * sizeof (float));
+    lambda = malloc (num_srs * sizeof (double));
     if (lambda == NULL)
     {
         RETURN_ERROR ("Allocating lambda memory", FUNC_NAME, FAILURE);
     }
 
-    /* Planck Const hecht pg, 585 ## units: Js */
-    h = 6.6260755 * (float) 10e-34;
-
-    /* Boltzmann Gas Const halliday et 2001 ## units: J/K */
-    k = 1.3806503 * (float) 10e-23;
-
-    /* Speed of Light ## units: m/s */
-    c = 299792458.0;
-
     for (i = 0; i < num_srs; i++)
     {
         /* Lambda intervals of Landsat5 spectral response locations microns 
            units: m */
-        lambda[i] = wavelength[i] * (float) 10e-6;
+        lambda[i] = wavelength[i] * 10e-6;
 
         /* Compute the Planck Blackbody Eq [W/m^2 sr um] */
-        black_radiance[i] = 2.0 * h * pow (c, 2.0)
-                            * ((float) (10e-6) * pow (lambda[i], -5.0))
-                            * (1.0 / (exp ((h * c)
-                                            / (lambda [i] * k * temperature))
+        black_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
+                            * (10e-6 * pow (lambda[i], -5.0))
+                            * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
+                                            / (lambda [i]
+                                               * BOLTZMANN_GAS_CONST
+                                               * temperature))
                                       - 1.0));
 
         /* convert to W/cm^2 sr micron to match modtran units */
-        black_radiance[i] /= 10000.0;
+        black_radiance[i] *= 10e-5;
     }
     free (lambda);
 
@@ -109,7 +106,7 @@ int spline
     double un;
     double *u = NULL;
 
-    u = (double *) malloc ((unsigned) (n - 1) * sizeof (double));
+    u = malloc ((unsigned) (n - 1) * sizeof (double));
     if (u == NULL)
     {
         RETURN_ERROR ("Can't allocate memory", FUNC_NAME, FAILURE);
@@ -283,19 +280,19 @@ int int_tabulated
     int segments;
 
     /* Allocate memory */
-    temp = (float *) malloc (nums * sizeof (float));
+    temp = malloc (nums * sizeof (float));
     if (temp == NULL)
     {
         RETURN_ERROR ("Allocating temp memory", FUNC_NAME, FAILURE);
     }
 
-    z = (float *) malloc (nums * sizeof (float));
+    z = malloc (nums * sizeof (float));
     if (z == NULL)
     {
         RETURN_ERROR ("Allocating z memory", FUNC_NAME, FAILURE);
     }
 
-    ii = (int *) malloc (nums * sizeof (int));
+    ii = malloc (nums * sizeof (int));
     if (ii == NULL)
     {
         RETURN_ERROR ("Allocating ii memory", FUNC_NAME, FAILURE);
@@ -389,14 +386,14 @@ int calculate_lt
     float *product;
 
     /* Allocate memory */
-    blackbody_radiance = (float *) malloc (num_srs * sizeof (float));
+    blackbody_radiance = malloc (num_srs * sizeof (float));
     if (blackbody_radiance == NULL)
     {
         RETURN_ERROR ("Allocating blackbody_radiance memory", FUNC_NAME,
                       FAILURE);
     }
 
-    product = (float *) malloc (num_srs * sizeof (float));
+    product = malloc (num_srs * sizeof (float));
     if (product == NULL)
     {
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
@@ -550,13 +547,13 @@ int calculate_lobs
     float *product;
 
     /* Allocate memory */
-    temp_rad = (float *) malloc (num_entries * sizeof (float));
+    temp_rad = malloc (num_entries * sizeof (float));
     if (temp_rad == NULL)
     {
         RETURN_ERROR ("Allocating temp_rad memory", FUNC_NAME, FAILURE);
     }
 
-    product = (float *) malloc (num_entries * sizeof (float));
+    product = malloc (num_entries * sizeof (float));
     if (product == NULL)
     {
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
@@ -618,7 +615,7 @@ Date        Programmer       Reason
 #define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
 int calculate_point_atmospheric_parameters
 (
-    Input_t * input,           /* I: input structure */
+    Input_t *input,            /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     float albedo,              /* I: albedo */
     float **modtran_results,   /* O: atmospheric parameter for modtarn run */
@@ -683,22 +680,24 @@ int calculate_point_atmospheric_parameters
     }
 
     /* Determine the spectral response file to read */
-    if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
+    if (input->meta.instrument == INST_TM
+        && input->meta.satellite == SAT_LANDSAT_5)
     {
         num_srs = L5_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
                   "%s/%s", lst_data_dir, "L5_Spectral_Response.rsp");
     }
-    else if (input->meta.inst == INST_ETM && input->meta.sat == SAT_LANDSAT_7)
+    else if (input->meta.instrument == INST_ETM
+             && input->meta.satellite == SAT_LANDSAT_7)
     {
         num_srs = L7_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
                   "%s/%s", lst_data_dir, "L7_Spectral_Response.rsp");
     }
-    else if (input->meta.inst == INST_OLI_TIRS
-             && input->meta.sat == SAT_LANDSAT_8)
+    else if (input->meta.instrument == INST_OLI_TIRS
+             && input->meta.satellite == SAT_LANDSAT_8)
     {
         num_srs = L8_OLITIRS_SRS_COUNT;
 
