@@ -22,60 +22,28 @@
 #define ANGLE_FILL (-999.0)
 #define WRS_FILL (-1)
 #define GAIN_BIAS_FILL (-999.0)
-#define NBAND_THM_MAX 2
-
-
-typedef enum
-{
-    HDF_FILE = 0,
-    BINARY_FILE
-} File_type;
-
-
-/* Input file type definition */
-typedef enum
-{
-    INPUT_TYPE_NULL = -1,
-    INPUT_TYPE_BINARY = 0,
-    INPUT_TYPE_MAX
-} Input_type_t;
 
 
 /* Satellite type definition */
 typedef enum
 {
     SAT_NULL = -1,
-    SAT_LANDSAT_1 = 0,
-    SAT_LANDSAT_2,
-    SAT_LANDSAT_3,
-    SAT_LANDSAT_4,
     SAT_LANDSAT_5,
     SAT_LANDSAT_7,
     SAT_LANDSAT_8,
     SAT_MAX
-} Sat_t;
+} Satellite_t;
 
 
 /* Instrument type definition */
 typedef enum
 {
     INST_NULL = -1,
-    INST_MSS = 0,
     INST_TM,
     INST_ETM,
     INST_OLI_TIRS,
     INST_MAX
-} Inst_t;
-
-
-/* World Reference System (WRS) type definition */
-typedef enum
-{
-    WRS_NULL = -1,
-    WRS_1 = 0,
-    WRS_2,
-    WRS_MAX
-} Wrs_t;
+} Instrument_t;
 
 
 /* Band gain settings (ETM+ only) */
@@ -91,26 +59,10 @@ typedef enum
 /* Structure for the metadata */
 typedef struct
 {
-    Sat_t sat;                  /* Satellite */
-    Inst_t inst;                /* Instrument */
+    Satellite_t satellite;      /* Satellite */
+    Instrument_t instrument;    /* Instrument */
     Date_t acq_date;            /* Acq. date/time (scene center) */
-    bool time_fill;             /* Acq. time fill; true = fill value (0h) */
-    Date_t prod_date;           /* Prod date (must be available for ETM) */
-    float sun_zen;              /* Solar zenith angle (deg; scene center) */
-    float sun_az;               /* Solar azimuth angle (deg; scene center) */
-    Wrs_t wrs_sys;              /* WRS system */
-    int ipath;                  /* WRS path number */
-    int irow;                   /* WRS row number */
-    int fill_value;             /* Fill value */
-    int iband_th[NBAND_THM_MAX];/* thermal band numbers */
-    int therm_satu_value_ref;   /* saturation value of thermal product */
-    int therm_satu_value_max;   /* maximum bt value (degrees Celsius) */
-    Gain_t gain_setting_th;     /* Band gain settings Thermal */
-    float scale_factor_th;      /* Scale factor for the thermal band */
     int zone;                   /* UTM zone number */
-    float pixel_size[2];        /* pixel size (x,y) */
-    float gain_th;              /* Thermal band gain */
-    float bias_th;              /* Thermal band bias */
     Map_coord_t ul_map_corner;  /* Map projection coordinates of the upper
                                    left corner of the pixel in the upper left
                                    corner of the image */
@@ -126,17 +78,26 @@ typedef struct
 } Input_meta_t;
 
 
+/* Structure for the thermal band data */
+typedef struct
+{
+    char *filename;       /* Name of the image file */
+    FILE *fd;             /* File pointer for file */
+    bool is_open;         /* Has the file been opened flag */
+    int band_index;       /* Index in the metadata */
+    Img_coord_int_t size; /* (line/sample) size */
+    float toa_gain;       /* TOA gain */
+    float toa_bias;       /* TOA bias */
+    int fill_value;       /* Fill value */
+    float pixel_size[2];  /* Pixel size (x,y) */
+} Input_band_t;
+
+
 /* Structure for the 'input' data type */
 typedef struct
 {
-    Input_type_t file_type;     /* Type of the input image files */
     Input_meta_t meta;          /* Input metadata */
-    int nband_th;               /* Num of thermal input image files (0 or 1) */
-    Img_coord_int_t size_th;    /* Input (thermal) file size */
-    char *file_name_th;         /* Name of the thermal input image files */
-    bool open_th;               /* thermal open flag */
-    FILE *fp_bin_th;            /* File pointer for thermal binary file */
-    int16_t *therm_buf;         /* Input data buf (one line of therm data) */
+    Input_band_t thermal;       /* Input thermal band data */
 } Input_t;
 
 
@@ -144,16 +105,16 @@ typedef struct
 Input_t *OpenInput (Espa_internal_meta_t *metadata);
 
 
-bool GetInputThermLine (Input_t *this, int iline);
+bool GetInputThermLine (Input_t *input, int iline, float *thermal_data);
 
 
-bool CloseInput (Input_t *this);
+bool CloseInput (Input_t *input);
 
 
-bool FreeInput (Input_t *this);
+bool FreeInput (Input_t *input);
 
 
-bool GetXMLInput (Input_t *this, Espa_internal_meta_t * metadata);
+bool GetXMLInput (Input_t *input, Espa_internal_meta_t * metadata);
 
 
 void split_filename

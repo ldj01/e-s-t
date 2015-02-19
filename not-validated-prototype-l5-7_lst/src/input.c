@@ -29,122 +29,136 @@ Team Unique Header:
 *****************************************************************************/
 {
     char FUNC_NAME[] = "OpenInput";
-    Input_t *this = NULL;
-    char *error_string = NULL;
+    Input_t *input = NULL;
 
     /* Create the Input data structure */
-    this = (Input_t *) malloc (sizeof (Input_t));
-    if (this == NULL)
+    input = malloc (sizeof (Input_t));
+    if (input == NULL)
     {
         RETURN_ERROR ("allocating Input data structure", FUNC_NAME, NULL);
     }
 
     /* Initialize and get input from header file */
-    if (!GetXMLInput (this, metadata))
+    if (!GetXMLInput (input, metadata))
     {
-        free (this);
-        this = NULL;
+        free (input);
+        input = NULL;
         RETURN_ERROR ("getting input from header file", FUNC_NAME, NULL);
     }
 
-    printf ("this->file_name_th=%s\n", this->file_name_th);
-
-    /* Open files for access */
-    if (this->file_type == INPUT_TYPE_BINARY)
+    /* Open file for access */
+    input->thermal.fd = fopen (input->thermal.filename, "r");
+    if (input->thermal.fd == NULL)
     {
-        if (this->nband_th == 1 || this->nband_th == 2)
-        {
-            this->fp_bin_th = fopen (this->file_name_th, "r");
-            if (this->fp_bin_th == NULL)
-                error_string = "opening thermal binary file";
-            else
-                this->open_th = true;
-        }
+        free (input->thermal.filename);
+        input->thermal.filename = NULL;
+
+        fclose (input->thermal.fd);
+
+        free (input);
+        input = NULL;
+
+        RETURN_ERROR ("opening thermal file", FUNC_NAME, NULL);
     }
     else
-        error_string = "invalid file type";
+        input->thermal.is_open = true;
 
-    if (error_string != NULL)
-    {
-        free (this->file_name_th);
-        this->file_name_th = NULL;
-        if (this->file_type == INPUT_TYPE_BINARY)
-            fclose (this->fp_bin_th);
-        this->open_th = false;
-        free (this);
-        this = NULL;
-        RETURN_ERROR (error_string, FUNC_NAME, NULL);
-    }
-
-    return this;
+    return input;
 }
 
 
 bool
 GetInputThermLine
 (
-    Input_t *this,
-    int iline
+    Input_t *input,
+    int iline,
+    float *thermal_data
 )
 {
     char FUNC_NAME[] = "GetInputThermLine";
     void *buf = NULL;
     long loc;         /* pointer location in the raw binary file */
     int sample;
-    uint8_t *line = NULL;
+    uint8_t *line_uint8 = NULL;
+    int16_t *line_int16 = NULL;
 
     /* Check the parameters */
-    if (this == (Input_t *) NULL)
+    if (input == NULL)
     {
         RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
     }
 
-    if (!this->open_th)
+    if (!input->thermal.is_open)
     {
         RETURN_ERROR ("file not open", FUNC_NAME, false);
     }
 
-    if (iline < 0 || iline >= this->size_th.l)
+    if (iline < 0 || iline >= input->thermal.size.l)
     {
         RETURN_ERROR ("invalid line number", FUNC_NAME, false);
     }
 
     /* Read the data */
-    if (this->meta.inst == INST_OLI_TIRS && this->meta.sat == SAT_LANDSAT_8)
+    if (input->meta.instrument == INST_OLI_TIRS
+        && input->meta.satellite == SAT_LANDSAT_8)
     {
-        buf = (void *) this->therm_buf;
-        loc = (long) (iline * this->size_th.s * sizeof (int16_t));
-        if (fseek (this->fp_bin_th, loc, SEEK_SET))
+        line_int16 = malloc (input->thermal.size.s * sizeof (int16_t));
+        if (line_int16 == NULL)
+        {
+            RETURN_ERROR ("error allocating memory", FUNC_NAME, false);
+        }
+
+        buf = (void *) thermal_data;
+        loc = (long) (iline * input->thermal.size.s * sizeof (int16_t));
+        if (fseek (input->thermal.fd, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
                           FUNC_NAME, false);
         }
 
-        if (read_raw_binary (this->fp_bin_th, 1, this->size_th.s,
+        if (read_raw_binary (input->thermal.fd, 1, input->thermal.size.s,
                              sizeof (int16_t), buf)
             != SUCCESS)
         {
             RETURN_ERROR ("error reading thermal line (binary)",
                           FUNC_NAME, false);
         }
+
+        /* Copy the data to the output buffer manually while converting to
+           radiance and float */
+        for (sample = 0; sample < input->thermal.size.s; sample++)
+        {
+            if (line_int16[sample] == input->thermal.fill_value)
+            {
+                thermal_data[sample] = LST_FILL_VALUE;
+            }
+            else
+            {
+                thermal_data[sample] =
+                    (float) ((input->thermal.toa_gain * line_int16[sample])
+                             + input->thermal.toa_bias);
+            }
+        }
+
+        free (line_int16);
     }
     else
     {
-        line = malloc (this->size_th.s * sizeof (uint8_t));
-        if (line == NULL)
+        line_uint8 = malloc (input->thermal.size.s * sizeof (uint8_t));
+        if (line_uint8 == NULL)
         {
             RETURN_ERROR ("error allocating memory", FUNC_NAME, false);
         }
 
-        buf = (void *) line;
-        loc = (long) (iline * this->size_th.s * sizeof (uint8_t));
-        if (fseek (this->fp_bin_th, loc, SEEK_SET))
+        buf = (void *) line_uint8;
+        loc = (long) (iline * input->thermal.size.s * sizeof (uint8_t));
+        if (fseek (input->thermal.fd, loc, SEEK_SET))
         {
             RETURN_ERROR ("error seeking thermal line (binary)",
                           FUNC_NAME, false);
         }
 
-        if (read_raw_binary (this->fp_bin_th, 1, this->size_th.s,
+        if (read_raw_binary (input->thermal.fd, 1, input->thermal.size.s,
                              sizeof (uint8_t), buf)
             != SUCCESS)
         {
@@ -152,14 +166,31 @@ GetInputThermLine
                           FUNC_NAME, false);
         }
 
-        /* Copy the line to the buffer manually,
-           since we are going from uint8 to int16 */
-        for (sample = 0; sample < this->size_th.s; sample++)
+        /* Copy the data to the output buffer manually while converting to
+           radiance and float */
+        for (sample = 0; sample < input->thermal.size.s; sample++)
         {
-            this->therm_buf[sample] = line[sample];
+            if (line_uint8[sample] == input->thermal.fill_value)
+            {
+                thermal_data[sample] = LST_FILL_VALUE;
+            }
+            else
+            {
+                thermal_data[sample] =
+                    (float) ((input->thermal.toa_gain * line_uint8[sample])
+                             + input->thermal.toa_bias);
+
+                /* If L5 data, it needs some adjustment, I don't know why...
+                   ???? it was in the original code ???? */
+                if (input->meta.instrument == INST_TM
+                    && input->meta.satellite == SAT_LANDSAT_5)
+                {
+                    thermal_data[sample] += 0.044;
+                }
+            }
         }
 
-        free (line);
+        free (line_uint8);
     }
 
     return true;
@@ -167,16 +198,16 @@ GetInputThermLine
 
 
 bool
-CloseInput (Input_t * this)
+CloseInput (Input_t *input)
 /*****************************************************************************
 
 Description: 'CloseInput' ends SDS access and closes the input file.
 
 Input Parameters:
-     this      'input' data structure
+     input     'input' data structure
 
 Output Parameters:
-     this      'input' data structure; the following fields are modified:
+     input     'input' data structure; the following fields are modified:
                open
      (returns) status:
                'true' = okay
@@ -186,17 +217,16 @@ Output Parameters:
 {
     char FUNC_NAME[] = "CloseInput";
 
-    if (this == NULL)
+    if (input == NULL)
     {
         RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
     }
 
     /*** now close the thermal file ***/
-    if (this->open_th)
+    if (input->thermal.is_open)
     {
-        if (this->file_type == INPUT_TYPE_BINARY)
-            fclose (this->fp_bin_th);
-        this->open_th = false;
+        fclose (input->thermal.fd);
+        input->thermal.is_open = false;
     }
 
     return true;
@@ -204,13 +234,13 @@ Output Parameters:
 
 
 bool
-FreeInput (Input_t * this)
+FreeInput (Input_t *input)
 /*****************************************************************************
 
 Description: 'FreeInput' frees the 'input' data structure memory.
 
 Input Parameters:
-    this           'input' data structure
+    input          'input' data structure
 
 Output Parameters:
     (returns)      status:
@@ -218,11 +248,11 @@ Output Parameters:
 
 *****************************************************************************/
 {
-    free (this->file_name_th);
-    this->file_name_th = NULL;
+    free (input->thermal.filename);
+    input->thermal.filename = NULL;
 
-    free (this);
-    this = NULL;
+    free (input);
+    input = NULL;
 
     return true;
 }
@@ -234,13 +264,13 @@ Output Parameters:
 
 
 bool
-GetXMLInput (Input_t * this, Espa_internal_meta_t * metadata)
+GetXMLInput (Input_t *input, Espa_internal_meta_t * metadata)
 /*****************************************************************************
 
 Description: 'GetXMLInput' pulls input values from the XML structure.
 
 Input Parameters:
-    this         'Input_t' data structure to be populated
+    input        'Input_t' data structure to be populated
     metadata     'Espa_internal_meta_t' data structure with XML info
 
 Output Parameters:
@@ -255,284 +285,162 @@ Design Notes:
 {
     char FUNC_NAME[] = "GetXMLInput";
     char acq_date[DATE_STRING_LEN + 1];
-//    char prod_date[DATE_STRING_LEN + 1];
     char acq_time[TIME_STRING_LEN + 1];
-    char temp[MAX_STR_LEN];
-    int th_indx; /* band index in XML file for the thermal band */
-    Espa_global_meta_t *gmeta = &metadata->global; /* pointer to global meta */
+    char date_time[MAX_STR_LEN];
+    char band_name[30];
+    char msg[MAX_STR_LEN];
+    int index;
+    Espa_global_meta_t *global = &metadata->global; /* pointer to global meta */
 
     /* Initialize the input fields.  Set file type to binary, since that is
        the ESPA internal format for the input L1G/T products. */
-    this->file_type = INPUT_TYPE_BINARY;
-    this->meta.sat = SAT_NULL;
-    this->meta.inst = INST_NULL;
-    this->meta.acq_date.fill = true;
-    this->meta.time_fill = true;
-    this->meta.prod_date.fill = true;
-    this->meta.sun_zen = ANGLE_FILL;
-    this->meta.sun_az = ANGLE_FILL;
-    this->meta.wrs_sys = (Wrs_t) WRS_FILL;
-    this->meta.ipath = -1;
-    this->meta.irow = -1;
-    this->meta.fill_value = INPUT_FILL;
-    this->size_th.s = this->size_th.l = -1;
-    this->nband_th = 0;
-    this->open_th = false;
-    this->meta.gain_th = GAIN_BIAS_FILL;
-    this->meta.bias_th = GAIN_BIAS_FILL;
-    this->file_name_th = NULL;
-    this->fp_bin_th = NULL;
+    input->meta.satellite = SAT_NULL;
+    input->meta.instrument = INST_NULL;
+    input->meta.acq_date.fill = true;
+    input->thermal.filename = NULL;
+    input->thermal.fd = NULL;
+    input->thermal.is_open = false;
+    input->thermal.size.s = -1;
+    input->thermal.size.l = -1;
+    input->thermal.toa_gain = GAIN_BIAS_FILL;
+    input->thermal.toa_bias = GAIN_BIAS_FILL;
+    input->thermal.fill_value = INPUT_FILL;
 
-    /* Pull the appropriate data from the XML file */
-    acq_date[0] = acq_time[0] = '\0';
-//    prod_date[0] = '\0';
-    if (!strcmp (gmeta->satellite, "LANDSAT_1"))
-        this->meta.sat = SAT_LANDSAT_1;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_2"))
-        this->meta.sat = SAT_LANDSAT_2;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_3"))
-        this->meta.sat = SAT_LANDSAT_3;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_4"))
-        this->meta.sat = SAT_LANDSAT_4;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_5"))
-        this->meta.sat = SAT_LANDSAT_5;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_7"))
-        this->meta.sat = SAT_LANDSAT_7;
-    else if (!strcmp (gmeta->satellite, "LANDSAT_8"))
-        this->meta.sat = SAT_LANDSAT_8;
+    /* Determine satellite */
+    if (strcmp (global->satellite, "LANDSAT_5") == 0)
+    {
+        input->meta.satellite = SAT_LANDSAT_5;
+    }
+    else if (strcmp (global->satellite, "LANDSAT_7") == 0)
+    {
+        input->meta.satellite = SAT_LANDSAT_7;
+    }
+    else if (strcmp (global->satellite, "LANDSAT_8") == 0)
+    {
+        input->meta.satellite = SAT_LANDSAT_8;
+    }
     else
     {
-        snprintf (temp, sizeof (temp),
-                  "invalid satellite; value = %s", gmeta->satellite);
-        RETURN_ERROR (temp, FUNC_NAME, true);
+        snprintf (msg, sizeof (msg),
+                  "invalid satellite; value = %s", global->satellite);
+        RETURN_ERROR (msg, FUNC_NAME, true);
     }
 
-    if (!strcmp (gmeta->instrument, "TM"))
-        this->meta.inst = INST_TM;
-    else if (!strncmp (gmeta->instrument, "ETM", 3))
-        this->meta.inst = INST_ETM;
-    else if (!strncmp (gmeta->instrument, "OLI_TIRS", 8))
-        this->meta.inst = INST_ETM;
+    /* Determine sensor */
+    if (!strcmp (global->instrument, "TM"))
+    {
+        input->meta.instrument = INST_TM;
+    }
+    else if (!strncmp (global->instrument, "ETM", 3))
+    {
+        input->meta.instrument = INST_ETM;
+    }
+    else if (!strncmp (global->instrument, "OLI_TIRS", 8))
+    {
+        input->meta.instrument = INST_ETM;
+    }
     else
     {
-        snprintf (temp, sizeof (temp),
-                  "invalid instrument; value = %s", gmeta->instrument);
-        RETURN_ERROR (temp, FUNC_NAME, true);
+        snprintf (msg, sizeof (msg),
+                  "invalid instrument; value = %s", global->instrument);
+        RETURN_ERROR (msg, FUNC_NAME, true);
     }
 
-    strcpy (acq_date, gmeta->acquisition_date);
-    strcpy (acq_time, gmeta->scene_center_time);
-    this->meta.time_fill = false;
+    /* Check satellite/instrument combination */
+    if (input->meta.instrument == INST_TM)
+    {
+        if (input->meta.satellite != SAT_LANDSAT_5)
+        {
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+        }
+
+        /* Specify the band name for the thermal band to use */
+        snprintf (band_name, sizeof (band_name), "band6");
+    }
+    else if (input->meta.instrument == INST_ETM)
+    {
+        if (input->meta.satellite != SAT_LANDSAT_7)
+        {
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+        }
+
+        /* Specify the band name for the thermal band to use */
+        snprintf (band_name, sizeof (band_name), "band61");
+    }
+    else if (input->meta.instrument == INST_OLI_TIRS)
+    {
+        if (input->meta.satellite != SAT_LANDSAT_8)
+        {
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+        }
+
+        /* Specify the band name for the thermal band to use */
+        snprintf (band_name, sizeof (band_name), "band10");
+    }
+
+    input->meta.zone = global->proj_info.utm_zone;
+
+    for (index = 0; index < metadata->nbands; index++)
+    {
+        /* Only look at the ones with the product name we are looking for */
+        if (strcmp (metadata->band[index].product, "L1T") == 0)
+        {
+            if (strcmp (metadata->band[index].name, band_name) == 0)
+            {
+                input->thermal.filename =
+                    strdup (metadata->band[index].file_name);
+
+                input->thermal.toa_gain = metadata->band[index].toa_gain;
+                input->thermal.toa_bias = metadata->band[index].toa_bias;
+
+                input->thermal.size.s = metadata->band[index].nsamps;
+                input->thermal.size.l = metadata->band[index].nlines;
+                input->thermal.pixel_size[0] =
+                    metadata->band[index].pixel_size[0];
+                input->thermal.pixel_size[1] =
+                    metadata->band[index].pixel_size[1];
+
+                input->thermal.band_index = index;
+
+                /* Only the one so break out */
+                break;
+            }
+        }
+    }
+
+    /* Get the map projection coordinates */
+    input->meta.ul_map_corner.x = metadata->global.proj_info.ul_corner[0];
+    input->meta.ul_map_corner.y = metadata->global.proj_info.ul_corner[1];
+    input->meta.ul_map_corner.is_fill = true;
+    input->meta.lr_map_corner.x = metadata->global.proj_info.lr_corner[0];
+    input->meta.lr_map_corner.y = metadata->global.proj_info.lr_corner[1];
+    input->meta.lr_map_corner.is_fill = true;
+
+    /* Get the geo graphic coordinates */
+    input->meta.ul_geo_corner.lat = metadata->global.ul_corner[0];
+    input->meta.ul_geo_corner.lon = metadata->global.ul_corner[1];
+    input->meta.ul_geo_corner.is_fill = true;
+    input->meta.lr_geo_corner.lat = metadata->global.lr_corner[0];
+    input->meta.lr_geo_corner.lon = metadata->global.lr_corner[1];
+    input->meta.lr_geo_corner.is_fill = true;
+
+    /* Convert the acquisition date/time values */
+    snprintf (acq_date, sizeof (acq_date), global->acquisition_date);
+    snprintf (acq_time, sizeof (acq_time), global->scene_center_time);
 
     /* Make sure the acquisition time is not too long (i.e. contains too
        many decimal points for the date/time routines).  The time should be
        hh:mm:ss.ssssssZ (see DATE_FORMAT_DATEA_TIME in date.h) which is 16
        characters long.  If the time is longer than that, just chop it off. */
     if (strlen (acq_time) > 16)
-        sprintf (&acq_time[15], "Z");
-
-    this->meta.zone = gmeta->proj_info.utm_zone;
-
-    this->meta.sun_zen = gmeta->solar_zenith;
-    if (this->meta.sun_zen < -90.0 || this->meta.sun_zen > 90.0)
     {
-        RETURN_ERROR ("solar zenith angle out of range", FUNC_NAME, true);
-    }
-    this->meta.sun_zen *= RAD;  /* convert to radians */
-
-    this->meta.sun_az = gmeta->solar_azimuth;
-    if (this->meta.sun_az < -360.0 || this->meta.sun_az > 360.0)
-    {
-        RETURN_ERROR ("solar azimuth angle out of range", FUNC_NAME, true);
-    }
-    this->meta.sun_az *= RAD;   /* convert to radians */
-
-    switch (gmeta->wrs_system)
-    {
-        case 1:
-            this->meta.wrs_sys = WRS_1;
-            break;
-        case 2:
-            this->meta.wrs_sys = WRS_2;
-            break;
-        default:
-            snprintf (temp, sizeof (temp),
-                      "invalid WRS system; value = %d", gmeta->wrs_system);
-            RETURN_ERROR (temp, FUNC_NAME, true);
-    }
-    this->meta.ipath = gmeta->wrs_path;
-    this->meta.irow = gmeta->wrs_row;
-
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-    if (this->meta.inst == INST_TM || this->meta.inst == INST_ETM)
-    {
-        this->nband_th = 1; /* number of thermal bands; only use 6L for ETM */
-        this->meta.iband_th[0] = 6;
-        th_indx = 5;
-        this->meta.gain_th = metadata->band[th_indx].toa_gain;
-        this->meta.bias_th = metadata->band[th_indx].toa_bias;
-        this->file_name_th = strdup (metadata->band[th_indx].file_name);
-    }
-    else /* this->meta.inst == INST_OLI_TIRS */
-    {
-        this->nband_th = 2; /* number of thermal bands */
-        this->meta.iband_th[0] = 10;
-        this->meta.iband_th[1] = 11;
-        th_indx = 9;
-        this->meta.gain_th = metadata->band[th_indx].toa_gain;
-        this->meta.bias_th = metadata->band[th_indx].toa_bias;
-        this->file_name_th = strdup (metadata->band[th_indx].file_name);
-    }
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-/* TODO TODO TODO - This is not a guarantee recode using an index */
-
-    /* Pull the reflectance info from thermal in the XML file */
-    this->size_th.s = metadata->band[th_indx].nsamps;
-    this->size_th.l = metadata->band[th_indx].nlines;
-    this->meta.pixel_size[0] = metadata->band[th_indx].pixel_size[0];
-    this->meta.pixel_size[1] = metadata->band[th_indx].pixel_size[1];
-    this->meta.scale_factor_th = metadata->band[th_indx].scale_factor;
-
-    /* Check WRS path/rows */
-    if (this->meta.wrs_sys == WRS_1)
-    {
-        if (this->meta.ipath > 251)
-        {
-            RETURN_ERROR ("WRS path number out of range", FUNC_NAME, true);
-        }
-        else if (this->meta.irow > 248)
-        {
-            RETURN_ERROR ("WRS row number out of range", FUNC_NAME, true);
-        }
-    }
-    else if (this->meta.wrs_sys == WRS_2)
-    {
-        if (this->meta.ipath > 233)
-        {
-            RETURN_ERROR ("WRS path number out of range", FUNC_NAME, true);
-        }
-        else if (this->meta.irow > 248)
-        {
-            RETURN_ERROR ("WRS row number out of range", FUNC_NAME, true);
-        }
-    }
-    else
-    {
-        RETURN_ERROR ("invalid WRS system", FUNC_NAME, true);
+        acq_time[15] = 'Z';
+        acq_time[16] = '\0';
     }
 
-    /* Check satellite/instrument combination */
-    if (this->meta.inst == INST_MSS)
-    {
-        if (this->meta.sat != SAT_LANDSAT_1 &&
-            this->meta.sat != SAT_LANDSAT_2 &&
-            this->meta.sat != SAT_LANDSAT_3 &&
-            this->meta.sat != SAT_LANDSAT_4 &&
-            this->meta.sat != SAT_LANDSAT_5)
-        {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
-        }
-    }
-    else if (this->meta.inst == INST_TM)
-    {
-        if (this->meta.sat != SAT_LANDSAT_4 &&
-            this->meta.sat != SAT_LANDSAT_5)
-        {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
-        }
-    }
-    else if (this->meta.inst == INST_ETM)
-    {
-        if (this->meta.sat != SAT_LANDSAT_7)
-        {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
-        }
-    }
-    else if (this->meta.inst == INST_OLI_TIRS)
-    {
-        if (this->meta.sat != SAT_LANDSAT_8)
-        {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
-        }
-    }
-    else
-    {
-        RETURN_ERROR ("invalid instrument type", FUNC_NAME, true);
-    }
-
-#if 0
-    /* Get the geo bound locations */
-    this->meta.geo_bounds->min_lon =
-        metadata->global.bounding_coords[ESPA_WEST];
-    this->meta.geo_bounds->max_lon =
-        metadata->global.bounding_coords[ESPA_EAST];
-    this->meta.geo_bounds->min_lat =
-        metadata->global.bounding_coords[ESPA_NORTH];
-    this->meta.geo_bounds->max_lat =
-        metadata->global.bounding_coords[ESPA_SOUTH];
-#endif
-
-    /* Get the map projection coordinates */
-    this->meta.ul_map_corner.x = metadata->global.proj_info.ul_corner[0];
-    this->meta.ul_map_corner.y = metadata->global.proj_info.ul_corner[1];
-    this->meta.ul_map_corner.is_fill = true;
-    this->meta.lr_map_corner.x = metadata->global.proj_info.lr_corner[0];
-    this->meta.lr_map_corner.y = metadata->global.proj_info.lr_corner[1];
-    this->meta.lr_map_corner.is_fill = true;
-
-    /* Get the geo graphic coordinates */
-    this->meta.ul_geo_corner.lat = metadata->global.ul_corner[0];
-    this->meta.ul_geo_corner.lon = metadata->global.ul_corner[1];
-    this->meta.ul_geo_corner.is_fill = true;
-    this->meta.lr_geo_corner.lat = metadata->global.lr_corner[0];
-    this->meta.lr_geo_corner.lon = metadata->global.lr_corner[1];
-    this->meta.lr_geo_corner.is_fill = true;
-
-    /* Convert the acquisition date/time values */
-    snprintf (temp, sizeof (temp),
+    snprintf (date_time, sizeof (date_time),
               "%sT%s", acq_date, acq_time);
-    if (!DateInit (&this->meta.acq_date, temp, DATE_FORMAT_DATEA_TIME))
+    if (!DateInit (&input->meta.acq_date, date_time, DATE_FORMAT_DATEA_TIME))
     {
         RETURN_ERROR ("converting acquisition date/time", FUNC_NAME, false);
     }

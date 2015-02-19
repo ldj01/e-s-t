@@ -123,30 +123,26 @@ main (int argc, char *argv[])
     if (verbose)
     {
         /* Print some info to show how the input metadata works */
-        printf ("Instrument: %d\n", input->meta.inst);
-        printf ("Satellite: %d\n", input->meta.sat);
-        printf ("Number of input thermal bands: %d\n",
-                input->nband_th);
-        printf ("Number of input lines: %d\n", input->size_th.l);
-        printf ("Number of input samples: %d\n", input->size_th.s);
+        printf ("Satellite: %d\n", input->meta.satellite);
+        printf ("Instrument: %d\n", input->meta.instrument);
+
+        printf ("Number of input lines: %d\n", input->thermal.size.l);
+        printf ("Number of input samples: %d\n", input->thermal.size.s);
+
+        printf ("Fill value is %d\n", input->thermal.fill_value);
+
+        printf ("Thermal Band -->\n");
+        printf ("  therm_gain: %f\n  therm_bias: %f\n",
+                input->thermal.toa_gain, input->thermal.toa_bias);
+
+        printf ("Year, Month, Day, Hour, Minute, Second:"
+                " %d, %d, %d, %d, %d, %f\n",
+                input->meta.acq_date.year, input->meta.acq_date.month,
+                input->meta.acq_date.day, input->meta.acq_date.hour,
+                input->meta.acq_date.minute, input->meta.acq_date.second);
         printf ("ACQUISITION_DATE.DOY is %d\n",
                 input->meta.acq_date.doy);
-        printf ("Fill value is %d\n", input->meta.fill_value);
-        printf ("Thermal Band -->\n");
-//        printf ("  therm_satu_value_ref: %d\n",
-//                input->meta.therm_satu_value_ref);
-//        printf ("  therm_satu_value_max: %d\n",
-//                input->meta.therm_satu_value_max);
-        printf ("  therm_gain: %f, therm_bias: %f\n",
-                input->meta.gain_th, input->meta.bias_th);
 
-        printf ("SUN AZIMUTH: %f\n", input->meta.sun_az);
-        printf ("SUN ZENITH: %f\n", input->meta.sun_zen);
-        printf ("Year, Month, Day, Hour, Minute, Second: %d, "
-                "%d, %d, %d, %d,%f\n", input->meta.acq_date.year,
-                input->meta.acq_date.month, input->meta.acq_date.day,
-                input->meta.acq_date.hour, input->meta.acq_date.minute,
-                input->meta.acq_date.second);
         printf ("UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
                 input->meta.ul_map_corner.y);
         printf ("LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
@@ -156,31 +152,6 @@ main (int argc, char *argv[])
         printf ("LR_GEO_CORNER: %f, %f\n",
                 input->meta.lr_geo_corner.lat, input->meta.lr_geo_corner.lon);
     }
-
-#if 0
-    /* If the scene is an ascending polar scene (flipped upside down), then
-       the solar azimuth needs to be adjusted by 180 degrees.  The scene in
-       this case would be north down and the solar azimuth is based on north
-       being up clock-wise direction. Flip the south to be up will not change 
-       the actual sun location, with the below relations, the solar azimuth
-       angle will need add in 180.0 for correct sun location */
-    if (input->meta.ul_corner.is_fill &&
-        input->meta.lr_corner.is_fill &&
-        (input->meta.ul_corner.lat - input->meta.lr_corner.lat) < MINSIGMA)
-    {
-        /* Keep the original solar azimuth angle */
-        sun_azi_temp = input->meta.sun_az;
-        input->meta.sun_az += 180.0;
-        if ((input->meta.sun_az - 360.0) > MINSIGMA)
-            input->meta.sun_az -= 360.0;
-        if (verbose)
-            printf
-                ("  Polar or ascending scene.  Readjusting solar azimuth by "
-                 "180 degrees.\n  New value: %f degrees\n",
-                 input->meta.sun_az);
-    }
-#endif
-
 
     /* Build the points that will be used */
     if (build_points (input, &points) != SUCCESS)
@@ -307,15 +278,6 @@ main (int argc, char *argv[])
     free_points_memory (&points);
 
 #if 0
-    /* Reassign solar azimuth angle for output purpose if south up north 
-       down scene is involved */
-    if (input->meta.ul_corner.is_fill &&
-        input->meta.lr_corner.is_fill &&
-        (input->meta.ul_corner.lat - input->meta.lr_corner.lat) < MINSIGMA)
-    {
-        input->meta.sun_az = sun_azi_temp;
-    }
-
     /* Open the output file */
     output = OpenOutput (&xml_metadata, input);
     if (output == NULL)

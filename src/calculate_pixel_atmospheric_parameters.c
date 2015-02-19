@@ -123,48 +123,9 @@ void distance_in_utm
 
 
 /******************************************************************************
-METHOD:  dn_to_radiance
-
-PURPOSE: convert digital counts to radiance for thermal band
-         [unit: W m^(-2) sr^(-1) mu^(-1) ]
-
-RETURN: NONE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/30/2014   Song Guo         Original Development
-******************************************************************************/
-void dn_to_radiance
-(
-    Input_t *input
-)
-{
-    int pix;
-    for (pix = 0; pix < input->size_th.s; pix++)
-    {
-        if (input->therm_buf[pix] == 0)
-        {
-            input->therm_buf[pix] = 0;
-        }
-        else
-        {
-            input->therm_buf[pix] = (int16_t) (input->meta.gain_th *
-                                             (float) input->therm_buf[pix] +
-                                             input->meta.bias_th);
-        }
-        if (input->meta.inst == INST_TM && input->meta.sat == SAT_LANDSAT_5)
-        {
-            input->therm_buf[pix] = (int16_t) (input->therm_buf[pix] + 0.044);
-        }
-    }
-}
-
-
-/******************************************************************************
 METHOD:  interpolate_to_height
 
-PURPOSE: Inteprolate to height of current pixel
+PURPOSE: Interpolate to height of current pixel
 
 ******************************************************************************/
 void interpolate_to_height
@@ -258,7 +219,7 @@ void interpolate_to_height
 /******************************************************************************
 METHOD:  interpolate_to_location
 
-PURPOSE: Inteprolate to location of current pixel
+PURPOSE: Interpolate to location of current pixel
 
 ******************************************************************************/
 void interpolate_to_location
@@ -347,7 +308,7 @@ RETURN: SUCCESS
 *****************************************************************************/
 int calculate_pixel_atmospheric_parameters
 (
-    Input_t * input,           /* I: input structure */
+    Input_t *input,            /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     char *dem_filename,        /* I: address of input DEM filename */
     char *emi_filename,        /* I: address of input Emissivity filename */
@@ -388,6 +349,7 @@ int calculate_pixel_atmospheric_parameters
     FILE *downwelled_fd = NULL;
 
     int16_t *dem = NULL;        /* input DEM data in meters */
+    float *thermal_data;
     float **landsat_results;
     char msg[MAX_STR_LEN];
     char *lst_data_dir = NULL;
@@ -412,7 +374,7 @@ int calculate_pixel_atmospheric_parameters
     }
 
     /* Allocate memory for one line of the DEM */
-    dem = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
+    dem = calloc (input->thermal.size.s, sizeof (int16_t));
     if (dem == NULL)
     {
         RETURN_ERROR ("Error allocating memory for the DEM data",
@@ -420,8 +382,8 @@ int calculate_pixel_atmospheric_parameters
     }
 
     /* Allocate memory for one line of the Thermal data */
-    input->therm_buf = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
-    if (input->therm_buf == NULL)
+    thermal_data = calloc (input->thermal.size.s, sizeof (float));
+    if (thermal_data == NULL)
     {
         RETURN_ERROR ("Error allocating memory for the Thermal data",
                       FUNC_NAME, FAILURE);
@@ -458,7 +420,7 @@ int calculate_pixel_atmospheric_parameters
     }
 
     /* Allocate memory for landsat_results */
-    landsat_results = (float **) allocate_2d_array (3, input->size_th.s,
+    landsat_results = (float **) allocate_2d_array (3, input->thermal.size.s,
                                                     sizeof (float));
     if (landsat_results == NULL)
     {
@@ -489,32 +451,31 @@ int calculate_pixel_atmospheric_parameters
     }
 
     /* Loop through each line in the image */
-    for (line = 0; line < input->size_th.l; line++)
+    for (line = 0; line < input->thermal.size.l; line++)
     {
-        /* Print status on every 250 lines */
-//        if (!(line % 250))
+        /* Print status on every 1000 lines */
+        if (!(line % 1000))
         {
             if (verbose)
             {
-//                printf ("Processing line %d\r", line);
-//                fflush (stdout);
+                printf ("Processing line %d\r", line);
+                fflush (stdout);
             }
         }
 
-        /* Read the input thermal band -- data is read into input->therm_buf */
-        if (!GetInputThermLine (input, line))
+        /* Read the input thermal band data */
+        if (!GetInputThermLine (input, line, thermal_data))
         {
             sprintf (msg, "Reading input thermal data for line %d", line);
             RETURN_ERROR (msg, FUNC_NAME, FAILURE);
         }
-        dn_to_radiance (input);
 
         /* Can also read in one line of DEM data here */
         /* Start reading DEM from the start_line */
-        offset = sizeof (int16_t) * line * input->size_th.s;
+        offset = sizeof (int16_t) * line * input->thermal.size.s;
         fseek (dem_fd, offset, SEEK_SET);
-        if (fread (dem, sizeof (int16_t), input->size_th.s, dem_fd)
-            != input->size_th.s)
+        if (fread (dem, sizeof (int16_t), input->thermal.size.s, dem_fd)
+            != input->thermal.size.s)
         {
             sprintf (msg, "Error reading values from the DEM file "
                              "starting at line %d.", line);
@@ -523,20 +484,20 @@ int calculate_pixel_atmospheric_parameters
 
         /* Set first_sample to be true */
         first_sample = true;
-        for (sample = 0; sample < input->size_th.s; sample++)
+        for (sample = 0; sample < input->thermal.size.s; sample++)
         {
-            if (input->therm_buf[sample] != input->meta.fill_value)
+            if (thermal_data[sample] != LST_FILL_VALUE)
             {
                 /* determine UTM coordinates of current pixel */
                 current_easting = input->meta.ul_map_corner.x
-                    + (sample * input->meta.pixel_size[0]);
+                    + (sample * input->thermal.pixel_size[0]);
                 current_northing = input->meta.ul_map_corner.y
-                    - (line * input->meta.pixel_size[1]);
+                    - (line * input->thermal.pixel_size[1]);
 
                 if (first_sample)
                 {
                     /* compute distance between current pixel and each narr
-                       points in UTM coordinates
+                       point in UTM coordinates
 
                        Note: consider only calculating points within a small
                        range nearby */
@@ -787,34 +748,34 @@ LOG_MESSAGE (msg, FUNC_NAME);
         } /* END - for sample */
 
         /* Write out the temporary binary output files
-           Note: needs to be deleted before release */
-        status = fwrite (&input->therm_buf[0], sizeof (int16_t),
-                         input->size_th.s, thermal_fd);
-        if (status != input->size_th.s)
+           Note: They need to be deleted before release */
+        status = fwrite (thermal_data, sizeof (float),
+                         input->thermal.size.s, thermal_fd);
+        if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", thermal_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[0][0], sizeof (float),
-                         input->size_th.s, transmittance_fd);
-        if (status != input->size_th.s)
+                         input->thermal.size.s, transmittance_fd);
+        if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", transmittance_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[1][0], sizeof (float),
-                         input->size_th.s, upwelled_fd);
-        if (status != input->size_th.s)
+                         input->thermal.size.s, upwelled_fd);
+        if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", upwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[2][0], sizeof (float),
-                         input->size_th.s, downwelled_fd);
-        if (status != input->size_th.s)
+                         input->thermal.size.s, downwelled_fd);
+        if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", downwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
@@ -824,8 +785,8 @@ LOG_MESSAGE (msg, FUNC_NAME);
     /* Free allocated memory */
     free (distances);
     free (dem);
-    free (input->therm_buf);
-    input->therm_buf = NULL;
+    free (thermal_data);
+    thermal_data = NULL;
 
     status = free_2d_array ((void **) at_height);
     if (status != SUCCESS)

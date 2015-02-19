@@ -65,7 +65,6 @@ Output_t *OpenOutput
                                                production */
     time_t tp;                  /* time structure */
     struct tm *tm = NULL;       /* time structure for UTC time */
-    int indx = -1;              /* thermal band index in XML file */
     Espa_band_meta_t *bmeta = NULL;     /* pointer to the band metadata array
                                            within the output structure */
 
@@ -75,12 +74,6 @@ Output_t *OpenOutput
     {
         RETURN_ERROR ("allocating Output data structure", "OpenOutput", NULL);
     }
-
-    /* Use thermal band for band metadata information */
-    if (input->nband_th == 1)
-        indx = 5;
-    else
-        indx = 9;
 
     /* Initialize the internal metadata for the output product. The global
        metadata won't be updated, however the band metadata will be updated
@@ -96,7 +89,7 @@ Output_t *OpenOutput
     bmeta = this->metadata.band;
 
     /* Determine the scene name */
-    strcpy (scene_name, in_meta->band[indx].file_name);
+    strcpy (scene_name, in_meta->band[input->thermal.band_index].file_name);
     mychar = strchr (scene_name, '_');
     if (mychar != NULL)
         *mychar = '\0';
@@ -124,10 +117,11 @@ Output_t *OpenOutput
     this->open = false;
     this->fp_bin = NULL;
     this->nband = 1;
-    this->size.l = input->size_th.l;
-    this->size.s = input->size_th.s;
+    this->size.l = input->thermal.size.l;
+    this->size.s = input->thermal.size.s;
 
-    strncpy (bmeta[0].short_name, in_meta->band[indx].short_name, 3);
+    strncpy (bmeta[0].short_name,
+             in_meta->band[input->thermal.band_index].short_name, 3);
     bmeta[0].short_name[3] = '\0';
     strcat (bmeta[0].short_name, "LST");
     strcpy (bmeta[0].product, "lst");
@@ -135,8 +129,8 @@ Output_t *OpenOutput
     strcpy (bmeta[0].category, "image");
     bmeta[0].nlines = this->size.l;
     bmeta[0].nsamps = this->size.s;
-    bmeta[0].pixel_size[0] = input->meta.pixel_size[0];
-    bmeta[0].pixel_size[1] = input->meta.pixel_size[1];
+    bmeta[0].pixel_size[0] = input->thermal.pixel_size[0];
+    bmeta[0].pixel_size[1] = input->thermal.pixel_size[1];
     strcpy (bmeta[0].pixel_units, "meters");
     sprintf (bmeta[0].app_version, "lst_%s", LST_VERSION);
     strcpy (bmeta[0].production_date, production_date);
