@@ -58,7 +58,7 @@ main (int argc, char *argv[])
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
     float alb = 0.1;
     int i;
-    float **results = NULL;
+    float **modtran_results = NULL;
     char *tmp_env = NULL;
 
     REANALYSIS_POINTS points;
@@ -131,7 +131,7 @@ main (int argc, char *argv[])
         printf ("Number of input samples: %d\n", input->size_th.s);
         printf ("ACQUISITION_DATE.DOY is %d\n",
                 input->meta.acq_date.doy);
-        printf ("Fill value is %d\n", input->meta.fill);
+        printf ("Fill value is %d\n", input->meta.fill_value);
         printf ("Thermal Band -->\n");
 //        printf ("  therm_satu_value_ref: %d\n",
 //                input->meta.therm_satu_value_ref);
@@ -246,8 +246,7 @@ main (int argc, char *argv[])
                       points.modtran_runs[i].path);
         }
 
-        snprintf (msg_str, sizeof(msg_str),
-                  "Executing [%s]", command);
+        snprintf (msg_str, sizeof(msg_str), "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
 #if 0
@@ -260,29 +259,48 @@ main (int argc, char *argv[])
 #endif
     }
 
-    /* Allocate memory for results */
-    results = (float **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
-                                            LST_NUM_ELEMENTS, sizeof (float));
-    if (results == NULL)
+    /* Allocate memory for MODTRAN results */
+    modtran_results =
+        (float **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
+                                      LST_NUM_ELEMENTS, sizeof (float));
+    if (modtran_results == NULL)
     {
-        RETURN_ERROR ("Allocating results memory", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR ("Allocating MODTRAN results memory", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
     /* Generate parameters for each height and NARR point */
     if (calculate_point_atmospheric_parameters (input, &points, alb,
-                                                results, verbose)
+                                                modtran_results, verbose)
         != SUCCESS)
     {
-        RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR ("Calculating point atmospheric parameters\n",
+                      FUNC_NAME, EXIT_FAILURE);
     }
 
-    /* call third_pixels_post to generate parameters for each Landsat pixel */
+#if 0
+    for (i = 0; i < points.num_points * NUM_ELEVATIONS; i++)
+    {
+        printf ("%04d [%f,%f,%f,%f,%f,%f]\n",
+                i,
+                modtran_results[i][LST_LATITUDE],
+                modtran_results[i][LST_LONGITUDE],
+                modtran_results[i][LST_HEIGHT],
+                modtran_results[i][LST_TRANSMISSION],
+                modtran_results[i][LST_UPWELLED_RADIANCE],
+                modtran_results[i][LST_DOWNWELLED_RADIANCE]);
+        fflush(stdout);
+    }
+#endif
+
+    /* Generate parameters for each Landsat pixel */
     if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 dem_name, emissivity_name,
-                                                results, verbose)
+                                                modtran_results, verbose)
         != SUCCESS)
     {
-        RETURN_ERROR ("Calling scene_based_list\n", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR ("Calculating per/pixel atmospheric parameters\n",
+                      FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Free memory allocation */
@@ -364,9 +382,10 @@ main (int argc, char *argv[])
     FreeInput (input);
 
     /* Free memory allocations */
-    if (free_2d_array ((void **) results) != SUCCESS)
+    if (free_2d_array ((void **) modtran_results) != SUCCESS)
     {
-        RETURN_ERROR ("Freeing memory: results\n", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR ("Freeing memory: MODTRAN results\n", FUNC_NAME,
+                      EXIT_FAILURE);
     }
 
 #if 0

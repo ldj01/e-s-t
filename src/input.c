@@ -91,6 +91,7 @@ GetInputThermLine
     void *buf = NULL;
     long loc;         /* pointer location in the raw binary file */
     int sample;
+    uint8_t *line = NULL;
 
     /* Check the parameters */
     if (this == (Input_t *) NULL)
@@ -129,7 +130,6 @@ GetInputThermLine
     }
     else
     {
-        uint8_t *line;
         line = malloc (this->size_th.s * sizeof (uint8_t));
         if (line == NULL)
         {
@@ -274,7 +274,7 @@ Design Notes:
     this->meta.wrs_sys = (Wrs_t) WRS_FILL;
     this->meta.ipath = -1;
     this->meta.irow = -1;
-    this->meta.fill = INPUT_FILL;
+    this->meta.fill_value = INPUT_FILL;
     this->size_th.s = this->size_th.l = -1;
     this->nband_th = 0;
     this->open_th = false;

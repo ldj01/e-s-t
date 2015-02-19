@@ -621,13 +621,14 @@ int calculate_point_atmospheric_parameters
     Input_t * input,           /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     float albedo,              /* I: albedo */
-    float **results,           /* O: atmospheric parameter for modtarn run */
+    float **modtran_results,   /* O: atmospheric parameter for modtarn run */
     bool verbose               /* I: value to indicate if intermediate
                                      messages should be printed */
 )
 {
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
     FILE *fd;
+    FILE *used_points_fd;
     int i, j, k;
     int entry;
     float **spectral_response = NULL;
@@ -745,19 +746,31 @@ int calculate_point_atmospheric_parameters
     x_1 = temp_radiance_300;
     inv_xx_diff = 1.0F / (x_0 - x_1);
 
+    used_points_fd = fopen ("used_points.txt", "w");
+    if (used_points_fd == NULL)
+    {
+        RETURN_ERROR ("Can't open used_points.txt file",
+                      FUNC_NAME, FAILURE);
+    }
     /* Iterate through all points and heights */
     counter = 0;
     for (i = 0; i < points->num_points; i++)
     {
+        fprintf (used_points_fd, "\"%d\"|\"%f\"|\"%f\"\n",
+                 i,
+                 points->utm_easting[i],
+                 points->utm_northing[i]);
+
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
             result_loc = i * NUM_ELEVATIONS + j;
-            /* put results into results array */
-            results[result_loc][LST_LATITUDE] =
+
+            /* put results into MODTRAN results array */
+            modtran_results[result_loc][LST_LATITUDE] =
                 points->modtran_runs[counter].latitude;
-            results[result_loc][LST_LONGITUDE] =
+            modtran_results[result_loc][LST_LONGITUDE] =
                 points->modtran_runs[counter].longitude;
-            results[result_loc][LST_HEIGHT] =
+            modtran_results[result_loc][LST_HEIGHT] =
                 points->modtran_runs[counter].height;
 
             /* Read the lst_modtran.info file for the 000 execution
@@ -912,12 +925,13 @@ int calculate_point_atmospheric_parameters
             ld = (((obs_radiance_0 - lu) / tau)
                   - (temp_radiance_0 * emissivity)) * inv_albedo;
 
-            /* Place results into results array */
-            results[result_loc][LST_TRANSMISSION] = tau;
-            results[result_loc][LST_UPWELLED_RADIANCE] = lu;
-            results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
+            /* Place results into MODTRAN results array */
+            modtran_results[result_loc][LST_TRANSMISSION] = tau;
+            modtran_results[result_loc][LST_UPWELLED_RADIANCE] = lu;
+            modtran_results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
         } /* END - NUM_ELEVATIONS loop */
     } /* END - num_points loop */
+    fclose (used_points_fd);
 
     /* Free allocated memory */
     if (free_2d_array ((void **) spectral_response) != SUCCESS)
@@ -942,12 +956,12 @@ int calculate_point_atmospheric_parameters
     for (k = 0; k < points->num_points * NUM_ELEVATIONS; k++)
     {
         fprintf (fd, "%f,%f,%f,%f,%f,%f\n",
-                 results[k][LST_LATITUDE],
-                 results[k][LST_LONGITUDE],
-                 results[k][LST_HEIGHT],
-                 results[k][LST_TRANSMISSION],
-                 results[k][LST_UPWELLED_RADIANCE],
-                 results[k][LST_DOWNWELLED_RADIANCE]);
+                 modtran_results[k][LST_LATITUDE],
+                 modtran_results[k][LST_LONGITUDE],
+                 modtran_results[k][LST_HEIGHT],
+                 modtran_results[k][LST_TRANSMISSION],
+                 modtran_results[k][LST_UPWELLED_RADIANCE],
+                 modtran_results[k][LST_DOWNWELLED_RADIANCE]);
     }
     fclose (fd);
 

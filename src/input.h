@@ -101,7 +101,7 @@ typedef struct
     Wrs_t wrs_sys;              /* WRS system */
     int ipath;                  /* WRS path number */
     int irow;                   /* WRS row number */
-    unsigned char fill;         /* Fill value */
+    int fill_value;             /* Fill value */
     int iband_th[NBAND_THM_MAX];/* thermal band numbers */
     int therm_satu_value_ref;   /* saturation value of thermal product */
     int therm_satu_value_max;   /* maximum bt value (degrees Celsius) */

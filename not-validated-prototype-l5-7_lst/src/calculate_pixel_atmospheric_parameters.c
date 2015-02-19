@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <float.h>
 #include <math.h>
 
 
@@ -13,15 +14,45 @@
 #include "build_points.h"
 
 
-int qsort_float_compare_function
+#define NUM_PARAMETERS 3
+
+
+/* Defines the distance to the current pixel, along with the index of the
+   point
+   So that we can find the index of the closest point to start determining the
+   correct cell to use */
+typedef struct
+{
+    int index;
+    float distance;
+} DISTANCE_ITEM;
+
+
+/* Defines index locations in the vertices array for the current cell to be
+   used for interpolation of the pixel */
+typedef enum
+{
+    LL_POINT,
+    UL_POINT,
+    UR_POINT,
+    LR_POINT,
+    NUM_CELL_POINTS
+} CELL_POINTS;
+
+
+/* A qsort routine that can be used with the DISTANCE_ITEM items */
+int qsort_distance_compare_function
 (
-    const void *a,
-    const void *b
+    const void *distance_item_a,
+    const void *distance_item_b
 )
 {
-    if (*(float*)a < *(float*)b)
+    float a = (*(DISTANCE_ITEM*)distance_item_a).distance;
+    float b = (*(DISTANCE_ITEM*)distance_item_b).distance;
+
+    if (a < b)
         return -1;
-    else if (*(float*)b < *(float*)a)
+    else if (b < a)
         return 1;
 
     return 0;
@@ -29,155 +60,70 @@ int qsort_float_compare_function
 
 
 /******************************************************************************
-MODULE:  distance_in_utm
+METHOD:  distance_in_utm
 
 PURPOSE: Calculate distances between UTM coordiantes
 
 RETURN: NONE
 
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-10/10/2014   Song Guo         Original Development
+NOTE: SR(x) = (scale_factor / cos ((x - false_easting) / equatorial_radius))
+
+NOTE: Simpson's Rule is applied for integrating the longitudinal distance
+      from easting of first point to easting of second point.
+
+      SR(x)dx ~= ((e2 - e0) / 6)
+                 * (SR(e0) + 4 * SR((e0 + e2) / 2) + SR(e2))
+
+      Where:
+          e0 = easting of starting point
+          e2 = easting of stopping point
+
 ******************************************************************************/
+#define INV_UTM_EQUATORIAL_RADIUS (1.0 / UTM_EQUATORIAL_RADIUS)
+#define INV_TWO (0.5) // (1.0 / 2.0)
+#define INV_SIX (1.0 / 6.0)
 void distance_in_utm
 (
-    float e1,
-    float n1,
+    float e0,
+    float n0,
     float e2,
     float n2,
     float *distance
 )
 {
-    float s = 0.9996;           /* scale factor */
-    float r = 6378137;          /* earth radius */
-    float sr1, sr2, sr3;
+    /* The UTM coordinates we are using have the 500000 false easting applied
+       to them, so we need to remove that before applying the distance
+       calculation. */
+    float e0_adj;
+    float e1_term;
+    float e2_adj;
+
+    float sr_e0;
+    float sr_e1;
+    float sr_e2;
+
     float edist;
 
-    sr1 = s / (cos (e1 / r));
-    sr2 = s / (cos (((e2 - e1) / 6.0) / r));
-    sr3 = s / (cos (e2 / r));
+    e0_adj = e0 - UTM_FALSE_EASTING;
+    e1_term = (e0 + e2) * INV_TWO;
+    e2_adj = e2 - UTM_FALSE_EASTING;
 
-    edist = ((e2 - e1) / 6.0) * (sr1 + 4 * sr2 + sr3);
 
-    *distance = sqrt (edist * edist + (n2 - n1) * (n2 - n1));
+    sr_e0 = UTM_SCALE_FACTOR / (cos (e0_adj * INV_UTM_EQUATORIAL_RADIUS));
+
+    sr_e1 = UTM_SCALE_FACTOR / (cos (e1_term * INV_UTM_EQUATORIAL_RADIUS));
+
+    sr_e2 = UTM_SCALE_FACTOR / (cos (e2_adj * INV_UTM_EQUATORIAL_RADIUS));
+
+    edist = ((e2 - e0) * INV_SIX)
+            * (sr_e0 + 4.0 * sr_e1 + sr_e2);
+
+    *distance = sqrt (edist * edist + (n2 - n0) * (n2 - n0));
 }
 
 
 /******************************************************************************
-MODULE:  convert_ll_utm
-
-PURPOSE: convert digital counts to radiance for thermal band
-         [unit: W m^(-2) sr^(-1) mu^(-1) ]
-
-RETURN: NONE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/30/2014   Song Guo         Original Development
-******************************************************************************/
-void convert_ll_utm
-(
-    Input_t *input,
-    float *lat,
-    float *lon,
-    int num_points,
-    float **narr_utm
-)
-{
-    int i;
-    float a = 6378137.0;        /* equatorial radius */
-    float b = 6356752.3;        /* polar radius */
-    float k0 = 0.9996;          /* scale factor */
-    float e;                    /* eccentricity */
-    float eprimesqrd;
-    float n;
-//    float rho;
-    float nu;
-    float a0;
-    float b0;
-    float c0;
-    float d0;
-    float e0;
-    float ki;
-    float kii;
-    float kiii;
-    float kiv;
-    float kv;
-    float zone_cm;
-//    float zone_cm_rad;
-    float delta_lon;
-    float p;
-    float lat_rad;
-//    float lon_rad;
-    float s;
-    float northing;
-    float easting;
-
-    /* calculate zone central meridian in degrees and radians */
-    zone_cm = (float) (6 * input->meta.zone - 183);
-//    zone_cm_rad =  zone_cm * PI / 180.0;
-
-    e = sqrt (1.0 - pow (b / a, 2));
-    eprimesqrd = e * e / (1.0 - e * e);
-    n = (a - b) / (a + b);
-
-    /* calculate meridional arc length */
-    a0 = a * (1.0 - n + (5.0 * n * n / 4.0) * (1.0 - n) +
-              (81.0 * (float) pow (n, 4) / 64.0) * (1.0 - n));
-    b0 = (3.0 * a * n / 2.0) * (1.0 - n - (7.0 * n * n / 8.0) * (1.0 - n) +
-                                55.0 * (float) pow (n, 4) / 64.0);
-    c0 = (15.0 * a * n * n / 16.0) * (1.0 - n +
-                                      (3.0 * n * n / 4.0) * (1.0 - n));
-    d0 = (35 * a * (float) pow (n, 3) / 48.0) * (1.0 - n +
-                                                 11.0 * n * n / 16.0);
-    e0 = (315.0 * a * (float) pow (n, 4) / 51.0) * (1.0 - n);
-
-    for (i = 0; i < num_points; i++)
-    {
-        delta_lon = lon[i] - zone_cm;
-        p = delta_lon * PI / 180.0;
-        /* convert lat and lon points from decimal degrees to radians */
-        lat_rad = lat[i] * PI / 180.0;
-//        lon_rad = lon[i]*PI/180.0;
-
-//        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
-//              (3.0/2.0)));
-        nu = a / pow ((1.0 - (e * sin (lat_rad)) * (e * sin (lat_rad))),
-                      (1.0 / 2.0));
-
-
-        s = a0 * lat_rad - b0 * sin (2 * lat_rad) + c0 * sin (4 * lat_rad) -
-            d0 * sin (6 * lat_rad) + e0 * sin (8 * lat_rad);
-
-        /* coefficients for UTM coordinates */
-        ki = s * k0;
-        kii = nu * sin (lat_rad) * cos (lat_rad) * k0 / 2.0;
-        kiii = (pow (nu * sin (lat_rad) * cos (lat_rad), 3) / 24.0) *
-            pow ((5 - tan (lat_rad)),
-                 2) + 9.0 * eprimesqrd * pow (cos (lat_rad),
-                                              2) +
-            4.0 * eprimesqrd * eprimesqrd * pow (cos (lat_rad), 4) * k0;
-        kiv = nu * cos (lat_rad) * k0;
-        kv = pow (cos (lat_rad),
-                  3) * (nu / 6.0) * (1 - tan (lat_rad) * tan (lat_rad) +
-                                     eprimesqrd * cos (lat_rad) *
-                                     cos (lat_rad)) * k0;
-
-        /* calculate UTM coordinates */
-        northing = (ki + kii * p * p + kiii * pow (p, 4));
-        easting = 500000.0 + (kiv * p + kv * pow (p, 3));
-
-        /* assign to narr_utm array */
-        narr_utm[i][0] = easting;
-        narr_utm[i][1] = northing;
-    }
-}
-
-
-/******************************************************************************
-MODULE:  dn_to_radiance
+METHOD:  dn_to_radiance
 
 PURPOSE: convert digital counts to radiance for thermal band
          [unit: W m^(-2) sr^(-1) mu^(-1) ]
@@ -216,142 +162,181 @@ void dn_to_radiance
 
 
 /******************************************************************************
-MODULE:  interpolate_to_height
+METHOD:  interpolate_to_height
 
 PURPOSE: Inteprolate to height of current pixel
 
-RETURN: SUCCESS
-        FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-10/29/2014   Song Guo
 ******************************************************************************/
 void interpolate_to_height
 (
-    float *height,        /*I: list of height of one location */
-    float *atm1,          /*I: atmospheric parameter colum1 */
-    float *atm2,          /*I: atmospheric parameter colum2 */
-    float *atm3,          /*I: atmospheric parameter colum3 */
-    float interpolate_to, /*I: current landsat pixel height */
-    float *at_height      /*O: interpolated height */
+    float **modtran_results, /* I: results from MODTRAN runs for a point */
+    float interpolate_to,    /* I: current landsat pixel height */
+    float *at_height         /* O: interpolated height for point */
 )
 {
     int i;
     int below = 0;
     int above = 0;
-    int close_below;
-    int close_above;
-    float under_height;
-    float under_variables[3];
-    float over_height;
-    float over_variables[3];
-    float m[3];
-    float b[3];
 
-    /* Determine points below/above interpolate_to */
-    for (i = 0; i < NUM_ELEVATIONS - 1; i++)
+    float below_parameters[NUM_PARAMETERS];
+    float above_parameters[NUM_PARAMETERS];
+
+    float slope;
+    float intercept;
+
+    float above_height;
+    float inv_height_diff; /* To remove the multiple divisions */
+
+    /* Find the height to use that is below the interpolate_to height */
+    for (i = 0; i < NUM_ELEVATIONS; i++)
     {
-        if ((height[i] - interpolate_to) < MINSIGMA)
-            below++;
-        else
-            above++;
+        if (modtran_results[i][LST_HEIGHT] < interpolate_to)
+        {
+            below = i; /* Last match will always be the one we want */
+        }
     }
 
-    if (below == 0)
-        close_below = 0;
-    else
-        close_below = below;
-    under_height = height[close_below];
-    under_variables[0] = atm1[close_below];
-    under_variables[1] = atm2[close_below];
-    under_variables[2] = atm3[close_below];
+    /* Find the height to use that is equal to or above the interpolate_to
+       height
 
-    if (above == 0)
-        close_above = NUM_ELEVATIONS - 1;
-    else
-        close_below = above;
-    over_height = height[close_below];
-    over_variables[0] = atm1[close_below];
-    over_variables[1] = atm2[close_below];
-    over_variables[2] = atm3[close_below];
-
-    for (i = 0; i < 3; i++)
+       It will always be the same or the next height */
+    above = below; /* Start with the same */
+    if (above != (NUM_ELEVATIONS - 1))
     {
-        if (close_above == close_below)
-            at_height[i] = under_variables[i];
-        else
+        /* Not the last height */
+
+        /* Check to make sure that we are not less that the below height,
+           indicating that our interpolate_to height is below the first
+           height */
+        if (! (interpolate_to < modtran_results[above][LST_HEIGHT]))
         {
-            m[i] = (over_variables[i] - under_variables[i]) /
-                (over_height - under_height);
-            b[i] = over_variables[i] - m[i] * over_height;
-            at_height[i] = m[i] * interpolate_to + b[i];
+            /* Use the next height, since it will be equal to or above our
+               interpolate_to height */
+            above++;
+        }
+        /* Else - We are at the first height, so use that for both above and
+                  below */
+    }
+    /* Else - We are at the last height, so use that for both above and
+              below */
+
+    below_parameters[0] = modtran_results[below][LST_TRANSMISSION];
+    below_parameters[1] = modtran_results[below][LST_UPWELLED_RADIANCE];
+    below_parameters[2] = modtran_results[below][LST_DOWNWELLED_RADIANCE];
+
+    if (above == below)
+    {
+        /* Use the below parameters since the same */
+        at_height[0] = below_parameters[0];
+        at_height[1] = below_parameters[1];
+        at_height[2] = below_parameters[2];
+    }
+    else
+    {
+        /* Interpolate between the heights for each parameter */
+        above_height = modtran_results[above][LST_HEIGHT];
+        inv_height_diff = 1.0 / (above_height
+                                 - modtran_results[below][LST_HEIGHT]);
+
+        above_parameters[0] = modtran_results[above][LST_TRANSMISSION];
+        above_parameters[1] = modtran_results[above][LST_UPWELLED_RADIANCE];
+        above_parameters[2] = modtran_results[above][LST_DOWNWELLED_RADIANCE];
+
+        for (i = 0; i < NUM_PARAMETERS; i++)
+        {
+            slope = (above_parameters[i] - below_parameters[i])
+                    * inv_height_diff;
+
+            intercept = above_parameters[i] - slope * above_height;
+
+            at_height[i] = slope * interpolate_to + intercept;
         }
     }
 }
 
 
 /******************************************************************************
-MODULE:  interpolate_to_location
+METHOD:  interpolate_to_location
 
 PURPOSE: Inteprolate to location of current pixel
 
-RETURN: SUCCESS
-        FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-10/29/2014   Song Guo
 ******************************************************************************/
 void interpolate_to_location
 (
-    float **coordinates,        /*I: current pixel coordinates */
-    float **at_height,          /*I: current height atmospheric results */
-    float interpolate_easting,  /*I: interpolate to easting */
-    float interpolate_northing, /*I: interpolate to northing */
+    REANALYSIS_POINTS *points,  /* I: The coordinate points */
+    int *cell_vertices,         /* I: The vertices in the pointds to use */
+    float **at_height,          /* I: current height atmospheric results */
+    float interpolate_easting,  /* I: interpolate to easting */
+    float interpolate_northing, /* I: interpolate to northing */
     float *parameters     /*O: interpolated pixel atmospheric parameters */
 )
 {
     int i, j;
-    float h[4];
-    float w[4];
+    float inv_h[NUM_CELL_POINTS];
+    float w[NUM_CELL_POINTS];
     float total = 0.0;
 
     /* shepard's method */
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < NUM_CELL_POINTS; i++)
     {
-        h[i] = (coordinates[i][0] - interpolate_easting)
-                 * (coordinates[i][0] - interpolate_easting)
-               + (coordinates[i][1] - interpolate_northing)
-                 * (coordinates[i][1] - interpolate_northing);
-    }
-    qsort (h, 4, sizeof (float), qsort_float_compare_function);
+        inv_h[i] = 1.0 / sqrt (((points->utm_easting[cell_vertices[i]]
+                                 - interpolate_easting)
+                                * (points->utm_easting[cell_vertices[i]]
+                                   - interpolate_easting))
+                               +
+                               ((points->utm_northing[cell_vertices[i]]
+                                 - interpolate_northing)
+                                * (points->utm_northing[cell_vertices[i]]
+                                   - interpolate_northing)));
 
-    for (i = 0; i < 4; i++)
-    {
-        total += 1.0 / h[i];
-    }
-
-    for (i = 0; i < 4; i++)
-    {
-        w[i] = (1.0 / h[i]) / total;
+        total += inv_h[i];
     }
 
-    for (i = 0; i < 3; i++)
+    /* Determine the weights for each vertex */
+    for (i = 0; i < NUM_CELL_POINTS; i++)
+    {
+        w[i] = inv_h[i] / total;
+    }
+
+    /* For each parameter apply each vertex's weighted value */
+    for (i = 0; i < NUM_PARAMETERS; i++)
     {
         parameters[i] = 0.0;
-        for (j = 0; j < 4; j++)
+        for (j = 0; j < NUM_CELL_POINTS; j++)
         {
-            parameters[i] += w[j] * at_height[i][j];
+            parameters[i] += (w[j] * at_height[i][j]);
         }
     }
 }
 
 
-/******************************************************************************
-MODULE:  calculate_pixel_atmospheric_parameters
+/*****************************************************************************
+METHOD:  point_is_left_of_line
+
+PURPOSE: Determines if a point is on the left side of the line or otherwise on
+         the line or on  the right side of the line.
+
+NOTE: This is based on a 2D geometry and when we are in UTM, that is the case.
+
+RETURN: type = bool
+    Value  Description
+    -----  -------------------------------------------------------------------
+    True   Indicates the value is on the left side of the line.
+    False  Indicates the value is on the line or on the right side of the line.
+*****************************************************************************/
+bool point_is_left_of_line(int x0, int y0, int x1, int y1, int px, int py)
+{
+    float result = ((x1 - x0) * (py - y0)) - ((px - x0) * (y1 - y0));
+
+    if (result > 0.0)
+        return true;
+
+    return false;
+}
+
+
+/*****************************************************************************
+METHOD:  calculate_pixel_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
          each Landsat pixel
@@ -359,74 +344,57 @@ PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
 RETURN: SUCCESS
         FAILURE
 
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-10/8/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 int calculate_pixel_atmospheric_parameters
 (
     Input_t * input,           /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    char *dem_infile,          /* I: address of input DEM filename */
-    char *emi_infile,          /* I: address of input Emissivity filename */
-    float **modtran_results,   /* I: atmospheric parameter for modtarn run */
+    char *dem_filename,        /* I: address of input DEM filename */
+    char *emi_filename,        /* I: address of input Emissivity filename */
+    float **modtran_results,   /* I: results from MODTRAN runs */
     bool verbose               /* I: value to indicate if intermediate
                                      messages be printed */
 )
 {
     char FUNC_NAME[] = "calculate_pixel_atmospheric_parameters";
-    int row;
-    int col;
     int line;
     int sample;
-    int16_t *dem = NULL;          /* input DEM data (meters) */
+    int status;
+    int closest_point;
     int offset;                 /* offset in the raw binary DEM file to seek to
                                    to begin reading the window in the DEM */
-    FILE *dem_fptr = NULL;      /* input scene-based DEM file pointer */
-    float **east_grid;
-    float **north_grid;
-    int first_line;
+    bool first_sample;
     float current_easting;
     float current_northing;
-    float *distances = NULL;
-    int g;
-    int n;
+    DISTANCE_ITEM *distances = NULL;
+
     int point;
-    int element;
-    int closest[6];
-//    float easting_near[6];
-    float northing_near[6];
-    int below[6];
-    int min_in_row = 0;
-    int min_in_col = 0;
-    float **coordinates;
-    int indices[4];
-    float stay_up, stay_down, stay_right;
-    float move_up, move_down, move_right;
-    float **at_height;
+    int vertex;
     int current_index;
-    float **current_location;
-    float parameters[3];
-    char therm_fname[] = "therm_radiance";
-    char up_fname[] = "upwell_radiance";
-    char down_fname[] = "downwell_radiance";
-    char trans_fname[] = "atmos_transmittance";
-    FILE *therm_fptr = NULL;
-    FILE *trans_fptr = NULL;
-    FILE *up_fptr = NULL;
-    FILE *down_fptr = NULL;
+    int cell_vertices[NUM_CELL_POINTS];
+
+    float **at_height = NULL;
+    float parameters[NUM_PARAMETERS];
+
+    char thermal_filename[] = "thermal_radiance";
+    char upwelled_filename[] = "upwelled_radiance";
+    char downwelled_filename[] = "downwelled_radiance";
+    char transmittance_filename[] = "atmospheric_transmittance";
+
+    FILE *dem_fd = NULL;
+    FILE *thermal_fd = NULL;
+    FILE *transmittance_fd = NULL;
+    FILE *upwelled_fd = NULL;
+    FILE *downwelled_fd = NULL;
+
+    int16_t *dem = NULL;        /* input DEM data in meters */
     float **landsat_results;
     char msg[MAX_STR_LEN];
     char *lst_data_dir = NULL;
-    int status;
-    int index;
 
     /* Use local variables for cleaner code */
-    int num_rows = points->num_rows;
     int num_cols = points->num_cols;
     int num_points = points->num_points;
-
 
     /* Grab the environment path to the LST_DATA_DIR */
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -436,41 +404,14 @@ int calculate_pixel_atmospheric_parameters
                       FUNC_NAME, FAILURE);
     }
 
-    /* Dynamic allocate the memory */
-    east_grid = (float **) allocate_2d_array (num_rows, num_cols,
-                                              sizeof (float));
-    if (east_grid == NULL)
-    {
-        RETURN_ERROR ("Allocating east_grid memory", FUNC_NAME, FAILURE);
-    }
-
-    north_grid = (float **) allocate_2d_array (num_rows, num_cols,
-                                               sizeof (float));
-    if (north_grid == NULL)
-    {
-        RETURN_ERROR ("Allocating north_grid memory", FUNC_NAME, FAILURE);
-    }
-
-    index = 0;
-    for (row = 0; row < num_rows; row++)
-    {
-        for (col = 0; col < num_cols; col++)
-        {
-            east_grid[row][col] = points->utm_easting[index];
-            north_grid[row][col] = points->utm_northing[index];
-
-            index++;
-        }
-    }
-
     /* Open the DEM for reading raw binary */
-    dem_fptr = fopen (dem_infile, "rb");
-    if (dem_fptr == NULL)
+    dem_fd = fopen (dem_filename, "rb");
+    if (dem_fd == NULL)
     {
         RETURN_ERROR ("Error opening the DEM file", FUNC_NAME, FAILURE);
     }
 
-    /* Allocate memory for the DEM */
+    /* Allocate memory for one line of the DEM */
     dem = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
     if (dem == NULL)
     {
@@ -478,33 +419,41 @@ int calculate_pixel_atmospheric_parameters
                       FUNC_NAME, FAILURE);
     }
 
+    /* Allocate memory for one line of the Thermal data */
+    input->therm_buf = (int16_t *) calloc (input->size_th.s, sizeof (int16_t));
+    if (input->therm_buf == NULL)
+    {
+        RETURN_ERROR ("Error allocating memory for the Thermal data",
+                      FUNC_NAME, FAILURE);
+    }
+
     /* Open the intermediate binary files for writing
        Note: Needs to be deleted before release */
-    therm_fptr = fopen (therm_fname, "wb");
-    if (therm_fptr == NULL)
+    thermal_fd = fopen (thermal_filename, "wb");
+    if (thermal_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", therm_fname);
+        sprintf (msg, "Opening report file: %s", thermal_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
-    trans_fptr = fopen (trans_fname, "wb");
-    if (trans_fptr == NULL)
+    transmittance_fd = fopen (transmittance_filename, "wb");
+    if (transmittance_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", trans_fname);
+        sprintf (msg, "Opening report file: %s", transmittance_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
-    up_fptr = fopen (up_fname, "wb");
-    if (up_fptr == NULL)
+    upwelled_fd = fopen (upwelled_filename, "wb");
+    if (upwelled_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", up_fname);
+        sprintf (msg, "Opening report file: %s", upwelled_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
-    down_fptr = fopen (down_fname, "wb");
-    if (down_fptr == NULL)
+    downwelled_fd = fopen (downwelled_filename, "wb");
+    if (downwelled_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", down_fname);
+        sprintf (msg, "Opening report file: %s", downwelled_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
@@ -516,28 +465,21 @@ int calculate_pixel_atmospheric_parameters
         RETURN_ERROR ("Allocating landsat_results memory", FUNC_NAME, FAILURE);
     }
 
-    /* Allocate memory for coordinates */
-    coordinates = (float **) allocate_2d_array (4, 2, sizeof (float));
-    if (coordinates == NULL)
-    {
-        RETURN_ERROR ("Allocating coordinates memory", FUNC_NAME, FAILURE);
-    }
-
     /* Allocate memory for at_height */
-    at_height = (float **) allocate_2d_array (4, 3, sizeof (float));
+    at_height = (float **) allocate_2d_array (NUM_CELL_POINTS, NUM_PARAMETERS,
+                                              sizeof (float));
     if (at_height == NULL)
     {
         RETURN_ERROR ("Allocating at_height memory", FUNC_NAME, FAILURE);
     }
 
-    /* Allocate memory for current_location */
-    current_location =
-        (float **) allocate_2d_array (num_points * NUM_ELEVATIONS,
-                                      LST_NUM_ELEMENTS, sizeof (float));
-    if (current_location == NULL)
+    /* Allocate memory to hold the distances to the first sample of data for
+       the current line */
+    distances = malloc (num_points * sizeof (DISTANCE_ITEM));
+    if (distances == NULL)
     {
-        RETURN_ERROR ("Allocating current_location memory", FUNC_NAME,
-                      FAILURE);
+        ERROR_MESSAGE ("Allocating distances memory",
+                       FUNC_NAME);
     }
 
     if (verbose)
@@ -549,13 +491,13 @@ int calculate_pixel_atmospheric_parameters
     /* Loop through each line in the image */
     for (line = 0; line < input->size_th.l; line++)
     {
-        /* Print status on every 1000 lines */
-        if (!(line % 250))
+        /* Print status on every 250 lines */
+//        if (!(line % 250))
         {
             if (verbose)
             {
-                printf ("Processing line %d\r", line);
-                fflush (stdout);
+//                printf ("Processing line %d\r", line);
+//                fflush (stdout);
             }
         }
 
@@ -570,8 +512,8 @@ int calculate_pixel_atmospheric_parameters
         /* Can also read in one line of DEM data here */
         /* Start reading DEM from the start_line */
         offset = sizeof (int16_t) * line * input->size_th.s;
-        fseek (dem_fptr, offset, SEEK_SET);
-        if (fread (dem, sizeof (int16_t), input->size_th.s, dem_fptr)
+        fseek (dem_fd, offset, SEEK_SET);
+        if (fread (dem, sizeof (int16_t), input->size_th.s, dem_fd)
             != input->size_th.s)
         {
             sprintf (msg, "Error reading values from the DEM file "
@@ -579,223 +521,255 @@ int calculate_pixel_atmospheric_parameters
             RETURN_ERROR (msg, FUNC_NAME, FAILURE);
         }
 
-        /* set first_line be 1 */
-        first_line = 1;
+        /* Set first_sample to be true */
+        first_sample = true;
         for (sample = 0; sample < input->size_th.s; sample++)
         {
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-// TODO TODO TODO - Change to use fill value from xml, not 0
-            if (input->therm_buf != 0)
+            if (input->therm_buf[sample] != input->meta.fill_value)
             {
                 /* determine UTM coordinates of current pixel */
                 current_easting = input->meta.ul_map_corner.x
-                    + line * input->meta.pixel_size[0];
+                    + (sample * input->meta.pixel_size[0]);
                 current_northing = input->meta.ul_map_corner.y
-                    + line * input->meta.pixel_size[1];
+                    - (line * input->meta.pixel_size[1]);
 
-                if (first_line == 1)
+                if (first_sample)
                 {
                     /* compute distance between current pixel and each narr
                        points in UTM coordinates
 
                        Note: consider only calculating points within a small
                        range nearby */
-                    distances = malloc (num_points * sizeof (float));
-                    if (distances == NULL)
-                    {
-                        ERROR_MESSAGE ("Allocating distances memory",
-                                       FUNC_NAME);
-                    }
                     for (point = 0; point < num_points; point++)
                     {
                         distance_in_utm (points->utm_easting[point],
                                          points->utm_northing[point],
                                          current_easting,
                                          current_northing,
-                                         &distances[point]);
+                                         &distances[point].distance);
+
+                        distances[point].index = point;
                     }
 
-                    /* find indices of 6 closet points */
-LOG_MESSAGE ("Before qsort", FUNC_NAME);
-                    qsort (distances, num_points, sizeof (float),
-                           qsort_float_compare_function);
-LOG_MESSAGE ("After qsort", FUNC_NAME);
+                    /* find the closest point */
+                    qsort (distances, num_points, sizeof (DISTANCE_ITEM),
+                           qsort_distance_compare_function);
+                    closest_point = distances[0].index;
+#if 0
+snprintf (msg, sizeof (msg), "closest = %d", closest_point);
+LOG_MESSAGE (msg, FUNC_NAME);
+#endif
 
-                    n = 0;
-                    /* find indices of 6 closest points */
-                    for (g = 0; g < 6; g++)
+                    /* Now determine where we are in the point data cells */
+                    if (point_is_left_of_line(
+                        points->utm_easting[closest_point],
+                        points->utm_northing[closest_point],
+                        points->utm_easting[closest_point + num_cols],
+                        points->utm_northing[closest_point + num_cols],
+                        current_easting,
+                        current_northing))
                     {
-                        for (point = 0; point < num_points; point++)
+                        if (! point_is_left_of_line(
+                            points->utm_easting[closest_point],
+                            points->utm_northing[closest_point],
+                            points->utm_easting[closest_point - 1],
+                            points->utm_northing[closest_point - 1],
+                            current_easting,
+                            current_northing))
                         {
-                            {
-                                closest[g] = point;
-//                                easting_near[g] = points->utm_easting[g];
-                                northing_near[g] = points->utm_northing[g];
-                                if ((northing_near[g] - current_northing) <=
-                                    MINSIGMA)
-                                {
-                                    below[n] = point;
-                                    n++;
-                                }
-                            }
+                            /* in quadrant top-left */
+                            closest_point--;
+                        }
+                        else if (! point_is_left_of_line(
+                            points->utm_easting[closest_point],
+                            points->utm_northing[closest_point],
+                            points->utm_easting[closest_point - num_cols],
+                            points->utm_northing[closest_point - num_cols],
+                            current_easting,
+                            current_northing))
+                        {
+                            /* in quadrant bottom-left */
+                            closest_point -= (num_cols + 1);
+                        }
+                        else
+                        {
+                            /* in quadrant bottom-right */
+                            closest_point -= num_cols;
                         }
                     }
-LOG_MESSAGE ("HERE 1", FUNC_NAME);
-
-                    min_in_row = points->row[closest[below[0]]];
-                    min_in_col = points->col[closest[below[0]]];
-                    for (g = 1; g < n; g++)
+                    else if (! point_is_left_of_line(
+                        points->utm_easting[closest_point],
+                        points->utm_northing[closest_point],
+                        points->utm_easting[closest_point + 1],
+                        points->utm_northing[closest_point + 1],
+                        current_easting,
+                        current_northing))
                     {
-                        min_in_row =
-                            min (min_in_row, points->row[closest[below[g]]]);
-                        min_in_col =
-                            min (min_in_col, points->col[closest[below[g]]]);
+                        if (point_is_left_of_line(
+                            points->utm_easting[closest_point],
+                            points->utm_northing[closest_point],
+                            points->utm_easting[closest_point - num_cols],
+                            points->utm_northing[closest_point - num_cols],
+                            current_easting,
+                            current_northing))
+                        {
+                            /* in quadrant bottom-right */
+                            closest_point -= num_cols;
+                        }
+                        else
+                        {
+                            /* in quadrant bottom-left */
+                            closest_point -= (num_cols + 1);
+                        }
                     }
-LOG_MESSAGE ("HERE 2", FUNC_NAME);
-
-                    /* extract UTM coordinates of four points to be
-                       interpolated and build array */
-                    coordinates[0][0] = east_grid[min_in_row][min_in_col];
-                    coordinates[0][1] = north_grid[min_in_row][min_in_col];
-                    coordinates[1][0] = east_grid[min_in_row][min_in_col + 1];
-                    coordinates[1][1] = north_grid[min_in_row][min_in_col + 1];
-                    coordinates[2][0] = east_grid[min_in_row + 1][min_in_col];
-                    coordinates[2][1] = north_grid[min_in_row + 1][min_in_col];
-                    coordinates[3][0] =
-                        east_grid[min_in_row + 1][min_in_col + 1];
-                    coordinates[3][1] =
-                        north_grid[min_in_row + 1][min_in_col + 1];
+                    /* else in quadrant top-right */
 
                     /* determine index of four points in order to pull from
                        MODTRAN results */
-                    indices[0] = min_in_row * num_cols + min_in_col;
-                    indices[1] = (min_in_row + 1) * num_cols + min_in_col;
-                    indices[2] = min_in_row * num_cols + min_in_col + 1;
-                    indices[3] = (min_in_row + 1) * num_cols + min_in_col + 1;
+                    /* LL */
+                    cell_vertices[LL_POINT] = closest_point;
+                    /* UL */
+                    cell_vertices[UL_POINT] =
+                        cell_vertices[LL_POINT] + num_cols;
+                    /* UR */
+                    cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
+                    /* LR */
+                    cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
 
-                    /* set firstInLine variable to false */
-                    first_line = 0;
-
-                    free (distances);
-                    distances = NULL;
-LOG_MESSAGE ("HERE XXX", FUNC_NAME);
+                    /* Set first_sample to be false */
+                    first_sample = false;
                 }
                 else
                 {
-LOG_MESSAGE ("****** NOT ****** First Line", FUNC_NAME);
-                    /* given indices of previous pixel, there are six possible
-                       quads to move into check 6 distances to determine new
-                       upperleft corner */
-                    distance_in_utm (east_grid[min_in_row][min_in_col],
-                                     north_grid[min_in_row][min_in_col],
-                                     current_easting, current_northing,
-                                     &stay_right);
+                    /* Make sure we are:
+                       left of LR->UR
+                       and
+                       below UR->UL
 
-                    if ((min_in_col + 2) < num_cols)
-                        distance_in_utm (east_grid[min_in_row][min_in_col + 2],
-                                         north_grid[min_in_row][min_in_col + 2],
-                                         current_easting, current_northing,
-                                         &move_right);
-                    else
-                        stay_right = (float) SHRT_MAX;
+                       If not we need to advance to a different group of 4
+                       points. */
 
-                    distance_in_utm (east_grid[min_in_row + 1][min_in_col + 1],
-                                     north_grid[min_in_row + 1][min_in_col + 1],
-                                     current_easting, current_northing,
-                                     &stay_up);
-
-                    distance_in_utm (east_grid[min_in_row - 1][min_in_col + 1],
-                                     north_grid[min_in_row - 1][min_in_col + 1],
-                                     current_easting, current_northing,
-                                     &move_up);
-
-                    distance_in_utm (east_grid[min_in_row][min_in_col + 1],
-                                     north_grid[min_in_row][min_in_col + 1],
-                                     current_easting, current_northing,
-                                     &stay_down);
-
-                    if ((min_in_row + 2) < num_rows)
+                    if (! point_is_left_of_line(
+                        points->utm_easting[cell_vertices[UR_POINT]],
+                        points->utm_northing[cell_vertices[UR_POINT]],
+                        points->utm_easting[cell_vertices[UL_POINT]],
+                        points->utm_northing[cell_vertices[UL_POINT]],
+                        current_easting,
+                        current_northing))
                     {
-                        distance_in_utm (
-                            east_grid[min_in_row + 2][min_in_col + 1],
-                            north_grid[min_in_row + 2][min_in_col + 1],
-                            current_easting, current_northing, &move_down);
+                        /* We are above the line
+                           Adjust the points and then test the right edge */
+
+                        /* LL */
+                        cell_vertices[LL_POINT] = cell_vertices[UL_POINT];
+                        /* UL */
+                        cell_vertices[UL_POINT] =
+                            cell_vertices[LL_POINT] + num_cols;
+                        /* UR */
+                        cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
+                        /* LR */
+                        cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+
+                        /* Now test the right edge */
+                        if (! point_is_left_of_line(
+                            points->utm_easting[cell_vertices[LR_POINT]],
+                            points->utm_northing[cell_vertices[LR_POINT]],
+                            points->utm_easting[cell_vertices[UR_POINT]],
+                            points->utm_northing[cell_vertices[UR_POINT]],
+                            current_easting,
+                            current_northing))
+                        {
+                            /* We are right of the line
+                               Adjust the points */
+
+                            /* LL */
+                            cell_vertices[LL_POINT] = cell_vertices[LR_POINT];
+                            /* UL */
+                            cell_vertices[UL_POINT] =
+                                cell_vertices[LL_POINT] + num_cols;
+                            /* UR */
+                            cell_vertices[UR_POINT] =
+                                cell_vertices[UL_POINT] + 1;
+                            /* LR */
+                            cell_vertices[LR_POINT] =
+                                cell_vertices[LL_POINT] + 1;
+                        }
+                        /* ELSE WE ARE OK FOR NOW */
                     }
-                    else
-                        move_down = (float) SHRT_MAX;
+                    else if (! point_is_left_of_line(
+                        points->utm_easting[cell_vertices[LR_POINT]],
+                        points->utm_northing[cell_vertices[LR_POINT]],
+                        points->utm_easting[cell_vertices[UR_POINT]],
+                        points->utm_northing[cell_vertices[UR_POINT]],
+                        current_easting,
+                        current_northing))
+                    {
+                        /* We are right of the line
+                           Adjust the points and then test the top edge */
 
-                    if ((move_right - stay_right) < MINSIGMA)
-                        min_in_col++;
-                    if ((move_up - stay_up) < MINSIGMA)
-                        min_in_row--;
-                    if ((move_down - stay_down) < MINSIGMA)
-                        min_in_row++;
+                        /* LL */
+                        cell_vertices[LL_POINT] = cell_vertices[LR_POINT];
+                        /* UL */
+                        cell_vertices[UL_POINT] =
+                            cell_vertices[LL_POINT] + num_cols;
+                        /* UR */
+                        cell_vertices[UR_POINT] =
+                            cell_vertices[UL_POINT] + 1;
+                        /* LR */
+                        cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
 
-                    /* extract UTM coordinates of four points to be interpolated
-                       and build array */
-                    coordinates[0][0] = east_grid[min_in_row][min_in_col];
-                    coordinates[0][1] = north_grid[min_in_row][min_in_col];
-                    coordinates[1][0] = east_grid[min_in_row + 1][min_in_col];
-                    coordinates[1][1] = north_grid[min_in_row + 1][min_in_col];
-                    coordinates[2][0] = east_grid[min_in_row][min_in_col + 1];
-                    coordinates[2][1] = north_grid[min_in_row][min_in_col + 1];
-                    coordinates[3][0] =
-                        east_grid[min_in_row + 1][min_in_col + 1];
-                    coordinates[3][1] =
-                        north_grid[min_in_row + 1][min_in_col + 1];
+                        if (! point_is_left_of_line(
+                            points->utm_easting[cell_vertices[UR_POINT]],
+                            points->utm_northing[cell_vertices[UR_POINT]],
+                            points->utm_easting[cell_vertices[UL_POINT]],
+                            points->utm_northing[cell_vertices[UL_POINT]],
+                            current_easting,
+                            current_northing))
+                        {
+                            /* LL */
+                            cell_vertices[LL_POINT] = cell_vertices[UL_POINT];
+                            /* UL */
+                            cell_vertices[UL_POINT] =
+                                cell_vertices[LL_POINT] + num_cols;
+                            /* UR */
+                            cell_vertices[UR_POINT] =
+                                cell_vertices[UL_POINT] + 1;
+                            /* LR */
+                            cell_vertices[LR_POINT] =
+                                cell_vertices[LL_POINT] + 1;
+                        }
+                        /* ELSE WE ARE OK FOR NOW */
+                    }
+                    /* ELSE WE ARE OK FOR NOW */
+                } /* END - Not first sample */
 
-                    /* determine index of four points in order to pull from
-                       MODTRAN results */
-                    indices[0] = min_in_row * num_cols + min_in_col;
-                    indices[1] = (min_in_row + 1) * num_cols + min_in_col;
-                    indices[2] = min_in_row * num_cols + min_in_col + 1;
-                    indices[3] = (min_in_row + 1) * num_cols + min_in_col + 1;
-                }
+#if 0
+snprintf (msg, sizeof (msg),
+          "[%d, %d] cell_vertices = LL[%d], UL[%d], UR[%d], LR[%d]",
+          line, sample, cell_vertices[LL_POINT], cell_vertices[UL_POINT],
+                        cell_vertices[UR_POINT], cell_vertices[LR_POINT]);
+LOG_MESSAGE (msg, FUNC_NAME);
+#endif
 
                 /* convert height from m to km */
                 dem[sample] = (float) dem[sample] / 1000.0;
 
                 /* interpolate three parameters to that height at each of the
                    four closest points */
-                for (g = 0; g < 4; g++)
+
+                for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
                 {
-                    current_index = indices[g] * NUM_ELEVATIONS;
-                    /* extract atmospheric parameters for all heights at current
-                       location */
-                    for (element = 0; element < LST_NUM_ELEMENTS; element++)
-                    {
-                        for (index = current_index;
-                             index < current_index + NUM_ELEVATIONS - 1;
-                             index++)
-                        {
-                            current_location[index - current_index][element] =
-                                modtran_results[index][element];
-                        }
-                    }
+                    current_index = cell_vertices[vertex] * NUM_ELEVATIONS;
 
                     /* interpolate three atmospheric parameters to current
                        height */
-                    interpolate_to_height (current_location[LST_HEIGHT],
-                        current_location[LST_TRANSMISSION],
-                        current_location[LST_UPWELLED_RADIANCE],
-                        current_location[LST_DOWNWELLED_RADIANCE],
-                        dem[sample], at_height[g]);
+                    interpolate_to_height (&modtran_results[current_index],
+                                           dem[sample], &at_height[vertex][0]);
                 }
 
                 /* interpolate parameters at appropriate height to location of
                    current pixel */
-                interpolate_to_location (coordinates, at_height,
+                interpolate_to_location (points, cell_vertices, at_height,
                                          current_easting, current_northing,
                                          parameters);
 
@@ -803,69 +777,60 @@ LOG_MESSAGE ("****** NOT ****** First Line", FUNC_NAME);
                 landsat_results[0][sample] = parameters[0];
                 landsat_results[1][sample] = 10000.0 * parameters[1];
                 landsat_results[2][sample] = 10000.0 * parameters[2];
-            } /* END - if (input->therm_buf != 0) */
+            } /* END - if not FILL */
+            else
+            {
+                landsat_results[0][sample] = LST_FILL_VALUE;
+                landsat_results[1][sample] = LST_FILL_VALUE;
+                landsat_results[2][sample] = LST_FILL_VALUE;
+            }
         } /* END - for sample */
 
         /* Write out the temporary binary output files
            Note: needs to be deleted before release */
         status = fwrite (&input->therm_buf[0], sizeof (int16_t),
-                         input->size_th.s, therm_fptr);
+                         input->size_th.s, thermal_fd);
         if (status != input->size_th.s)
         {
-            sprintf (msg, "Writing to %s", therm_fname);
+            sprintf (msg, "Writing to %s", thermal_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[0][0], sizeof (float),
-                         input->size_th.s, trans_fptr);
+                         input->size_th.s, transmittance_fd);
         if (status != input->size_th.s)
         {
-            sprintf (msg, "Writing to %s", trans_fname);
+            sprintf (msg, "Writing to %s", transmittance_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[1][0], sizeof (float),
-                         input->size_th.s, up_fptr);
+                         input->size_th.s, upwelled_fd);
         if (status != input->size_th.s)
         {
-            sprintf (msg, "Writing to %s", up_fname);
+            sprintf (msg, "Writing to %s", upwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
         status = fwrite (&landsat_results[2][0], sizeof (float),
-                         input->size_th.s, down_fptr);
+                         input->size_th.s, downwelled_fd);
         if (status != input->size_th.s)
         {
-            sprintf (msg, "Writing to %s", down_fname);
+            sprintf (msg, "Writing to %s", downwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
     } /* END - for line */
 
     /* Free allocated memory */
-    status = free_2d_array ((void **) current_location);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
-    }
+    free (distances);
+    free (dem);
+    free (input->therm_buf);
+    input->therm_buf = NULL;
+
     status = free_2d_array ((void **) at_height);
     if (status != SUCCESS)
     {
         ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
-    }
-    status = free_2d_array ((void **) coordinates);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: coordinates\n", FUNC_NAME);
-    }
-    status = free_2d_array ((void **) east_grid);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: east_grid\n", FUNC_NAME);
-    }
-    status = free_2d_array ((void **) north_grid);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: north_grid\n", FUNC_NAME);
     }
 
     status = free_2d_array ((void **) landsat_results);
@@ -876,31 +841,31 @@ LOG_MESSAGE ("****** NOT ****** First Line", FUNC_NAME);
 
     /* Close the intermediate binary files
        Note: needs to be deleted before release */
-    status = fclose (therm_fptr);
+    status = fclose (thermal_fd);
     if (status)
     {
-        sprintf (msg, "Closing file %s", therm_fname);
+        sprintf (msg, "Closing file %s", thermal_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
 
-    status = fclose (trans_fptr);
+    status = fclose (transmittance_fd);
     if (status)
     {
-        sprintf (msg, "Closing file %s", trans_fname);
+        sprintf (msg, "Closing file %s", transmittance_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
 
-    status = fclose (up_fptr);
+    status = fclose (upwelled_fd);
     if (status)
     {
-        sprintf (msg, "Closing file %s", up_fname);
+        sprintf (msg, "Closing file %s", upwelled_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
 
-    status = fclose (down_fptr);
+    status = fclose (downwelled_fd);
     if (status)
     {
-        sprintf (msg, "Closing file %s", down_fname);
+        sprintf (msg, "Closing file %s", downwelled_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
 

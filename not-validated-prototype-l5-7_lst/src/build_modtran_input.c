@@ -16,8 +16,8 @@
 
 
 #define STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD 9.80665
-#define POLAR_RADIUS_IN_KM 6356.752
-#define EQUATORIAL_RADIUS_IN_KM 6378.137
+#define EQUATORIAL_RADIUS_IN_KM (UTM_EQUATORIAL_RADIUS / 1000.0)
+#define POLAR_RADIUS_IN_KM (UTM_POLAR_RADIUS / 1000.0)
 
 
 #define P_LAYER 29
@@ -366,8 +366,10 @@ int read_narr_parameter_values
                           " NARR parameters", FUNC_NAME, FAILURE);
         }
 
+#if 0
         snprintf(msg_str, sizeof (msg_str), "Reading [%s]", parm_filename);
         LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
 
         /* Open the parameter file for reading */
         fd = fopen (parm_filename, "r");
@@ -1056,9 +1058,11 @@ int build_modtran_input
                   "%s_%s", lat_str, lon_str);
 
         /* Create the directory */
+#if 0
         snprintf(msg_str, sizeof (msg_str),
                  "Creating directory [%s]", current_point);
         LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
         if (mkdir (current_point, 0755) != SUCCESS)
         {
             if (errno != EEXIST)
@@ -1108,9 +1112,11 @@ int build_modtran_input
                       "%s/%5.3f", current_point, gndalt[elevation]);
 
             /* Create the directory */
+#if 0
             snprintf (msg_str, sizeof (msg_str),
                       "Creating directory [%s]", current_gdalt);
             LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
             if (mkdir (current_gdalt, 0755) != SUCCESS)
             {
                 if (errno != EEXIST)
@@ -1146,17 +1152,20 @@ int build_modtran_input
             /* linearly interpolate pressure, temperature, and relative 
                humidity to gndalt for lowest layer */
             new_pressure = pressure[layer_below][point]
-                           + (gndalt[elevation] - narr_height[layer_below][point])
+                           + (gndalt[elevation]
+                              - narr_height[layer_below][point])
                            * ((pressure[layer_above][point]
                                - pressure[layer_below][point])
                               * inv_height_diff);
             new_temp = narr_tmp[layer_below][point]
                        + (gndalt[elevation] - narr_height[layer_below][point])
-                       * ((narr_tmp[layer_above][point] - narr_tmp[layer_below][point])
+                       * ((narr_tmp[layer_above][point]
+                           - narr_tmp[layer_below][point])
                           * inv_height_diff);
             new_rh = narr_rh[layer_below][point]
                      + (gndalt[elevation] - narr_height[layer_below][point])
-                     * ((narr_rh[layer_above][point] - narr_rh[layer_below][point])
+                     * ((narr_rh[layer_above][point]
+                         - narr_rh[layer_below][point])
                         * inv_height_diff);
 
             /* create arrays containing only layers to be included in current
@@ -1181,7 +1190,8 @@ int build_modtran_input
             /* MODTRAN throws an error when there are two identical layers in
                the tape5 file, if the current ground altitude and the next
                highest layer are close enough, eliminate interpolated layer */
-            if (fabs (gndalt[elevation] - narr_height[layer_above][point]) < 0.001)
+            if (fabs (gndalt[elevation] - narr_height[layer_above][point])
+                < 0.001)
             {
                 curr_layer = 0;
                 for (layer = layer_above; layer < P_LAYER; layer++)
@@ -1213,10 +1223,12 @@ int build_modtran_input
                and the standard upper atmosphere */
             if (std_layer >= 3)
             {
+#if 0
                 snprintf (msg_str, sizeof (msg_str),
                           "Adding interpolated layer between the NARR layers"
                           " and the standard atmosphere.");
                 LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
 
                 /* To save divisions */
                 inv_height_diff = 1.0 / (stan_height[counter[2]]
@@ -1271,8 +1283,9 @@ int build_modtran_input
             for (layer = 0; layer < curr_layer; layer++)
             {
                 fprintf (fd, "%10.3f%10.3e%10.3e%10.3e%10.3e%10.3e%16s\n",
-                         temp_height[layer], temp_pressure[layer], temp_temp[layer],
-                         temp_rh[layer], 0.0, 0.0, "AAH             ");
+                         temp_height[layer], temp_pressure[layer],
+                         temp_temp[layer], temp_rh[layer], 0.0, 0.0,
+                         "AAH             ");
             }
 
             /* Close the intermediate file */
@@ -1304,9 +1317,11 @@ int build_modtran_input
                 /* create directory for the current temperature */
                 snprintf (current_temp, sizeof (current_temp),
                           "%s/%s", current_gdalt, temp_strs[temperature]);
+#if 0
                 snprintf (msg_str, sizeof (msg_str),
                           "Creating directory [%s]", current_temp);
                 LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
                 if (mkdir (current_temp, 0755) != SUCCESS)
                 {
                     if (errno != EEXIST)
@@ -1321,9 +1336,11 @@ int build_modtran_input
                 /* create directory for the current albedo */
                 snprintf (current_alb, sizeof (current_alb),
                           "%s/%3.1f", current_temp, alb[temperature]);
+#if 0
                 snprintf (msg_str, sizeof (msg_str),
                           "Creating directory [%s]", current_alb);
                 LOG_MESSAGE (msg_str, FUNC_NAME);
+#endif
                 if (mkdir (current_alb, 0755) != SUCCESS)
                 {
                     if (errno != EEXIST)
@@ -1359,7 +1376,8 @@ int build_modtran_input
                    the MODTRAN run
 
                    iterate entry count */
-                case_counter = point * NUM_ELEVATIONS * 3 + elevation * 3 + temperature;
+                case_counter = point * NUM_ELEVATIONS * 3
+                               + elevation * 3 + temperature;
                 snprintf (points->modtran_runs[case_counter].path, PATH_MAX,
                           "%s", current_alb);
                 snprintf (points->modtran_runs[case_counter].command, PATH_MAX,
@@ -1367,9 +1385,12 @@ int build_modtran_input
                           points->modtran_runs[case_counter].path,
                           modtran_data_dir, modtran_path);
 
-                points->modtran_runs[case_counter].latitude = points->lat[point];
-                points->modtran_runs[case_counter].longitude = points->lon[point];
-                points->modtran_runs[case_counter].height = gndalt[elevation];
+                points->modtran_runs[case_counter].latitude =
+                    points->lat[point];
+                points->modtran_runs[case_counter].longitude =
+                    points->lon[point];
+                points->modtran_runs[case_counter].height =
+                    gndalt[elevation];
             } /* END - Tempurature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */

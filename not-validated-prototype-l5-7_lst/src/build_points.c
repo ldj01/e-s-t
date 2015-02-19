@@ -120,10 +120,10 @@ void convert_ll_to_utm
 )
 {
     int point;
-    float a = 6378137.0;        /* equatorial radius */
-    float b = 6356752.3142;     /* polar radius */
-    float k0 = 0.9996;          /* scale factor */
-    float ecc;                  /* eccentricity */
+    float a = UTM_EQUATORIAL_RADIUS; /* equatorial radius */
+    float b = UTM_POLAR_RADIUS;      /* polar radius */
+    float k0 = UTM_SCALE_FACTOR;     /* scale factor */
+    float ecc;                       /* eccentricity */
     float ecc_prime_sqrd;
     float n;
 //    float rho;
@@ -213,7 +213,8 @@ void convert_ll_to_utm
              * k0;
 
         /* calculate UTM coordinates */
-        points->utm_easting[point] = 500000.0 + (kiv * p + kv * pow (p, 3));
+        points->utm_easting[point] = UTM_FALSE_EASTING
+                                     + (kiv * p + kv * pow (p, 3));
         points->utm_northing[point] = (ki + kii * p * p + kiii * pow (p, 4));
     }
 }
@@ -282,10 +283,10 @@ int build_points
               This is probably only a CONUS quick and dirty solution.
 
        NOTE - MERRA is even farther apart so this will not work for that. */
-    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
-    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
-    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
-    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
+    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.2;
+    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.2;
+    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.2;
+    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.2;
 
     /* determine what points in the NARR dataset fall within our buffered
        Landsat area using logical operators lessThanLat and greaterThanLat
