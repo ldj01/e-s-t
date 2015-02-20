@@ -42,28 +42,37 @@ int
 main (int argc, char *argv[])
 {
     char FUNC_NAME[] = "main";
+
+    Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
+
     char msg_str[MAX_STR_LEN];      /* input data scene name */
     char xml_name[PATH_MAX];        /* input XML filename */
     char dem_name[PATH_MAX];        /* input DEM filename */
     char emissivity_name[PATH_MAX]; /* input Emissivity filename */
     char command[PATH_MAX];
+
     Input_t *input = NULL;          /* input data and meta data */
     //    Output_t *output = NULL; /* output structure and metadata */
+
     bool use_tape6;             /* Use the tape6 output */
     bool verbose;               /* verbose flag for printing messages */
     bool debug;                 /* debug flag for debug output */
-    Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
+
+    int modtran_run;
+
     float alb = 0.1;
-    int i;
     float **modtran_results = NULL;
+
     char *tmp_env = NULL;
 
     REANALYSIS_POINTS points;
 
     time_t now;
+
+    /* Display the starting time of the application */
     time (&now);
     snprintf (msg_str, sizeof(msg_str),
-              "scene_based_lst start_time=%s", ctime (&now));
+              "LST start_time [%s]", ctime (&now));
     LOG_MESSAGE (msg_str, FUNC_NAME);
 
     /* Read the command-line arguments, including the name of the input
@@ -162,15 +171,15 @@ main (int argc, char *argv[])
     }
 
     /* Perform MODTRAN runs by calling each command */
-    for (i = 0; i < points.num_modtran_runs; i++)
+    for (modtran_run = 0; modtran_run < points.num_modtran_runs; modtran_run++)
     {
         snprintf (msg_str, sizeof(msg_str),
-                  "Executing MODTRAN [%s]", points.modtran_runs[i].command);
+                  "Executing MODTRAN [%s]",
+                   points.modtran_runs[modtran_run].command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if 0
-// TEMP TAKE THIS OUT TO SAVE TIME
-        if (system (points.modtran_runs[i].command) != SUCCESS)
+#if TEMP_TAKE_THIS_OUT_TO_SAVE_TIME
+        if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
         {
             RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
                           EXIT_FAILURE);
@@ -181,7 +190,7 @@ main (int argc, char *argv[])
     /* PARSING MODTRAN RESULTS:
        for each case in caseList (for each modtran run),
        parse wavelength and total radiance from tape6 file into parsed */
-    for (i = 0; i < points.num_modtran_runs; i++)
+    for (modtran_run = 0; modtran_run < points.num_modtran_runs; modtran_run++)
     {
         if (use_tape6)
         {
@@ -191,8 +200,8 @@ main (int argc, char *argv[])
                       " --tape6"
                       " --input-path %s"
                       " --output-path %s",
-                      points.modtran_runs[i].path,
-                      points.modtran_runs[i].path);
+                      points.modtran_runs[modtran_run].path,
+                      points.modtran_runs[modtran_run].path);
         }
         else
         {
@@ -202,15 +211,14 @@ main (int argc, char *argv[])
                       " --pltout"
                       " --input-path %s"
                       " --output-path %s",
-                      points.modtran_runs[i].path,
-                      points.modtran_runs[i].path);
+                      points.modtran_runs[modtran_run].path,
+                      points.modtran_runs[modtran_run].path);
         }
 
         snprintf (msg_str, sizeof(msg_str), "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if 0
-// TEMP TAKE THIS OUT TO SAVE TIME
+#if TEMP_TAKE_THIS_OUT_TO_SAVE_TIME
         if (system (command) != SUCCESS)
         {
             RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
@@ -238,21 +246,6 @@ main (int argc, char *argv[])
                       FUNC_NAME, EXIT_FAILURE);
     }
 
-#if 0
-    for (i = 0; i < points.num_points * NUM_ELEVATIONS; i++)
-    {
-        printf ("%04d [%f,%f,%f,%f,%f,%f]\n",
-                i,
-                modtran_results[i][LST_LATITUDE],
-                modtran_results[i][LST_LONGITUDE],
-                modtran_results[i][LST_HEIGHT],
-                modtran_results[i][LST_TRANSMISSION],
-                modtran_results[i][LST_UPWELLED_RADIANCE],
-                modtran_results[i][LST_DOWNWELLED_RADIANCE]);
-        fflush(stdout);
-    }
-#endif
-
     /* Generate parameters for each Landsat pixel */
     if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 dem_name, emissivity_name,
@@ -266,7 +259,7 @@ main (int argc, char *argv[])
     /* Free memory allocation */
     free_points_memory (&points);
 
-#if 0
+#if NOT_TESTED
     /* Open the output file */
     output = OpenOutput (&xml_metadata, input);
     if (output == NULL)
@@ -339,7 +332,7 @@ main (int argc, char *argv[])
                       EXIT_FAILURE);
     }
 
-#if 0
+#if NOT_TESTED
     /* Delete temporary file */
     if (system ("rm newHead*") != SUCCESS)
     {
