@@ -11,7 +11,6 @@ install:
 	install -d $(PREFIX)/bin
 	install -m 755 do_lst.py $(PREFIX)/bin
 	install -m 755 download_narr_aux_data.py $(PREFIX)/bin
-	install -m 755 extract_aux_data.py $(PREFIX)/bin
 	install -m 755 lst_extract_modtran_results.py $(PREFIX)/bin
 
 clean:
