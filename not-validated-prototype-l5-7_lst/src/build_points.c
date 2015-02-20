@@ -60,7 +60,7 @@ int read_narr_coordinates
         for (col = 0; col < NARR_COLS; col++)
         {
             /* File Format:
-               Grid_I Grid_J Latitude Longitude
+               Grid_Column Grid_Row Grid_Latitude Grid_Longitude
              */
             if (fscanf (fd, "%d %d %f %f",
                         &grid_col, &grid_row, &grid_lat, &grid_lon)
@@ -75,13 +75,15 @@ int read_narr_coordinates
 
             /* TODO - Should think about fixing the input file, so that this
                       confusing conversion is not needed.
-                      When you read  the file data, it is as if you are
+
+                      When you read the file data, it is as if you are
                       reading the values from the lower left to the upper
                       right as applied to the earth.  And the values being
                       read in start with an origin somewhere around the lower
                       left, hence the need for the following conversion.
-               NOTE - If this is changed here, the else-where in the code will
-                      break. */
+
+               NOTE - If this is changed here, then else-where in the code
+                      will break. */
             if (grid_lon > 180.0)
                 lon[row][col] = 360.0 - grid_lon;
             else
@@ -109,7 +111,7 @@ RETURN: NONE
 HISTORY:
     Date        Programmer       Reason
     ----------  ---------------  ---------------------------------------------
-    09/30/2014  Song Guo         Original Development
+    Sep 2014    Song Guo         Original Development
     Feb 2015    Ron Dilley       Renamed and modified to use the
                                  REANALYSIS_POINTS data structure.
 *****************************************************************************/
@@ -124,9 +126,8 @@ void convert_ll_to_utm
     float b = UTM_POLAR_RADIUS;      /* polar radius */
     float k0 = UTM_SCALE_FACTOR;     /* scale factor */
     float ecc;                       /* eccentricity */
-    float ecc_prime_sqrd;
+    float ecc_prime_sqrd;            /* prime of eccentricity squared */
     float n;
-//    float rho;
     float nu;
     float a0;
     float b0;
@@ -139,21 +140,18 @@ void convert_ll_to_utm
     float kiv;
     float kv;
     float zone_cm;
-//    float zone_cm_rad;
     float p;
     float lat_rad;
-//    float lon_rad;
     float s;
 
-    /* calculate zone central meridian in degrees and radians */
+    /* Calculate zone central meridian in degrees and radians */
     zone_cm = (6.0 * input->meta.zone) - 183.0;
-//    zone_cm_rad =  zone_cm * PI / 180.0;
 
     ecc = sqrt (1.0 - ((b / a) * (b / a)));
     ecc_prime_sqrd = (ecc * ecc) / (1.0 - ecc * ecc);
     n = (a - b) / (a + b);
 
-    /* calculate meridional arc length */
+    /* Calculate meridional arc length */
     a0 = a * (1.0 - n
               + (5.0 * n * n / 4.0) * (1.0 - n)
               + (81.0 * pow (n, 4) / 64.0) * (1.0 - n));
@@ -172,19 +170,14 @@ void convert_ll_to_utm
 
     for (point = 0; point < points->num_points; point++)
     {
-        p = (points->lon[point] - zone_cm) * PI / 180.0;
+        /* Distance from the point to the zone central meridian in radians */
+        p = (points->lon[point] - zone_cm) * RADIANS_PER_DEGREE;
 
-        /* convert lat and lon points from decimal degrees to radians */
-        lat_rad = points->lat[point] * PI / 180.0;
-//        lon_rad = lon[i]*PI/180.0;
+        /* Convert latitude for the point to radians */
+        lat_rad = points->lat[point] * RADIANS_PER_DEGREE;
 
-//        rho = a*(1.0-e*e)/(pow((1.0-(e*sin(lat_rad))*(e*sin(lat_rad))),
-//              (3.0/2.0)));
-//        nu = a / pow ((1.0 - (ecc * sin (lat_rad)) * (ecc * sin (lat_rad))),
-//                      (1.0 / 2.0));
         nu = a / sqrt (1.0 - (ecc * sin (lat_rad))
                              * (ecc * sin (lat_rad)));
-
 
         s = a0 * lat_rad
             - b0 * sin (2 * lat_rad)
@@ -192,7 +185,7 @@ void convert_ll_to_utm
             - d0 * sin (6 * lat_rad)
             + e0 * sin (8 * lat_rad);
 
-        /* coefficients for UTM coordinates */
+        /* Coefficients for UTM coordinates */
         ki = s * k0;
 
         kii = nu * sin (lat_rad) * cos (lat_rad) * k0 / 2.0;
@@ -212,7 +205,7 @@ void convert_ll_to_utm
                 + ecc_prime_sqrd * cos (lat_rad) * cos (lat_rad))
              * k0;
 
-        /* calculate UTM coordinates */
+        /* Calculate UTM coordinates */
         points->utm_easting[point] = UTM_FALSE_EASTING
                                      + (kiv * p + kv * pow (p, 3));
         points->utm_northing[point] = (ki + kii * p * p + kiii * pow (p, 4));
@@ -227,6 +220,7 @@ int build_points
 )
 {
     char FUNC_NAME[] = "build_points";
+
     char *lst_data_dir = NULL;
     char msg[PATH_MAX];
 
@@ -256,7 +250,7 @@ int build_points
                       FUNC_NAME, FAILURE);
     }
 
-    /* Dynamic allocate the 2d memory for the coordinates */
+    /* Allocate 2d memory to hold the coordinates */
     lat = (float **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (float));
     if (lat == NULL)
     {
@@ -276,7 +270,7 @@ int build_points
     }
 
     /* expand range to include NARR points outside image for edge pixels */
-    /* TODO - 0.5deg at higher latitudes will not be sufficient for the
+    /* TODO - 0.2deg at higher latitudes will not be sufficient for the
               longitudinal test, since at lat(72deg) 1deg lon = 34504.22meters
               and the NARR data is 34k between points.
 
@@ -314,10 +308,6 @@ int build_points
             }
         }
     }
-//    min_row--;
-//    max_row--;
-//    min_col--;
-//    max_col--;
 
     /* Save these in the points structure */
     points->ul_lat = buffered_ul_lat;
@@ -353,7 +343,10 @@ int build_points
     snprintf (msg, sizeof (msg), "num_points = %d\n", points->num_points);
     LOG_MESSAGE (msg, FUNC_NAME);
 
-    /* Determine the number of byte for the memory allocations */
+    /* Initialize this pointer */
+    points->modtran_runs = NULL;
+
+    /* Determine the number of bytes for the memory allocations */
     num_bytes = points->num_points * sizeof (float);
 
     /* Allocate memory for points within the rectangle */
