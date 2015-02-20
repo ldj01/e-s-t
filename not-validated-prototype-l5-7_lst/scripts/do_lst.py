@@ -356,17 +356,24 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    # Verify environment variable exists along with the directory that is
-    # specified
+    # Verify required environment variables exists
     base_aux_dir = os.environ.get('LST_AUX_DIR')
     if base_aux_dir is None:
         logger.info("Missing environment variable LST_AUX_DIR")
         sys.exit(EXIT_FAILURE)
 
+    # Not used here, only verified because the lst executable requires it
+    base_data_dir = os.environ.get('LST_DATA_DIR')
+    if base_data_dir is None:
+        logger.info("Missing environment variable LST_DATA_DIR")
+        sys.exit(EXIT_FAILURE)
+
+    # Verify that the base_aux_dir exists
     if not os.path.isdir(base_aux_dir):
         logger.info("LST_AUX_DIR directory does not exist")
         sys.exit(EXIT_FAILURE)
 
+    # Verify that the XML filename provided is not an empty string
     if args.xml_filename == '':
         logger.fatal("No XML metadata filename provided.")
         logger.fatal("Error processing LST.  Processing will terminate.")
