@@ -573,37 +573,37 @@ int build_modtran_input
         RETURN_ERROR ("Allocating TMP_2 memory", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR height for time before landsat acqusition */
+    /* Read in NARR height for time before Landsat acqusition */
     if (read_narr_parameter_values (layers, "HGT_1", hgt1) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR specific humidity for time before landsat acqusition */
+    /* Read in NARR specific humidity for time before Landsat acqusition */
     if (read_narr_parameter_values (layers, "SPFH_1", spfh1) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading SPFH_1 parameters", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR temperature for time before landsat acqusition */
+    /* Read in NARR temperature for time before Landsat acqusition */
     if (read_narr_parameter_values (layers, "TMP_1", tmp1) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading TMP_1 parameters", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR height for time after landsat acqusition */
+    /* Read in NARR height for time after Landsat acqusition */
     if (read_narr_parameter_values (layers, "HGT_2", hgt2) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading HGT_2 parameters", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR specific humidity for time after landsat acqusition */
+    /* Read in NARR specific humidity for time after Landsat acqusition */
     if (read_narr_parameter_values (layers, "SPFH_2", spfh2) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading SPFH_2 parameters", FUNC_NAME, FAILURE);
     }
 
-    /* Read in NARR temperature for time after landsat acqusition */
+    /* Read in NARR temperature for time after Landsat acqusition */
     if (read_narr_parameter_values (layers, "TMP_2", tmp2) != SUCCESS)
     {
         RETURN_ERROR ("Failed loading TMP_2 parameters", FUNC_NAME, FAILURE);
@@ -1042,7 +1042,9 @@ int build_modtran_input
             points->lon[point] = 360.0 - points->lon[point];
         }
 
-        /* Figure out the lat and lon strings to use */
+        /* Figure out the lat and lon strings to use.
+           MODTRAN tape files are finicky about value locations and size,
+           so the following adjusts for the values less than 100. */
         if (points->lat[point] < 100.0)
             snprintf (lat_str, sizeof (lat_str), "%6.3f", points->lat[point]);
         else
@@ -1391,7 +1393,7 @@ int build_modtran_input
                     points->lon[point];
                 points->modtran_runs[case_counter].height =
                     gndalt[elevation];
-            } /* END - Tempurature Albedo Pairs */
+            } /* END - Temperature Albedo Pairs */
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
 
