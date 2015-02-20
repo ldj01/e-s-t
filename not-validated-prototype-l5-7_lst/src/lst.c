@@ -46,11 +46,8 @@ main (int argc, char *argv[])
     char xml_name[PATH_MAX];        /* input XML filename */
     char dem_name[PATH_MAX];        /* input DEM filename */
     char emissivity_name[PATH_MAX]; /* input Emissivity filename */
-    char directory[PATH_MAX];       /* input/output data directory */
-    char extension[MAX_STR_LEN];    /* input TOA file extension */
-    Input_t *input = NULL;          /* input data and meta data */
-    char scene_name[PATH_MAX];      /* input data scene name */
     char command[PATH_MAX];
+    Input_t *input = NULL;          /* input data and meta data */
     //    Output_t *output = NULL; /* output structure and metadata */
     bool use_tape6;             /* Use the tape6 output */
     bool verbose;               /* verbose flag for printing messages */
@@ -103,14 +100,6 @@ main (int argc, char *argv[])
     {
         /* Error messages already written */
         return EXIT_FAILURE;
-    }
-
-    /* Split the filename to obtain the directory, scene name, and extension */
-    split_filename (xml_name, directory, scene_name, extension);
-    if (verbose)
-    {
-        printf ("directory, scene_name, extension=%s,%s,%s\n",
-                directory, scene_name, extension);
     }
 
     /* Open input file, read metadata, and set up buffers */

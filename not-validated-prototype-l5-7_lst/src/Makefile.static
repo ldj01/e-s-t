@@ -25,7 +25,6 @@ SRC = \
       date.c \
       input.c \
       output.c \
-      split_filename.c \
       get_args.c \
       build_points.c \
       build_modtran_input.c \

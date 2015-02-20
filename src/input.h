@@ -117,13 +117,4 @@ bool FreeInput (Input_t *input);
 bool GetXMLInput (Input_t *input, Espa_internal_meta_t * metadata);
 
 
-void split_filename
-(
-    const char *filename, /* I: Name of file to split */
-    char *directory,      /* O: Directory portion of file name */
-    char *scene_name,     /* O: Scene name portion of the file name */
-    char *extension       /* O: Extension portion of the file name */
-);
-
-
 #endif

@@ -18,7 +18,6 @@ add_executable ( lst lst.c
                      2d_array.c
                      date.c
                      get_args.c
-                     split_filename.c
                      build_points.c
                      build_modtran_input.c
                      calculate_point_atmospheric_parameters.c
