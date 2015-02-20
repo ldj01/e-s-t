@@ -42,14 +42,6 @@ Input Parameters:this
 Output Parameters:
  (returns)      'output' data structure or NULL when an error occurs
 
-HISTORY:
-Date         Programmer       Reason
----------    ---------------  -------------------------------------
-2/19/2014    Gail Schmidt     Modified to work with ESPA internal raw binary
-                              file format
-
-Design Notes:
-1. MASK_INDEX "0 clear; 1 water; 2 cloud_shadow; 3 snow; 4 cloud"
 *****************************************************************************/
 Output_t *OpenOutput
 (

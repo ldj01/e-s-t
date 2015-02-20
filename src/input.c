@@ -322,7 +322,7 @@ Design Notes:
     else
     {
         snprintf (msg, sizeof (msg),
-                  "invalid satellite; value = %s", global->satellite);
+                  "(Satellite not supported with LST processing)");
         RETURN_ERROR (msg, FUNC_NAME, true);
     }
 
@@ -342,7 +342,7 @@ Design Notes:
     else
     {
         snprintf (msg, sizeof (msg),
-                  "invalid instrument; value = %s", global->instrument);
+                  "(Sensor not supported with LST processing)");
         RETURN_ERROR (msg, FUNC_NAME, true);
     }
 
