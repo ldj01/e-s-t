@@ -5,17 +5,18 @@ CONFIGURATION:
 
        $LST_AUX_DIR  - Where the input grib files are archived.
 
-       $MODTRAN_PATH - Where the MODTRAN executable file is located and where
-                       the "DATA" subdiectory exists.
+       $MODTRAN_PATH - Where the MODTRAN executable file is located.
+
+       $MODTRAN_DATA_DIR - Exactly the "path/to/DATA" diectory.
 
 
 2. Executables needed in the $PATH:
    lst
    do_lst.py
-   wgrib
+   lst_extract_modtran_results.py
 
 
-3. New tools to be added to the system.
+3. New tools to be added to the system and path.
    MODTRAN x.x.x
    wgrib
 
@@ -27,7 +28,5 @@ PROCESSING:
 
 
 QUESTIONS:
-1. Should we be using Radiance or TOA for the thermal data?
-    a. If Radiance, why is 0.044 added for L5 thermal only??????
-    b. If TOA, probably don't need the 0.044 to be added??????
+1. Why is 0.044 added for L5 thermal only??????
 
