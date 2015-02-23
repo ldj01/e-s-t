@@ -1,42 +1,28 @@
+
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
+#include <stdbool.h>
+#include <stdint.h>
 
-#include <time.h>
+#include "espa_metadata.h"
 
-
-#include "input.h"
-
-
-#define FILL_VALUE 255
+#include "const.h"
 
 
-/* Structure for the 'output' data type */
-
-typedef struct
-{
-    bool open;             /* Flag to indicate whether output file is open 
-                              for access; 'true' = open, 'false' = not open */
-    Img_coord_int_t size;  /* Output image size */
-    int nband;             /* Number of output image bands */
-    Espa_internal_meta_t metadata; /* metadata container to hold the band
-                                      metadata for the output band; global
-                                      metadata won't be valid */
-    FILE *fp_bin;          /* File pointer for binary output file */
-} Output_t;
-
-
-/* Prototypes */
-Output_t *OpenOutput (Espa_internal_meta_t *in_meta, Input_t *input);
+int
+add_lst_band_product
+(
+    char *xml_filename,
+    char *thermal_band_name,
+    char *product_name,
+    char *band_name,
+    char *short_name,
+    char *long_name,
+    char *data_units,
+    float min_range,
+    float max_range
+);
 
 
-bool PutOutput (Output_t *this, unsigned char **final_mask);
-
-
-bool CloseOutput (Output_t *this);
-
-
-bool FreeOutput (Output_t *this);
-
-
-#endif
+#endif /* OUTPUT_H */

@@ -44,10 +44,10 @@ main (int argc, char *argv[])
 
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
 
-    char msg_str[MAX_STR_LEN];      /* input data scene name */
-    char xml_name[PATH_MAX];        /* input XML filename */
-    char dem_name[PATH_MAX];        /* input DEM filename */
-    char emissivity_name[PATH_MAX]; /* input Emissivity filename */
+    char msg_str[MAX_STR_LEN];
+    char xml_filename[PATH_MAX];        /* input XML filename */
+    char dem_filename[PATH_MAX];        /* input DEM filename */
+    char emissivity_filename[PATH_MAX]; /* input Emissivity filename */
     char command[PATH_MAX];
 
     Input_t *input = NULL;          /* input data and meta data */
@@ -76,7 +76,7 @@ main (int argc, char *argv[])
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
-    if (get_args (argc, argv, xml_name, dem_name, emissivity_name,
+    if (get_args (argc, argv, xml_filename, dem_filename, emissivity_filename,
                   &use_tape6, &verbose, &debug) != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
@@ -92,7 +92,7 @@ main (int argc, char *argv[])
     }
 
     /* Validate the input metadata file */
-    if (validate_xml_file (xml_name) != SUCCESS)
+    if (validate_xml_file (xml_filename) != SUCCESS)
     {
         /* Error messages already written */
         return EXIT_FAILURE;
@@ -104,7 +104,7 @@ main (int argc, char *argv[])
     /* Parse the metadata file into our internal metadata structure; also
        allocates space as needed for various pointers in the global and band
        metadata */
-    if (parse_metadata (xml_name, &xml_metadata) != SUCCESS)
+    if (parse_metadata (xml_filename, &xml_metadata) != SUCCESS)
     {
         /* Error messages already written */
         return EXIT_FAILURE;
@@ -247,7 +247,9 @@ main (int argc, char *argv[])
 
     /* Generate parameters for each Landsat pixel */
     if (calculate_pixel_atmospheric_parameters (input, &points,
-                                                dem_name, emissivity_name,
+                                                xml_filename,
+                                                dem_filename,
+                                                emissivity_filename,
                                                 modtran_results, verbose)
         != SUCCESS)
     {
@@ -302,7 +304,7 @@ main (int argc, char *argv[])
     }
 
     /* Append the LST band to the XML file */
-    if (append_metadata (output->nband, output->metadata.band, xml_name)
+    if (append_metadata (output->nband, output->metadata.band, xml_filename)
         != SUCCESS)
     {
         RETURN_ERROR ("Appending spectral index bands to XML file.",

@@ -85,6 +85,7 @@ typedef struct
     FILE *fd;             /* File pointer for file */
     bool is_open;         /* Has the file been opened flag */
     int band_index;       /* Index in the metadata */
+    char *band_name;      /* Band name in the metadata */
     Img_coord_int_t size; /* (line/sample) size */
     float toa_gain;       /* TOA gain */
     float toa_bias;       /* TOA bias */

@@ -130,7 +130,7 @@ GetInputThermLine
         {
             if (line_int16[sample] == input->thermal.fill_value)
             {
-                thermal_data[sample] = LST_FILL_VALUE;
+                thermal_data[sample] = LST_NO_DATA_VALUE;
             }
             else
             {
@@ -172,7 +172,7 @@ GetInputThermLine
         {
             if (line_uint8[sample] == input->thermal.fill_value)
             {
-                thermal_data[sample] = LST_FILL_VALUE;
+                thermal_data[sample] = LST_NO_DATA_VALUE;
             }
             else
             {
@@ -251,6 +251,9 @@ Output Parameters:
     free (input->thermal.filename);
     input->thermal.filename = NULL;
 
+    free (input->thermal.band_name);
+    input->thermal.band_name = NULL;
+
     free (input);
     input = NULL;
 
@@ -264,7 +267,7 @@ Output Parameters:
 
 
 bool
-GetXMLInput (Input_t *input, Espa_internal_meta_t * metadata)
+GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
 /*****************************************************************************
 
 Description: 'GetXMLInput' pulls input values from the XML structure.
@@ -287,7 +290,6 @@ Design Notes:
     char acq_date[DATE_STRING_LEN + 1];
     char acq_time[TIME_STRING_LEN + 1];
     char date_time[MAX_STR_LEN];
-    char band_name[30];
     char msg[MAX_STR_LEN];
     int index;
     Espa_global_meta_t *global = &metadata->global; /* pointer to global meta */
@@ -300,6 +302,7 @@ Design Notes:
     input->thermal.filename = NULL;
     input->thermal.fd = NULL;
     input->thermal.is_open = false;
+    input->thermal.band_name = NULL;
     input->thermal.size.s = -1;
     input->thermal.size.l = -1;
     input->thermal.toa_gain = GAIN_BIAS_FILL;
@@ -355,7 +358,8 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-        snprintf (band_name, sizeof (band_name), "band6");
+//        snprintf (band_name, sizeof (band_name), "band6");
+        input->thermal.band_name = strdup ("band6");
     }
     else if (input->meta.instrument == INST_ETM)
     {
@@ -365,7 +369,8 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-        snprintf (band_name, sizeof (band_name), "band61");
+//        snprintf (band_name, sizeof (band_name), "band61");
+        input->thermal.band_name = strdup ("band61");
     }
     else if (input->meta.instrument == INST_OLI_TIRS)
     {
@@ -375,7 +380,8 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-        snprintf (band_name, sizeof (band_name), "band10");
+//        snprintf (band_name, sizeof (band_name), "band10");
+        input->thermal.band_name = strdup ("band10");
     }
 
     input->meta.zone = global->proj_info.utm_zone;
@@ -385,7 +391,8 @@ Design Notes:
         /* Only look at the ones with the product name we are looking for */
         if (strcmp (metadata->band[index].product, "L1T") == 0)
         {
-            if (strcmp (metadata->band[index].name, band_name) == 0)
+            if (strcmp (metadata->band[index].name,
+                        input->thermal.band_name) == 0)
             {
                 input->thermal.filename =
                     strdup (metadata->band[index].file_name);

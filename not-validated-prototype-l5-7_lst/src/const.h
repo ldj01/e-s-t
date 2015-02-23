@@ -5,8 +5,30 @@
 #include <math.h>
 
 
-#define LST_VERSION "1.0.0"
-#define LST_FILL_VALUE (-9999.0)
+#define LST_VERSION "0.0.5"
+#define LST_NO_DATA_VALUE (-9999.0)
+
+
+#define LST_THERMAL_RADIANCE_PRODUCT_NAME "lst_thermal_radiance"
+#define LST_THERMAL_RADIANCE_BAND_NAME "lst_thermal_radiance"
+#define LST_THERMAL_RADIANCE_SHORT_NAME "LST_THERMAL_RADIANCE"
+#define LST_THERMAL_RADIANCE_LONG_NAME "thermal band converted to radiance"
+#define LST_RADIANCE_UNITS "radiance (W m^(-2) sr^(-1) mu^(-1))"
+
+#define LST_ATMOS_TRANS_PRODUCT_NAME "lst_atmospheric_transmittance"
+#define LST_ATMOS_TRANS_BAND_NAME "lst_atmospheric_transmittance"
+#define LST_ATMOS_TRANS_SHORT_NAME "LST_ATMOSPHERIC_TRANSMITTANCE"
+#define LST_ATMOS_TRANS_LONG_NAME "atmospheric transmittance"
+
+#define LST_UPWELLED_RADIANCE_PRODUCT_NAME "lst_upwelled_radiance"
+#define LST_UPWELLED_RADIANCE_BAND_NAME "lst_upwelled_radiance"
+#define LST_UPWELLED_RADIANCE_SHORT_NAME "LST_UPWELLED_RADIANCE"
+#define LST_UPWELLED_RADIANCE_LONG_NAME "upwelled radiance"
+
+#define LST_DOWNWELLED_RADIANCE_PRODUCT_NAME "lst_downwelled_radiance"
+#define LST_DOWNWELLED_RADIANCE_BAND_NAME "lst_downwelled_radiance"
+#define LST_DOWNWELLED_RADIANCE_SHORT_NAME "LST_DOWNWELLED_RADIANCE"
+#define LST_DOWNWELLED_RADIANCE_LONG_NAME "downwelled radiance"
 
 
 #define TWO_PI (2.0 * PI)

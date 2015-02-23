@@ -1,250 +1,193 @@
-/*****************************************************************************
-File: output.c
 
-Description: Functions creating and writting data to the product output file.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <limits.h>
+#include <time.h>
 
-Revision History:
- Song Guo
- Original Version - borrowed and modified from some of the LEDAPS libraries.
-
-Team Unique Header:
-  This software was developed by the Landsat Science, Research, and
-  Development (LSRD) Team at the USGS EROS.
-
-Design Notes:
- 1. The following public functions handle the output files:
-    CreateOutput - Create new output file.
-    OutputFile - Setup 'output' data structure.
-    CloseOutput - Close the output file.
-    FreeOutput - Free the 'output' data structure memory.
-    PutMetadata - Write the output product metadata.
-    WriteOutput - Write a line of data to the output product file.
-*****************************************************************************/
-
+#include "espa_metadata.h"
+#include "parse_metadata.h"
+#include "write_metadata.h"
+#include "envi_header.h"
+#include "raw_binary_io.h"
 
 #include "const.h"
 #include "utilities.h"
-#include "output.h"
 
 
-#define LST_BAND "lst"
-#define LST_LONG_NAME "lst_band"
+#define MAX_DATE_LEN 28
 
 
 /******************************************************************************
-Description: 'OutputFile' sets up the 'output' data structure and opens the
- output file for write access.
+  NAME:  add_lst_band_product
 
-Input Parameters:this
- in_meta        input XML metadata structure (band-related info)
- input          input structure with input image metadata (nband, iband, size)
+  PURPOSE:  Create a new envi output file including envi header and add the
+            associated information to the XML metadata file.
 
-Output Parameters:
- (returns)      'output' data structure or NULL when an error occurs
-
-*****************************************************************************/
-Output_t *OpenOutput
+  RETURN VALUE:  Type = int
+      Value    Description
+      -------  ---------------------------------------------------------------
+      SUCCESS  No errors were encountered.
+      ERROR    An error was encountered.
+******************************************************************************/
+int
+add_lst_band_product
 (
-    Espa_internal_meta_t *in_meta, /* I: input metadata structure */
-    Input_t *input                 /* I: input reflectance band data */
+    char *xml_filename,
+    char *thermal_band_name,
+    char *product_name,
+    char *band_name,
+    char *short_name,
+    char *long_name,
+    char *data_units,
+    int min_range,
+    int max_range
 )
 {
-    Output_t *this = NULL;
-    char *mychar = NULL;        /* pointer to '_' */
-    char scene_name[STR_SIZE];  /* scene name for the current scene */
-    char file_name[STR_SIZE];   /* output filename */
-    char production_date[MAX_DATE_LEN + 1]; /* current date/time for
-                                               production */
-    time_t tp;                  /* time structure */
-    struct tm *tm = NULL;       /* time structure for UTC time */
-    Espa_band_meta_t *bmeta = NULL;     /* pointer to the band metadata array
-                                           within the output structure */
+    char FUNC_NAME[] = "add_lst_band_product";
 
-    /* Create the Output data structure */
-    this = (Output_t *) malloc (sizeof (Output_t));
-    if (this == NULL)
+    int count;
+    int band_index = -1;
+    int src_index = -1;
+    char scene_name[PATH_MAX];
+    char image_filename[PATH_MAX];
+    char *tmp_char = NULL;
+    Espa_internal_meta_t in_meta;
+    Espa_internal_meta_t tmp_meta;
+    Espa_band_meta_t *bmeta = NULL; /* pointer to the band metadata array
+                                       within the output structure */
+    time_t tp;                   /* time structure */
+    struct tm *tm = NULL;        /* time structure for UTC time */
+    char production_date[MAX_DATE_LEN+1]; /* current date/time for production */
+    Envi_header_t envi_hdr;   /* output ENVI header information */
+    char envi_file[PATH_MAX];
+
+    /* Initialize the input metadata structure */
+    init_metadata_struct (&in_meta);
+
+    /* Parse the metadata file into our internal metadata structure; also
+       allocates space as needed for various pointers in the global and band
+       metadata */
+    if (parse_metadata (xml_filename, &in_meta) != SUCCESS)
     {
-        RETURN_ERROR ("allocating Output data structure", "OpenOutput", NULL);
+        /* Error messages already written */
+        return ERROR;
     }
 
-    /* Initialize the internal metadata for the output product. The global
-       metadata won't be updated, however the band metadata will be updated
-       and used later for appending to the original XML file. */
-    init_metadata_struct (&this->metadata);
-
-    /* Allocate memory for the output band */
-    if (allocate_band_metadata (&this->metadata, 1) != SUCCESS)
+    /* Find the representative band for metadata information */
+    for (band_index = 0; band_index < in_meta.nbands; band_index++)
     {
-        RETURN_ERROR ("allocating band metadata", "OpenOutput", NULL);
+        if ((strcmp (in_meta.band[band_index].product, "L1T") == 0)
+            && (strcmp (in_meta.band[band_index].name, thermal_band_name)
+                == 0))
+        {
+            /* this is the index we'll use for output band information */
+            src_index = band_index;
+            break;
+        }
     }
 
-    bmeta = this->metadata.band;
-
-    /* Determine the scene name */
-    strcpy (scene_name, in_meta->band[input->thermal.band_index].file_name);
-    mychar = strchr (scene_name, '_');
-    if (mychar != NULL)
-        *mychar = '\0';
+    /* Figure out the scene name */
+    strcpy (scene_name, in_meta.band[src_index].file_name);
+    tmp_char = strchr (scene_name, '_');
+    if (tmp_char != NULL)
+        *tmp_char = '\0';
 
     /* Get the current date/time (UTC) for the production date of each band */
     if (time (&tp) == -1)
     {
-        RETURN_ERROR ("unable to obtain current time", "OpenOutput", NULL);
+        RETURN_ERROR ("unable to obtain current time", FUNC_NAME, ERROR);
     }
 
     tm = gmtime (&tp);
     if (tm == NULL)
     {
-        RETURN_ERROR ("converting time to UTC", "OpenOutput", NULL);
+        RETURN_ERROR ("converting time to UTC", FUNC_NAME, ERROR);
     }
 
-    if (strftime (production_date, MAX_DATE_LEN, "%Y-%m-%dT%H:%M:%SZ", tm)
-        == 0)
+    if (strftime (production_date, MAX_DATE_LEN, "%Y-%m-%dT%H:%M:%SZ", tm) == 0)
     {
-        RETURN_ERROR ("formatting the production date/time", "OpenOutput",
-                      NULL);
+        RETURN_ERROR ("formatting the production date/time", FUNC_NAME, ERROR);
     }
 
-    /* Populate the data structure */
-    this->open = false;
-    this->fp_bin = NULL;
-    this->nband = 1;
-    this->size.l = input->thermal.size.l;
-    this->size.s = input->thermal.size.s;
+    /* Figure out the output filename */
+    count = snprintf (image_filename, sizeof (image_filename),
+                      "%s_%s.img", scene_name, product_name);
+    if (count < 0 || count >= sizeof (image_filename))
+    {
+        RETURN_ERROR ("Failed creating output filename", FUNC_NAME, ERROR);
+    }
 
-    strncpy (bmeta[0].short_name,
-             in_meta->band[input->thermal.band_index].short_name, 3);
+    /* Gather all the band information from the representative band */
+
+    /* Initialize the internal metadata for the output product. The global
+       metadata won't be updated, however the band metadata will be updated
+       and used later for appending to the original XML file. */
+    init_metadata_struct (&tmp_meta);
+
+    /* Allocate memory for the output band */
+    if (allocate_band_metadata (&tmp_meta, 1) != SUCCESS)
+        RETURN_ERROR("allocating band metadata", FUNC_NAME, ERROR);
+    bmeta = tmp_meta.band;
+
+    snprintf (bmeta[0].short_name, sizeof (bmeta[0].short_name),
+              in_meta.band[src_index].short_name);
     bmeta[0].short_name[3] = '\0';
-    strcat (bmeta[0].short_name, "LST");
-    strcpy (bmeta[0].product, "lst");
-    strcpy (bmeta[0].source, "level1");
-    strcpy (bmeta[0].category, "image");
-    bmeta[0].nlines = this->size.l;
-    bmeta[0].nsamps = this->size.s;
-    bmeta[0].pixel_size[0] = input->thermal.pixel_size[0];
-    bmeta[0].pixel_size[1] = input->thermal.pixel_size[1];
-    strcpy (bmeta[0].pixel_units, "meters");
-    sprintf (bmeta[0].app_version, "lst_%s", LST_VERSION);
-    strcpy (bmeta[0].production_date, production_date);
-    bmeta[0].data_type = ESPA_UINT16;
-    bmeta[0].fill_value = FILL_VALUE;
-    strcpy (bmeta[0].name, LST_BAND);
-    strcpy (bmeta[0].long_name, LST_LONG_NAME);
-    strcpy (bmeta[0].data_units, "quality/feature classification");
-    bmeta[0].scale_factor = 10000.0;
-    bmeta[0].add_offset = 0.0;
+    strcat (bmeta[0].short_name, short_name);
+    snprintf (bmeta[0].product, sizeof (bmeta[0].product), product_name);
+    snprintf (bmeta[0].source, sizeof (bmeta[0].source), "level1");
+    snprintf (bmeta[0].category, sizeof (bmeta[0].category), "image");
+    bmeta[0].nlines = in_meta.band[src_index].nlines;
+    bmeta[0].nsamps = in_meta.band[src_index].nsamps;
+    bmeta[0].pixel_size[0] = in_meta.band[src_index].pixel_size[0];
+    bmeta[0].pixel_size[1] = in_meta.band[src_index].pixel_size[1];
+    snprintf (bmeta[0].pixel_units, sizeof (bmeta[0].pixel_units), "meters");
+    snprintf (bmeta[0].app_version, sizeof (bmeta[0].app_version),
+              "lst_%s", LST_VERSION);
+    snprintf (bmeta[0].production_date, sizeof (bmeta[0].production_date),
+              production_date);
+    bmeta[0].data_type = ESPA_FLOAT32;
+    bmeta[0].fill_value = LST_NO_DATA_VALUE;
+    bmeta[0].valid_range[0] = min_range;
+    bmeta[0].valid_range[1] = max_range;
+    snprintf (bmeta[0].name, sizeof (bmeta[0].name), band_name);
+    snprintf (bmeta[0].long_name, sizeof (bmeta[0].long_name), long_name);
+    snprintf (bmeta[0].data_units, sizeof (bmeta[0].data_units), data_units);
+    snprintf (bmeta[0].file_name, sizeof (bmeta[0].file_name), image_filename);
 
-    /* Set up the filename with the scene name and band name and open the
-       file for write access */
-    sprintf (file_name, "%s_%s.img", scene_name, bmeta[0].name);
-    strcpy (bmeta[0].file_name, file_name);
-    this->fp_bin = open_raw_binary (file_name, "w");
-    if (this->fp_bin == NULL)
+    /* Create the ENVI header file this band */
+    if (create_envi_struct (&bmeta[0], &in_meta.global, &envi_hdr) != SUCCESS)
     {
-        RETURN_ERROR ("unable to open output file", "OpenOutput", NULL);
+        RETURN_ERROR ("Failed to create ENVI header structure.", FUNC_NAME,
+                      ERROR);
     }
 
-    this->open = true;
-
-    return this;
-}
-
-
-/******************************************************************************
-Description: 'CloseOutput' closes the output files which are open.
-
-Input Parameters:
- this           'output' data structure
-
-Output Parameters:
- this           'output' data structure; the following fields are modified:
-                   open
- (returns)      status:
-                  'true' = okay
-                  'false' = error return
-*****************************************************************************/
-bool
-CloseOutput (Output_t *this)
-{
-    if (!this->open)
+    /* Write the ENVI header */
+    snprintf (envi_file, sizeof(envi_file), bmeta[0].file_name);
+    tmp_char = strchr (envi_file, '.');
+    if (tmp_char == NULL)
     {
-        RETURN_ERROR ("image files not open", "CloseOutput", false);
+        RETURN_ERROR ("Failed creating ENVI header filename", FUNC_NAME,
+                      ERROR);
     }
 
-    close_raw_binary (this->fp_bin);
-    this->open = false;
-
-    return true;
-}
-
-
-/******************************************************************************
-Description: 'FreeOutput' frees the 'output' data structure memory.
-
-Input Parameters:
- this           'output' data structure for which the fields are freed
-
-Output Parameters:
- this           'output' data structure
- (returns)      status:
-                  'true' = okay
-                  'false' = error occurred
-*****************************************************************************/
-bool
-FreeOutput (Output_t *this)
-{
-    if (this->open)
+    sprintf (tmp_char, ".hdr");
+    if (write_envi_hdr (envi_file, &envi_hdr) != SUCCESS)
     {
-        RETURN_ERROR ("file still open", "FreeOutput", false);
+        RETURN_ERROR ("Failed writing ENVI header file", FUNC_NAME, ERROR);
     }
 
-    free (this);
-    this = NULL;
-
-    return true;
-}
-
-
-/******************************************************************************
-Description: 'PutOutputLine' writes nlines of data to the output file.
-
-Input Parameters:
- this           'output' data structure; the following fields are written:
-                buf -- contains the line to be written
- final_mask     current nlines of data to be written (0-based)
-
-Output Parameters:
- this           'output' data structure; the following fields are modified:
- (returns)      status:
-                  'true' = okay
-                  'false' = error return
-*****************************************************************************/
-bool
-PutOutput (Output_t * this, unsigned char **final_mask)
-{
-    int il;
-    void *buf = NULL;
-
-    /* Check the parameters */
-    if (this == (Output_t *) NULL)
+    /* Append the LST band to the XML file */
+    if (append_metadata (1, bmeta, xml_filename)
+        != SUCCESS)
     {
-        RETURN_ERROR ("invalid input structure", "PutOutputLine", false);
+        RETURN_ERROR ("Appending spectral index bands to XML file",
+                       FUNC_NAME, ERROR);
     }
 
-    if (!this->open)
-    {
-        RETURN_ERROR ("file not open", "PutOutputLine", false);
-    }
+    free_metadata (&in_meta);
+    free_metadata (&tmp_meta);
 
-    for (il = 0; il < this->size.l; il++)
-    {
-        buf = (void *) final_mask[il];
-        if (write_raw_binary (this->fp_bin, 1, this->size.s,
-                              sizeof (unsigned char), buf) != SUCCESS)
-        {
-            RETURN_ERROR ("writing output line", "PutOutput", false);
-        }
-    }
-
-    return true;
+    return SUCCESS;
 }
