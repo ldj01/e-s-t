@@ -2,6 +2,7 @@
 #define LST_TYPES_H
 
 
+#include <stdbool.h>
 #include <limits.h>
 
 
@@ -12,7 +13,8 @@ typedef struct
     float latitude;
     float longitude;
     float height;
-} POINT_INFO;
+    bool run_modtran;
+} MODTRAN_INFO;
 
 
 typedef struct
@@ -32,7 +34,7 @@ typedef struct
     int num_points;
     int num_modtran_runs;
 
-    POINT_INFO *modtran_runs;
+    MODTRAN_INFO *modtran_runs;
 
     float *row;
     float *col;
@@ -40,6 +42,7 @@ typedef struct
     float *lon;
     float *utm_easting;
     float *utm_northing;
+    bool *use_point;
 } REANALYSIS_POINTS;
 
 

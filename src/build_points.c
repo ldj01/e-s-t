@@ -395,6 +395,7 @@ int build_points
         {
             index = (row - min_row) * points->num_cols + (col - min_col);
 
+            /* Row and col are not used, but maintained for debugging */
             points->row[index] = row;
             points->col[index] = col;
             points->lat[index] = lat[row][col];
@@ -407,14 +408,6 @@ int build_points
 
     /* Convert lat/lon to UTM northing/easting*/
     convert_ll_to_utm (input, points);
-
-    for (row = min_row; row <= max_row; row++)
-    {
-        for (col = min_col; col <= max_col; col++)
-        {
-            index = (row - min_row) * points->num_cols + (col - min_col);
-        }
-    }
 
     /* Free memory only used locally */
     if (free_2d_array ((void **) lat) != SUCCESS)

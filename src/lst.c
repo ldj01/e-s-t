@@ -17,9 +17,9 @@
 
 
 /******************************************************************************
-METHOD:  scene_based_lst
+METHOD:  lst
 
-PURPOSE:  the main routine for scene based LST (Land Surface Temperature) in C
+PURPOSE:  The main routine for scene based LST (Land Surface Temperature).
 
 RETURN VALUE:
 Type = int
@@ -29,14 +29,13 @@ ERROR           An error occurred during processing of the scene_based_lst
 SUCCESS         Processing was successful
 
 PROJECT:  Land Satellites Data System Science Research and Development (LSRD)
-at the USGS EROS
+          at the USGS EROS
 
 HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 3/15/2013   Song Guo         Original Development
 
-NOTES: type ./scene_based_lst --help for information to run the code
 ******************************************************************************/
 int
 main (int argc, char *argv[])

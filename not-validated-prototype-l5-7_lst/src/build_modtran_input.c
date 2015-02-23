@@ -969,7 +969,7 @@ int build_modtran_input
 
     /* Allocate memory */
     points->modtran_runs =
-        (POINT_INFO *) malloc (num_modtran_runs * sizeof (POINT_INFO));
+        (MODTRAN_INFO *) malloc (num_modtran_runs * sizeof (MODTRAN_INFO));
     if (points->modtran_runs == NULL)
     {
         RETURN_ERROR ("Allocating modtran_runs memory", FUNC_NAME, FAILURE);
