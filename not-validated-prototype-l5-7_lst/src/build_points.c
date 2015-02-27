@@ -277,10 +277,10 @@ int build_points
               This is probably only a CONUS quick and dirty solution.
 
        NOTE - MERRA is even farther apart so this will not work for that. */
-    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.2;
-    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.2;
-    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.2;
-    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.2;
+    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.5;
+    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.5;
+    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.5;
+    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.5;
 
     /* determine what points in the NARR dataset fall within our buffered
        Landsat area using logical operators lessThanLat and greaterThanLat

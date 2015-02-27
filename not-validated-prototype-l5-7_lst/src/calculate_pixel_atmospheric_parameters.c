@@ -10,6 +10,7 @@
 #include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
+#include "output.h"
 #include "lst_types.h"
 #include "build_points.h"
 
@@ -131,7 +132,7 @@ PURPOSE: Interpolate to height of current pixel
 void interpolate_to_height
 (
     float **modtran_results, /* I: results from MODTRAN runs for a point */
-    float interpolate_to,    /* I: current landsat pixel height */
+    double interpolate_to,   /* I: current landsat pixel height */
     float *at_height         /* O: interpolated height for point */
 )
 {
@@ -225,7 +226,7 @@ PURPOSE: Interpolate to location of current pixel
 void interpolate_to_location
 (
     REANALYSIS_POINTS *points,  /* I: The coordinate points */
-    int *cell_vertices,         /* I: The vertices in the pointds to use */
+    int *cell_vertices,         /* I: The vertices in the points to use */
     float **at_height,          /* I: current height atmospheric results */
     float interpolate_easting,  /* I: interpolate to easting */
     float interpolate_northing, /* I: interpolate to northing */
@@ -233,9 +234,9 @@ void interpolate_to_location
 )
 {
     int i, j;
-    float inv_h[NUM_CELL_POINTS];
-    float w[NUM_CELL_POINTS];
-    float total = 0.0;
+    double inv_h[NUM_CELL_POINTS];
+    double w[NUM_CELL_POINTS];
+    double total = 0.0;
 
     /* shepard's method */
     for (i = 0; i < NUM_CELL_POINTS; i++)
@@ -265,7 +266,7 @@ void interpolate_to_location
         parameters[i] = 0.0;
         for (j = 0; j < NUM_CELL_POINTS; j++)
         {
-            parameters[i] += (w[j] * at_height[i][j]);
+            parameters[i] += (w[j] * at_height[j][i]);
         }
     }
 }
@@ -310,14 +311,16 @@ int calculate_pixel_atmospheric_parameters
 (
     Input_t *input,            /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    char *dem_filename,        /* I: address of input DEM filename */
-    char *emi_filename,        /* I: address of input Emissivity filename */
+    char *xml_filename,        /* I: XML filename */
+    char *dem_filename,        /* I: input DEM filename */
+    char *emi_filename,        /* I: input Emissivity filename */
     float **modtran_results,   /* I: results from MODTRAN runs */
     bool verbose               /* I: value to indicate if intermediate
                                      messages be printed */
 )
 {
     char FUNC_NAME[] = "calculate_pixel_atmospheric_parameters";
+
     int line;
     int sample;
     int status;
@@ -337,10 +340,12 @@ int calculate_pixel_atmospheric_parameters
     float **at_height = NULL;
     float parameters[NUM_PARAMETERS];
 
-    char thermal_filename[] = "thermal_radiance";
-    char upwelled_filename[] = "upwelled_radiance";
-    char downwelled_filename[] = "downwelled_radiance";
-    char transmittance_filename[] = "atmospheric_transmittance";
+    char *tmp_char = NULL;
+    char scene_name[PATH_MAX];
+    char thermal_filename[PATH_MAX];
+    char upwelled_filename[PATH_MAX];
+    char downwelled_filename[PATH_MAX];
+    char transmittance_filename[PATH_MAX];
 
     FILE *dem_fd = NULL;
     FILE *thermal_fd = NULL;
@@ -351,6 +356,7 @@ int calculate_pixel_atmospheric_parameters
     int16_t *dem = NULL;        /* input DEM data in meters */
     float *thermal_data;
     float **landsat_results;
+    double current_height;
     char msg[MAX_STR_LEN];
     char *lst_data_dir = NULL;
 
@@ -388,6 +394,21 @@ int calculate_pixel_atmospheric_parameters
         RETURN_ERROR ("Error allocating memory for the Thermal data",
                       FUNC_NAME, FAILURE);
     }
+
+    /* Figure out the filenames */
+    snprintf (scene_name, sizeof (scene_name), input->thermal.filename);
+    tmp_char = strchr (scene_name, '_');
+    if (tmp_char != NULL)
+        *tmp_char = '\0';
+
+    snprintf (thermal_filename, sizeof (thermal_filename),
+              "%s_%s.img", scene_name, LST_THERMAL_RADIANCE_PRODUCT_NAME);
+    snprintf (upwelled_filename, sizeof (upwelled_filename),
+              "%s_%s.img", scene_name, LST_UPWELLED_RADIANCE_PRODUCT_NAME);
+    snprintf (downwelled_filename, sizeof (downwelled_filename),
+              "%s_%s.img", scene_name, LST_DOWNWELLED_RADIANCE_PRODUCT_NAME);
+    snprintf (transmittance_filename, sizeof (transmittance_filename),
+              "%s_%s.img", scene_name, LST_ATMOS_TRANS_PRODUCT_NAME);
 
     /* Open the intermediate binary files for writing
        Note: Needs to be deleted before release */
@@ -486,7 +507,7 @@ int calculate_pixel_atmospheric_parameters
         first_sample = true;
         for (sample = 0; sample < input->thermal.size.s; sample++)
         {
-            if (thermal_data[sample] != LST_FILL_VALUE)
+            if (thermal_data[sample] != LST_NO_DATA_VALUE)
             {
                 /* determine UTM coordinates of current pixel */
                 current_easting = input->meta.ul_map_corner.x
@@ -713,11 +734,17 @@ LOG_MESSAGE (msg, FUNC_NAME);
 #endif
 
                 /* convert height from m to km */
-                dem[sample] = (float) dem[sample] / 1000.0;
+                current_height = (double) dem[sample] / 1000.0;
 
                 /* interpolate three parameters to that height at each of the
                    four closest points */
 
+if (line == 3500 && sample == 4000)
+{
+    printf ("\n\n");
+    printf ("easting [%lf]\n", current_easting);
+    printf ("northing [%lf]\n", current_northing);
+}
                 for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
                 {
                     current_index = cell_vertices[vertex] * NUM_ELEVATIONS;
@@ -725,25 +752,59 @@ LOG_MESSAGE (msg, FUNC_NAME);
                     /* interpolate three atmospheric parameters to current
                        height */
                     interpolate_to_height (&modtran_results[current_index],
-                                           dem[sample], &at_height[vertex][0]);
+                                           current_height,
+                                           at_height[vertex]);
+//                                           &at_height[vertex][0]);
+if (line == 3500 && sample == 4000)
+{
+    int bbbb;
+    for (bbbb = 0; bbbb < NUM_ELEVATIONS; bbbb++)
+    {
+        printf ("%15.9f %15.9f %15.9f %15.9f %15.9f %15.9f\n",
+                modtran_results[current_index+bbbb][LST_LATITUDE],
+                modtran_results[current_index+bbbb][LST_LONGITUDE],
+                modtran_results[current_index+bbbb][LST_HEIGHT],
+                modtran_results[current_index+bbbb][LST_TRANSMISSION],
+                modtran_results[current_index+bbbb][LST_UPWELLED_RADIANCE],
+                modtran_results[current_index+bbbb][LST_DOWNWELLED_RADIANCE]);
+    }
+
+    printf ("at_height [%d][%d][%f] [%15.9f][%15.9f][%15.9f]\n",
+            current_index, cell_vertices[vertex], current_height,
+            at_height[vertex][0],
+            at_height[vertex][1],
+            at_height[vertex][2]);
+}
                 }
 
                 /* interpolate parameters at appropriate height to location of
                    current pixel */
                 interpolate_to_location (points, cell_vertices, at_height,
                                          current_easting, current_northing,
-                                         parameters);
+                                         &parameters[0]);
 
                 /* convert radiances to W*m^(-2)*sr(-1) */
                 landsat_results[0][sample] = parameters[0];
-                landsat_results[1][sample] = 10000.0 * parameters[1];
-                landsat_results[2][sample] = 10000.0 * parameters[2];
+                landsat_results[1][sample] = parameters[1] * 10000.0;
+                landsat_results[2][sample] = parameters[2] * 10000.0;
+
+if (line == 3500 && sample == 4000)
+{
+    printf ("thermal [%f]\n", thermal_data[sample]);
+    printf ("transmittance [%f]\n", landsat_results[0][sample]);
+    printf ("transmittance [%f]\n", parameters[0]);
+    printf ("upwelled [%f]\n", landsat_results[1][sample]);
+    printf ("upwelled [%f]\n", parameters[1]);
+    printf ("downwelled [%f]\n", landsat_results[2][sample]);
+    printf ("downwelled [%f]\n", parameters[2]);
+    printf ("\n\n");
+}
             } /* END - if not FILL */
             else
             {
-                landsat_results[0][sample] = LST_FILL_VALUE;
-                landsat_results[1][sample] = LST_FILL_VALUE;
-                landsat_results[2][sample] = LST_FILL_VALUE;
+                landsat_results[0][sample] = LST_NO_DATA_VALUE;
+                landsat_results[1][sample] = LST_NO_DATA_VALUE;
+                landsat_results[2][sample] = LST_NO_DATA_VALUE;
             }
         } /* END - for sample */
 
@@ -828,6 +889,54 @@ LOG_MESSAGE (msg, FUNC_NAME);
     {
         sprintf (msg, "Closing file %s", downwelled_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->thermal.band_name,
+                             LST_THERMAL_RADIANCE_PRODUCT_NAME,
+                             LST_THERMAL_RADIANCE_BAND_NAME,
+                             LST_THERMAL_RADIANCE_SHORT_NAME,
+                             LST_THERMAL_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST band product", FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->thermal.band_name,
+                             LST_ATMOS_TRANS_PRODUCT_NAME,
+                             LST_ATMOS_TRANS_BAND_NAME,
+                             LST_ATMOS_TRANS_SHORT_NAME,
+                             LST_ATMOS_TRANS_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST band product", FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->thermal.band_name,
+                             LST_UPWELLED_RADIANCE_PRODUCT_NAME,
+                             LST_UPWELLED_RADIANCE_BAND_NAME,
+                             LST_UPWELLED_RADIANCE_SHORT_NAME,
+                             LST_UPWELLED_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST band product", FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->thermal.band_name,
+                             LST_DOWNWELLED_RADIANCE_PRODUCT_NAME,
+                             LST_DOWNWELLED_RADIANCE_BAND_NAME,
+                             LST_DOWNWELLED_RADIANCE_SHORT_NAME,
+                             LST_DOWNWELLED_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST band product", FUNC_NAME);
     }
 
     return SUCCESS;

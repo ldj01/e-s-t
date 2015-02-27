@@ -23,51 +23,45 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
-/* Planck Const hecht pg, 585 ## units: Js */
-#define PLANCK_CONST (6.6260755 * 10e-34)
-/* Boltzmann Gas Const halliday et 2001 ## units: J/K */
-#define BOLTZMANN_GAS_CONST (1.3806503 * 10e-23)
-/* Speed of Light ## units: m/s */
-#define SPEED_OF_LIGHT (299792458.0)
-#define SPEED_OF_LIGHT_SQRD (SPEED_OF_LIGHT * SPEED_OF_LIGHT)
 int planck_eq
 (
     float *wavelength,
     int num_srs,
     float temperature,
-    float *black_radiance
+    double *black_radiance
 )
 {
-    char FUNC_NAME[] = "planck_eq";
     int i;
-    double *lambda;
+    double lambda;
 
-    /* Allocate memory */
-    lambda = malloc (num_srs * sizeof (double));
-    if (lambda == NULL)
-    {
-        RETURN_ERROR ("Allocating lambda memory", FUNC_NAME, FAILURE);
-    }
+    /* Planck Const hecht pg, 585 ## units: Js */
+    double PLANCK_CONST = (6.6260755 * pow (10, -34));
+
+    /* Boltzmann Gas Const halliday et 2001 -- units: J/K */
+    double BOLTZMANN_GAS_CONST = (1.3806503 * pow (10, -23));
+
+    /* Speed of Light -- units: m/s */
+    double SPEED_OF_LIGHT = (299792458.0);
+    double SPEED_OF_LIGHT_SQRD = (SPEED_OF_LIGHT * SPEED_OF_LIGHT);
 
     for (i = 0; i < num_srs; i++)
     {
-        /* Lambda intervals of Landsat5 spectral response locations microns 
-           units: m */
-        lambda[i] = wavelength[i] * 10e-6;
+        /* Lambda intervals of spectral response locations microns units: m */
+        lambda = wavelength[i] * pow (10, -6);
 
         /* Compute the Planck Blackbody Eq [W/m^2 sr um] */
         black_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
-                            * (10e-6 * pow (lambda[i], -5.0))
+                            * (pow (10, -6) * pow (lambda, -5.0))
                             * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
-                                            / (lambda [i]
+                                            / (lambda
                                                * BOLTZMANN_GAS_CONST
                                                * temperature))
                                       - 1.0));
 
         /* convert to W/cm^2 sr micron to match modtran units */
+        /* br / (100 * 100) == br * 10e-5 */
         black_radiance[i] *= 10e-5;
     }
-    free (lambda);
 
     return SUCCESS;
 }
@@ -258,6 +252,8 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
+
+NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
 ******************************************************************************/
 int int_tabulated
 (
@@ -270,14 +266,29 @@ int int_tabulated
     char FUNC_NAME[] = "int_tabulated";
     float *temp = NULL;
     float *z = NULL;
-    float xmin;
-    float xmax;
+    double xmin;
+    double xmax;
     int i;
     int *ii = NULL;
     int ii_count;
-    float h;
-    float result;
+    double h;
+    double result;
     int segments;
+
+    /* Figure out the number of segments needed */
+    segments = nums - 1;
+    while (segments % 4 != 0)
+        segments++;
+
+    /* Determine how many iterations are needed  */
+    ii_count = (int) ((segments) / 4);
+
+    /* Determine the min and max */
+    xmin = x[0];
+    xmax = x[nums - 1];
+
+    /* Determine the step size */
+    h = (xmax - xmin) / segments;
 
     /* Allocate memory */
     temp = malloc (nums * sizeof (float));
@@ -286,64 +297,45 @@ int int_tabulated
         RETURN_ERROR ("Allocating temp memory", FUNC_NAME, FAILURE);
     }
 
-    z = malloc (nums * sizeof (float));
+    z = malloc ((segments+1) * sizeof (float));
     if (z == NULL)
     {
         RETURN_ERROR ("Allocating z memory", FUNC_NAME, FAILURE);
     }
 
-    ii = malloc (nums * sizeof (int));
+    ii = malloc (ii_count * sizeof (int));
     if (ii == NULL)
     {
         RETURN_ERROR ("Allocating ii memory", FUNC_NAME, FAILURE);
     }
 
-    segments = nums - 1;
-/* Songs original code
-    if (nums % 4 != 0)
-        segments++;
-*/
-    /* RDD - New code based on IDL */
-    while (segments % 4 != 0)
-        segments++;
-
-    xmin = x[0];
-    xmax = x[nums - 1];
-    h = (xmax - xmin) / (float) segments;
-
-    /* integrate spectral response over wavelength */
-    /* Call spline to get second derivatives, */
-    if (spline (x, f, nums, 2.0, 2.0, temp) != SUCCESS)
+    /* Interpolate spectral response over wavelength */
+    /* Using 1e30 forces generation of a natural spline and produces the same
+       results as IDL */
+    if (spline (x, f, nums, 1e30, 1e30, temp) != SUCCESS)
     {
         RETURN_ERROR ("Failed during spline", FUNC_NAME, FAILURE);
     }
 
     /* Call splint for interpolations. one-based arrays are considered */
-    for (i = 0; i < nums; i++)
+    for (i = 0; i < segments+1; i++)
     {
-        splint (x, f, temp, nums, i, &z[i]);
+        splint (x, f, temp, nums, h*i+xmin, &z[i]);
     }
 
-    result = 0.0;
     /* Get the 5-points needed for Newton-Cotes formula */
-#if 0
-printf("-------------\n");
-printf("nums = %d\n", nums);
-#endif
-    ii_count = (int) ((nums - 1) / 4);
     for (i = 0; i < ii_count; i++)
     {
         ii[i] = (i + 1) * 4;
-#if 0
-printf("ii[%d] = %d\n", i, ii[i]);
-#endif
     }
+
     /* Compute the integral using the 5-point Newton-Cotes formula */
+    result = 0.0;
     for (i = 0; i < ii_count; i++)
     {
-        result += 2.0 * h * (7.0 * (z[ii[i] - 4] + z[ii[i]]) +
-                             32.0 * (z[ii[i] - 3] + z[ii[i] - 1]) +
-                             12.0 * z[ii[i] - 2]) / 45.0;
+        result += (h * (14.0 * (z[ii[i] - 4] + z[ii[i]]) +
+                        64.0 * (z[ii[i] - 3] + z[ii[i] - 1]) +
+                        24.0 * z[ii[i] - 2]) / 45.0);
     }
 
     *result_out = result;
@@ -382,11 +374,11 @@ int calculate_lt
     int i;
     float rs_integral;
     float temp_integral;
-    float *blackbody_radiance;
     float *product;
+    double *blackbody_radiance;
 
     /* Allocate memory */
-    blackbody_radiance = malloc (num_srs * sizeof (float));
+    blackbody_radiance = malloc (num_srs * sizeof (double));
     if (blackbody_radiance == NULL)
     {
         RETURN_ERROR ("Allocating blackbody_radiance memory", FUNC_NAME,
@@ -406,13 +398,27 @@ int calculate_lt
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* using planck's equaiton to calculate radiance at each wavelength for 
+    /* using planck's equation to calculate radiance at each wavelength for 
        current temp */
     if (planck_eq (spectral_response[0], num_srs, temperature,
                    blackbody_radiance) != SUCCESS)
     {
         RETURN_ERROR ("Calling planck_eq\n", FUNC_NAME, FAILURE);
     }
+
+char fname[PATH_MAX];
+snprintf (fname, sizeof (fname), "lt_%f.txt", temperature);
+FILE *fd = fopen (fname, "w");
+if (fd == NULL)
+{
+    RETURN_ERROR ("Can't open point_input.txt file",
+                  FUNC_NAME, FAILURE);
+}
+fprintf (fd, "blackbody_radiance\n");
+for (i = 0; i < num_srs; i++)
+{
+    fprintf (fd, "%15.9f\n", blackbody_radiance[i]);
+}
 
     /* multiply the caluclated planck radiance by the spectral reponse and
        integrate over wavelength to get one number for current temp */
@@ -430,6 +436,21 @@ int calculate_lt
     /* divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
 
+fprintf (fd, "rs_integral = [%15.9f]\n", rs_integral);
+fprintf (fd, "temp_integral = [%15.9f]\n", temp_integral);
+fprintf (fd, "radiance = [%15.9f]\n", *radiance);
+fprintf (fd, "blackbody_radiance\n");
+for (i = 0; i < num_srs; i++)
+{
+    fprintf (fd, "%15.9f\n", blackbody_radiance[i]);
+}
+fprintf (fd, "product\n");
+for (i = 0; i < num_srs; i++)
+{
+    fprintf (fd, "%15.9f\n", product[i]);
+}
+fclose(fd);
+
     /* Free allocated memory */
     free (blackbody_radiance);
     free (product);
@@ -439,78 +460,69 @@ int calculate_lt
 
 
 /******************************************************************************
-MODULE:  interpol
+MODULE:  linear_interpolate_over_modtran
 
-PURPOSE: Simulate IDL interpol function for LST purpose.
+PURPOSE: Simulate IDL (interpol) function for LST.
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-10/3/2014   Song Guo         Original Development
-
-TODO TODO TODO - RDD - I have modified this and have no idea (yet) if it is
-                       correctly doing what is required of the IDL codebase.
-                       But it was definitly wrong before I got it.
 ******************************************************************************/
-void interpol
+void linear_interpolate_over_modtran
 (
-    float **v_x,     /*I: The input vector data */
-    float *u,        /*I: The output grid points */
-    int num_v,       /*I: number of input data */
-    int num_u,       /*I: number of output grid points */
-    int index,       /*I: Which index column data be used */
-    float *r         /*O: Interpolated results */
+    float **modtran, /* I: The MODTRAN data - provides both the a and b */
+    int index,       /* I: The MODTRAN temp to use for a */
+    float *c,        /* I: The Landsat wavelength grid points */
+    int num_in,      /* I: Number of input data and grid points*/
+    int num_out,     /* I: Number of output grid points */
+    float *x         /* O: Interpolated output results */
 )
 {
     int i;
-    int ix = 0;
-    float s1;
-    int d;
+    int o;
 
-    if ((v_x[1][0] - v_x[0][0]) >= MINSIGMA)
-    {
-        s1 = 1;
-    }
-    else
-    {
-        s1 = -1;
-    }
+    float d1 = 0;
+    float d2 = 0;
+    float g;
+    float g1 = 0;
+    float g2 = 0;
 
-    for (i = 0; i < num_u; i++)
-    {
-        d = (int) (s1 * (u[i] - v_x[ix][0]));
+    int a = index; /* MODTRAN radiance for specififc temp */
+    int b = 0;     /* MODTRAN wavelength */
 
-        if (d == 0)
+    for (o = 0; o < num_out; o++)
+    {
+        g = c[o];
+
+        /* Initialize to the first two */
+        d1 = modtran[0][a];
+        d2 = modtran[1][a];
+        g1 = modtran[0][b];
+        g2 = modtran[1][b];
+
+        for (i = 0; i < num_in-1; i++)
         {
-            r[i] = v_x[ix][index];
+            if (g <= modtran[i][b] && g > modtran[i+1][b])
+            {
+                /* Found it in the middle of the data */
+                d1 = modtran[i][a];
+                d2 = modtran[i+1][a];
+                g1 = modtran[i][b];
+                g2 = modtran[i+1][b];
+                break;
+            }
         }
-        else
-        {
-            if (d > 0)
-            {
-                while ((s1 * (u[i] - v_x[ix + 1][0]) > 0)
-                       && (ix < num_v - 1))
-                {
-                    ix++;
-                }
-            }
-            else
-            {
-                while ((s1 * (u[i] - v_x[ix][0]) < 0) && (ix > 0))
-                {
-                    ix--;
-                }
-            }
 
-            r[i] = v_x[ix][index]
-                   + (u[i] - v_x[ix][0]) * (v_x[ix + 1][index]
-                                            - v_x[ix][index]) / (v_x[ix
-                                                                 + 1][0]
-                                                                 - v_x[ix][0]);
+        if (i == num_in-1)
+        {
+            /* Less than the last so use the last two */
+            d1 = modtran[i-1][a];
+            d2 = modtran[i][a];
+            g1 = modtran[i-1][b];
+            g2 = modtran[i][b];
         }
+
+        /* Apply the formula for linear interpolation */
+        x[o] = d1 + ((g - g1) / (g2 - g1)) * (d2 - d1);
     }
 }
 
@@ -547,13 +559,13 @@ int calculate_lobs
     float *product;
 
     /* Allocate memory */
-    temp_rad = malloc (num_entries * sizeof (float));
+    temp_rad = malloc (num_srs * sizeof (float));
     if (temp_rad == NULL)
     {
         RETURN_ERROR ("Allocating temp_rad memory", FUNC_NAME, FAILURE);
     }
 
-    product = malloc (num_entries * sizeof (float));
+    product = malloc (num_srs * sizeof (float));
     if (product == NULL)
     {
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
@@ -566,12 +578,11 @@ int calculate_lobs
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* using planck's equaiton to calculate radiance at each wavelength for 
-       current temp */
-    interpol (modtran, spectral_response[0], num_entries, num_srs, index,
-              temp_rad);
+    /* interpolate MODTRAN radiance to Landsat wavelengths */
+    linear_interpolate_over_modtran (modtran, index, spectral_response[0],
+                                     num_entries, num_srs, temp_rad);
 
-    /* multiply the caluclated radiance by the spectral reponse and integrate 
+    /* multiply the calculated radiance by the spectral reponse and integrate
        over wavelength to get one number for current temp */
     for (i = 0; i < num_srs; i++)
     {
@@ -593,6 +604,66 @@ int calculate_lobs
 
     return SUCCESS;
 }
+
+
+void matrix_transpose_2x2(float *A, float *out)
+{
+    out[0] = A[0];
+    out[1] = A[2];
+    out[2] = A[1];
+    out[3] = A[3];
+}
+
+
+void matrix_inverse_2x2(float *A, float *out)
+{
+    float a = A[0];
+    float b = A[1];
+    float c = A[2];
+    float d = A[3];
+
+    float determinant = (1.0 / (a * d - b * c));
+
+    out[0] = A[3] * determinant;
+    out[1] = (-A[1]) * determinant;
+    out[2] = (-A[2]) * determinant;
+    out[3] = A[0] * determinant;
+}
+
+
+void matrix_multiply_2x2_2x2(float *A, float *B, float *out)
+{
+    float a = A[0];
+    float b = A[1];
+    float c = A[2];
+    float d = A[3];
+
+    float e = B[0];
+    float f = B[1];
+    float g = B[2];
+    float h = B[3];
+
+    out[0] = a*e + b*g;
+    out[1] = a*f + b*h;
+    out[2] = c*e + d*g;
+    out[3] = c*f + d*h;
+}
+
+
+void matrix_multiply_2x2_2x1(float *A, float *B, float *out)
+{
+    float a = A[0];
+    float b = A[1];
+    float c = A[2];
+    float d = A[3];
+
+    float e = B[0];
+    float f = B[1];
+
+    out[0] = a*e + b*f;
+    out[1] = c*e + d*f;
+}
+
 
 
 /******************************************************************************
@@ -626,13 +697,14 @@ int calculate_point_atmospheric_parameters
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
     FILE *fd;
     FILE *used_points_fd;
+    FILE *point_input_fd;
     int i, j, k;
     int entry;
     float **spectral_response = NULL;
     float temp_radiance_0;
     float obs_radiance_0;
     float temp_radiance_273;
-    float temp_radiance_300;
+    float temp_radiance_310;
     int counter;
     int index;
     int num_entries;
@@ -661,6 +733,14 @@ int calculate_point_atmospheric_parameters
     char *lst_data_dir = NULL;
     char srs_file_path[PATH_MAX];
     char msg[PATH_MAX];
+
+    float X_2x2[4];
+    float Xt_2x2[4];
+    float Xt_X_2x2[4];
+    float Inv_Xt_X_2x2[4];
+    float Y_2x1[2];
+    float Xt_Y_2x1[4];
+    float A_2x1[2];
 
 
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -735,15 +815,23 @@ int calculate_point_atmospheric_parameters
     {
         RETURN_ERROR ("Calling calculate_lt for 273K", FUNC_NAME, FAILURE);
     }
-    if (calculate_lt (300, spectral_response, num_srs, &temp_radiance_300)
+    if (calculate_lt (310, spectral_response, num_srs, &temp_radiance_310)
         != SUCCESS)
     {
-        RETURN_ERROR ("Calling calculate_lt for 300K", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Calling calculate_lt for 310K", FUNC_NAME, FAILURE);
     }
 
     x_0 = temp_radiance_273;
-    x_1 = temp_radiance_300;
-    inv_xx_diff = 1.0F / (x_0 - x_1);
+    x_1 = temp_radiance_310;
+    inv_xx_diff = 1.0F / fabs(x_0 - x_1);
+    X_2x2[0] = 1;
+    X_2x2[1] = temp_radiance_273;
+    X_2x2[2] = 1;
+    X_2x2[3] = temp_radiance_310;
+
+    matrix_transpose_2x2(X_2x2, Xt_2x2);
+    matrix_multiply_2x2_2x2(Xt_2x2, X_2x2, Xt_X_2x2);
+    matrix_inverse_2x2(Xt_X_2x2, Inv_Xt_X_2x2);
 
     used_points_fd = fopen ("used_points.txt", "w");
     if (used_points_fd == NULL)
@@ -751,14 +839,22 @@ int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Can't open used_points.txt file",
                       FUNC_NAME, FAILURE);
     }
+
+point_input_fd = fopen ("point_input.txt", "w");
+if (point_input_fd == NULL)
+{
+    RETURN_ERROR ("Can't open point_input.txt file",
+                  FUNC_NAME, FAILURE);
+}
+fprintf (point_input_fd, "tr_273 = %15.9f\ntr_310 = %15.9f\n",
+         temp_radiance_273, temp_radiance_310);
+
     /* Iterate through all points and heights */
     counter = 0;
     for (i = 0; i < points->num_points; i++)
     {
         fprintf (used_points_fd, "\"%d\"|\"%f\"|\"%f\"\n",
-                 i,
-                 points->utm_easting[i],
-                 points->utm_northing[i]);
+                 i, points->utm_easting[i], points->utm_northing[i]);
 
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
@@ -855,21 +951,6 @@ int calculate_point_atmospheric_parameters
                 counter++;
             }
 
-#if 0
-            snprintf (msg, sizeof (msg), "num_srs = %d\n", num_srs);
-            LOG_MESSAGE (msg, FUNC_NAME);
-
-            snprintf (msg, sizeof (msg), "num_entries = %d\n", num_entries);
-            LOG_MESSAGE (msg, FUNC_NAME);
-
-            snprintf (msg, sizeof (msg),
-                      "temp_radiance_273 = %f\n", temp_radiance_273);
-            LOG_MESSAGE (msg, FUNC_NAME);
-
-            snprintf (msg, sizeof (msg),
-                      "temp_radiance_300 = %f\n", temp_radiance_300);
-            LOG_MESSAGE (msg, FUNC_NAME);
-#endif
             /* parameters from 3 modtran runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
             if (calculate_lobs (current_data, spectral_response,
@@ -890,8 +971,18 @@ int calculate_point_atmospheric_parameters
 
             /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
                Note: I slove the two equations analytically */
-            tau = (y_0 - y_1) * inv_xx_diff;
-            lu = (x_1 * y_0 - x_0 * y_1) * inv_xx_diff;
+            Y_2x1[0] = y_0;
+            Y_2x1[1] = y_1;
+            matrix_multiply_2x2_2x1(Xt_2x2, Y_2x1, Xt_Y_2x1);
+            matrix_multiply_2x2_2x1(Inv_Xt_X_2x2, Xt_Y_2x1, A_2x1);
+            tau = A_2x1[1];
+            lu = A_2x1[0];
+fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = %15.9f\n", i, j, y_0, y_1, tau, lu);
+
+// TODO TODO TODO - I DONT TRUST THIS
+            tau = fabs(y_0 - y_1) * inv_xx_diff;
+            lu = fabs(x_1 * y_0 - x_0 * y_1) * inv_xx_diff;
+fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = %15.9f\n", i, j, y_0, y_1, tau, lu);
 
             /* determine Lobs and Lt when
                modtran was run at 0K - calculate downwelled */
@@ -930,6 +1021,7 @@ int calculate_point_atmospheric_parameters
             modtran_results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
         } /* END - NUM_ELEVATIONS loop */
     } /* END - num_points loop */
+    fclose (point_input_fd);
     fclose (used_points_fd);
 
     /* Free allocated memory */
