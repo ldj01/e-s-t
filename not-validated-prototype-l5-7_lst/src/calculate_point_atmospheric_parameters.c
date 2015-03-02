@@ -10,7 +10,7 @@
 
 
 /******************************************************************************
-MODULE:  planck_eq
+METHOD:  planck_eq
 
 PURPOSE: Using Planck's equaiton to calculate radiance at each wavelength for
          current temperature.
@@ -23,12 +23,12 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
 ******************************************************************************/
-int planck_eq
+void planck_eq
 (
-    float *wavelength,
-    int num_srs,
-    float temperature,
-    double *black_radiance
+    float *wavelength,  /* I: Each wavelength */
+    int num_elements,   /* I: Number of wavelengths to calculate */
+    float temperature,  /* I: The temperature to calculate for */
+    double *bb_radiance /* I: the blackbody results for each wavelength */
 )
 {
     int i;
@@ -44,26 +44,24 @@ int planck_eq
     double SPEED_OF_LIGHT = (299792458.0);
     double SPEED_OF_LIGHT_SQRD = (SPEED_OF_LIGHT * SPEED_OF_LIGHT);
 
-    for (i = 0; i < num_srs; i++)
+    for (i = 0; i < num_elements; i++)
     {
         /* Lambda intervals of spectral response locations microns units: m */
         lambda = wavelength[i] * pow (10, -6);
 
         /* Compute the Planck Blackbody Eq [W/m^2 sr um] */
-        black_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
-                            * (pow (10, -6) * pow (lambda, -5.0))
-                            * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
-                                            / (lambda
-                                               * BOLTZMANN_GAS_CONST
-                                               * temperature))
-                                      - 1.0));
+        bb_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
+                         * (pow (10, -6) * pow (lambda, -5.0))
+                         * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
+                                         / (lambda
+                                            * BOLTZMANN_GAS_CONST
+                                            * temperature))
+                                   - 1.0));
 
         /* convert to W/cm^2 sr micron to match modtran units */
         /* br / (100 * 100) == br * 10e-5 */
-        black_radiance[i] *= 10e-5;
+        bb_radiance[i] *= 10e-5;
     }
-
-    return SUCCESS;
 }
 
 
@@ -178,8 +176,8 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Modified from online code
 ******************************************************************************/
-static int klo = -1;
-static int khi = -1;
+static int splint_klo = -1;
+static int splint_khi = -1;
 static double one_sixth = (1.0 / 6.0); /* To remove a division */
 void splint
 (
@@ -196,30 +194,30 @@ void splint
     double b;
     double a;
 
-    if (klo < 0)
+    if (splint_klo < 0)
     {
-        klo = 0;
-        khi = n - 1;
+        splint_klo = 0;
+        splint_khi = n - 1;
     }
     else
     {
-        if (x < xa[klo])
-            klo = 0;
-        if (x > xa[khi])
-            khi = n - 1;
+        if (x < xa[splint_klo])
+            splint_klo = 0;
+        if (x > xa[splint_khi])
+            splint_khi = n - 1;
     }
 
-    while (khi - klo > 1)
+    while (splint_khi - splint_klo > 1)
     {
-        k = (khi + klo) >> 1;
+        k = (splint_khi + splint_klo) >> 1;
 
         if (xa[k] > x)
-            khi = k;
+            splint_khi = k;
         else
-            klo = k;
+            splint_klo = k;
     }
 
-    h = xa[khi] - xa[klo];
+    h = xa[splint_khi] - xa[splint_klo];
 
     if (h == 0.0)
     {
@@ -227,14 +225,14 @@ void splint
     }
     else
     {
-        a = (xa[khi] - x) / h;
+        a = (xa[splint_khi] - x) / h;
 
-        b = (x - xa[klo]) / h;
+        b = (x - xa[splint_klo]) / h;
 
-        *y = a * ya[klo]
-             + b * ya[khi]
-             + ((a * a * a - a) * y2a[klo]
-                + (b * b * b - b) * y2a[khi]) * (h * h) * one_sixth;
+        *y = a * ya[splint_klo]
+             + b * ya[splint_khi]
+             + ((a * a * a - a) * y2a[splint_klo]
+                + (b * b * b - b) * y2a[splint_khi]) * (h * h) * one_sixth;
     }
 }
 
@@ -257,10 +255,10 @@ NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
 ******************************************************************************/
 int int_tabulated
 (
-    float *x,         /*I: The tabulated X-value data */
-    float *f,         /*I: The tabulated F-value data */
-    int nums,         /*I: number of points */
-    float *result_out /*O: integraeted result */
+    float *x,         /*I: Tabulated X-value data */
+    float *f,         /*I: Tabulated F-value data */
+    int nums,         /*I: Number of points */
+    float *result_out /*O: Integrated result */
 )
 {
     char FUNC_NAME[] = "int_tabulated";
@@ -310,8 +308,8 @@ int int_tabulated
     }
 
     /* Interpolate spectral response over wavelength */
-    /* Using 1e30 forces generation of a natural spline and produces the same
-       results as IDL */
+    /* Using 1e30 forces generation of a natural spline and produces nearly
+       the same results as IDL */
     if (spline (x, f, nums, 1e30, 1e30, temp) != SUCCESS)
     {
         RETURN_ERROR ("Failed during spline", FUNC_NAME, FAILURE);
@@ -338,6 +336,7 @@ int int_tabulated
                         24.0 * z[ii[i] - 2]) / 45.0);
     }
 
+    /* Assign the results to the output */
     *result_out = result;
 
     free (temp);
@@ -398,29 +397,11 @@ int calculate_lt
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* using planck's equation to calculate radiance at each wavelength for 
-       current temp */
-    if (planck_eq (spectral_response[0], num_srs, temperature,
-                   blackbody_radiance) != SUCCESS)
-    {
-        RETURN_ERROR ("Calling planck_eq\n", FUNC_NAME, FAILURE);
-    }
+    /* Use planck's blackbody radiance equation to calculate radiance at each
+       wavelength for the current temperature */
+    planck_eq (spectral_response[0], num_srs, temperature, blackbody_radiance);
 
-char fname[PATH_MAX];
-snprintf (fname, sizeof (fname), "lt_%f.txt", temperature);
-FILE *fd = fopen (fname, "w");
-if (fd == NULL)
-{
-    RETURN_ERROR ("Can't open point_input.txt file",
-                  FUNC_NAME, FAILURE);
-}
-fprintf (fd, "blackbody_radiance\n");
-for (i = 0; i < num_srs; i++)
-{
-    fprintf (fd, "%15.9f\n", blackbody_radiance[i]);
-}
-
-    /* multiply the caluclated planck radiance by the spectral reponse and
+    /* multiply the calculated planck radiance by the spectral reponse and
        integrate over wavelength to get one number for current temp */
     for (i = 0; i < num_srs; i++)
     {
@@ -435,21 +416,6 @@ for (i = 0; i < num_srs; i++)
 
     /* divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
-
-fprintf (fd, "rs_integral = [%15.9f]\n", rs_integral);
-fprintf (fd, "temp_integral = [%15.9f]\n", temp_integral);
-fprintf (fd, "radiance = [%15.9f]\n", *radiance);
-fprintf (fd, "blackbody_radiance\n");
-for (i = 0; i < num_srs; i++)
-{
-    fprintf (fd, "%15.9f\n", blackbody_radiance[i]);
-}
-fprintf (fd, "product\n");
-for (i = 0; i < num_srs; i++)
-{
-    fprintf (fd, "%15.9f\n", product[i]);
-}
-fclose(fd);
 
     /* Free allocated memory */
     free (blackbody_radiance);
@@ -470,7 +436,7 @@ RETURN: SUCCESS
 void linear_interpolate_over_modtran
 (
     float **modtran, /* I: The MODTRAN data - provides both the a and b */
-    int index,       /* I: The MODTRAN temp to use for a */
+    int index,       /* I: The MODTRAN temperatur to use for a */
     float *c,        /* I: The Landsat wavelength grid points */
     int num_in,      /* I: Number of input data and grid points*/
     int num_out,     /* I: Number of output grid points */
@@ -480,11 +446,11 @@ void linear_interpolate_over_modtran
     int i;
     int o;
 
-    float d1 = 0;
-    float d2 = 0;
-    float g;
-    float g1 = 0;
-    float g2 = 0;
+    double d1 = 0.0;
+    double d2 = 0.0;
+    double g;
+    double g1 = 0.0;
+    double g2 = 0.0;
 
     int a = index; /* MODTRAN radiance for specififc temp */
     int b = 0;     /* MODTRAN wavelength */
@@ -583,7 +549,7 @@ int calculate_lobs
                                      num_entries, num_srs, temp_rad);
 
     /* multiply the calculated radiance by the spectral reponse and integrate
-       over wavelength to get one number for current temp */
+       over wavelength to get one number for current temperature */
     for (i = 0; i < num_srs; i++)
     {
         product[i] = temp_rad[i] * spectral_response[1][i];
@@ -606,8 +572,31 @@ int calculate_lobs
 }
 
 
-void matrix_transpose_2x2(float *A, float *out)
+/*****************************************************************************
+METHOD:  matrix_transpose_2x2
+
+PURPOSE: Transposes a 2x2 matrix, producing a 2x2 result.
+
+RETURN: None
+*****************************************************************************/
+void matrix_transpose_2x2(double *A, double *out)
 {
+    /*
+        Formula is:
+
+            out[0] = a
+            out[1] = c
+            out[2] = b
+            out[3] = d
+
+        Where:
+
+            a = A[0]
+            b = A[1]
+            c = A[2]
+            d = A[3]
+    */
+
     out[0] = A[0];
     out[1] = A[2];
     out[2] = A[1];
@@ -615,14 +604,34 @@ void matrix_transpose_2x2(float *A, float *out)
 }
 
 
-void matrix_inverse_2x2(float *A, float *out)
-{
-    float a = A[0];
-    float b = A[1];
-    float c = A[2];
-    float d = A[3];
+/*****************************************************************************
+METHOD:  matrix_inverse_2x2
 
-    float determinant = (1.0 / (a * d - b * c));
+PURPOSE: Inverts a 2x2 matrix, producing a 2x2 result.
+
+RETURN: None
+*****************************************************************************/
+void matrix_inverse_2x2(double *A, double *out)
+{
+    /*
+        Formula is:
+
+            out[0] = d * determinant;
+            out[1] = (-b) * determinant;
+            out[2] = (-c) * determinant;
+            out[3] = a * determinant;
+
+        Where:
+
+            a = A[0]
+            b = A[1]
+            c = A[2]
+            d = A[3]
+
+            determinant = 1.0 / (a * d - b * c)
+    */
+
+    double determinant = (1.0 / (A[0] * A[3] - A[1] * A[2]));
 
     out[0] = A[3] * determinant;
     out[1] = (-A[1]) * determinant;
@@ -631,43 +640,76 @@ void matrix_inverse_2x2(float *A, float *out)
 }
 
 
-void matrix_multiply_2x2_2x2(float *A, float *B, float *out)
+/*****************************************************************************
+METHOD:  matrix_multiply_2x2_2x2
+
+PURPOSE: Multiply a 2x2 matrix with a 2x2 matrix, producing a 2x2 result.
+
+RETURN: None
+*****************************************************************************/
+void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
 {
-    float a = A[0];
-    float b = A[1];
-    float c = A[2];
-    float d = A[3];
+    /*
+        Formula is:
 
-    float e = B[0];
-    float f = B[1];
-    float g = B[2];
-    float h = B[3];
+            out[0] = a * e + b * g
+            out[1] = a * f + b * h
+            out[2] = c * e + d * g
+            out[3] = c * f + d * h
 
-    out[0] = a*e + b*g;
-    out[1] = a*f + b*h;
-    out[2] = c*e + d*g;
-    out[3] = c*f + d*h;
+        Where:
+
+            a = A[0]
+            b = A[1]
+            c = A[2]
+            d = A[3]
+
+            e = B[0]
+            f = B[1]
+            g = B[2]
+            h = B[3]
+    */
+
+    out[0] = A[0] * B[0] + A[1] * B[2];
+    out[1] = A[0] * B[1] + A[1] * B[3];
+    out[2] = A[2] * B[0] + A[3] * B[2];
+    out[3] = A[2] * B[1] + A[3] * B[3];
 }
 
 
-void matrix_multiply_2x2_2x1(float *A, float *B, float *out)
+/*****************************************************************************
+METHOD:  matrix_multiply_2x2_2x1
+
+PURPOSE: Multiply a 2x2 matrix with a 2x1 matrix, producing a 2x1 result.
+
+RETURN: None
+*****************************************************************************/
+void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 {
-    float a = A[0];
-    float b = A[1];
-    float c = A[2];
-    float d = A[3];
+    /*
+        Formula is:
 
-    float e = B[0];
-    float f = B[1];
+            out[0] = a * e + b * f
+            out[1] = c * e + d * f
 
-    out[0] = a*e + b*f;
-    out[1] = c*e + d*f;
+        Where:
+
+            a = A[0]
+            b = A[1]
+            c = A[2]
+            d = A[3]
+
+            e = B[0]
+            f = B[1]
+    */
+
+    out[0] = A[0] * B[0] + A[1] * B[1];
+    out[1] = A[2] * B[0] + A[3] * B[1];
 }
 
 
-
-/******************************************************************************
-MODULE:  calculate_point_atmospheric_parameters
+/*****************************************************************************
+METHOD:  calculate_point_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
          each height for each NARR point that is used.
@@ -679,7 +721,7 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 #define L5_TM_SRS_COUNT (171)
 #define L7_TM_SRS_COUNT (47)
 #define L8_OLITIRS_SRS_COUNT (101)
@@ -695,11 +737,15 @@ int calculate_point_atmospheric_parameters
 )
 {
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
+
     FILE *fd;
     FILE *used_points_fd;
-    FILE *point_input_fd;
-    int i, j, k;
+
+    int i;
+    int j;
+    int k;
     int entry;
+
     float **spectral_response = NULL;
     float temp_radiance_0;
     float obs_radiance_0;
@@ -707,17 +753,19 @@ int calculate_point_atmospheric_parameters
     float temp_radiance_310;
     int counter;
     int index;
-    int num_entries;
+    int num_entries;   /* Number of MODTRAN output results to read and use */
     int num_srs;       /* Number of spectral response values available */
     int result_loc;
+
+    char *lst_data_dir = NULL;
     char current_file[PATH_MAX];
+    char srs_file_path[PATH_MAX];
+    char msg[PATH_MAX];
+
     float modtran_wavelength;
     float modtran_radiance;
     float zero_temp;
     float **current_data;
-    float x_0;
-    float x_1;
-    float inv_xx_diff; /* To save divisions */
     float y_0;
     float y_1;
     float tau; /* Transmission */
@@ -730,17 +778,16 @@ int calculate_point_atmospheric_parameters
                         execution of this routine, and then utilized here. */
     double emissivity = 1.0 - albedo;
     double inv_albedo = 1.0 / albedo;
-    char *lst_data_dir = NULL;
-    char srs_file_path[PATH_MAX];
-    char msg[PATH_MAX];
 
-    float X_2x2[4];
-    float Xt_2x2[4];
-    float Xt_X_2x2[4];
-    float Inv_Xt_X_2x2[4];
-    float Y_2x1[2];
-    float Xt_Y_2x1[4];
-    float A_2x1[2];
+    /* Variables to hold matricies and the results for the operations perfomed
+       on them */
+    double X_2x2[4];
+    double Xt_2x2[4];
+    double Xt_X_2x2[4];
+    double Inv_Xt_X_2x2[4];
+    double Y_2x1[2];
+    double Xt_Y_2x1[4];
+    double A_2x1[2];
 
 
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -821,9 +868,10 @@ int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Calling calculate_lt for 310K", FUNC_NAME, FAILURE);
     }
 
-    x_0 = temp_radiance_273;
-    x_1 = temp_radiance_310;
-    inv_xx_diff = 1.0F / fabs(x_0 - x_1);
+    /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y
+       from the IDL code base.
+       Partially implemented here, the variable part is implemented in the
+       looping code. */
     X_2x2[0] = 1;
     X_2x2[1] = temp_radiance_273;
     X_2x2[2] = 1;
@@ -833,21 +881,14 @@ int calculate_point_atmospheric_parameters
     matrix_multiply_2x2_2x2(Xt_2x2, X_2x2, Xt_X_2x2);
     matrix_inverse_2x2(Xt_X_2x2, Inv_Xt_X_2x2);
 
+    /* Output information about the used points, primarily usefull for
+       plotting them against the scene */
     used_points_fd = fopen ("used_points.txt", "w");
     if (used_points_fd == NULL)
     {
         RETURN_ERROR ("Can't open used_points.txt file",
                       FUNC_NAME, FAILURE);
     }
-
-point_input_fd = fopen ("point_input.txt", "w");
-if (point_input_fd == NULL)
-{
-    RETURN_ERROR ("Can't open point_input.txt file",
-                  FUNC_NAME, FAILURE);
-}
-fprintf (point_input_fd, "tr_273 = %15.9f\ntr_310 = %15.9f\n",
-         temp_radiance_273, temp_radiance_310);
 
     /* Iterate through all points and heights */
     counter = 0;
@@ -969,20 +1010,17 @@ fprintf (point_input_fd, "tr_273 = %15.9f\ntr_310 = %15.9f\n",
                               FUNC_NAME, FAILURE);
             }
 
-            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y 
-               Note: I slove the two equations analytically */
+            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y
+               from the IDL code base.
+               Partially implemented above and used here. */
             Y_2x1[0] = y_0;
             Y_2x1[1] = y_1;
+
             matrix_multiply_2x2_2x1(Xt_2x2, Y_2x1, Xt_Y_2x1);
             matrix_multiply_2x2_2x1(Inv_Xt_X_2x2, Xt_Y_2x1, A_2x1);
-            tau = A_2x1[1];
-            lu = A_2x1[0];
-fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = %15.9f\n", i, j, y_0, y_1, tau, lu);
 
-// TODO TODO TODO - I DONT TRUST THIS
-            tau = fabs(y_0 - y_1) * inv_xx_diff;
-            lu = fabs(x_1 * y_0 - x_0 * y_1) * inv_xx_diff;
-fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = %15.9f\n", i, j, y_0, y_1, tau, lu);
+            tau = A_2x1[1]; /* Transmittance */
+            lu = A_2x1[0];  /* Upwelled Radiance */
 
             /* determine Lobs and Lt when
                modtran was run at 0K - calculate downwelled */
@@ -1001,14 +1039,10 @@ fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = 
                               FUNC_NAME, FAILURE);
             }
 
-            /* Free the allocated memory in the loop */
-            if (free_2d_array ((void **) current_data) != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: current_data\n",
-                              FUNC_NAME, FAILURE);
-            }
-            current_data = NULL;
-
+            /* Calculate the downwelled radiance */
+            /* TODO - These are all equivalent today, but may need to change
+                      to use the (1.0 - emissivity) when emissivity is
+                      provided. */
             /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/(1.0-emissivity) */
             /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/abledo */
             /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))*inv_albedo */
@@ -1019,9 +1053,16 @@ fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = 
             modtran_results[result_loc][LST_TRANSMISSION] = tau;
             modtran_results[result_loc][LST_UPWELLED_RADIANCE] = lu;
             modtran_results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
+
+            /* Free the allocated memory in the loop */
+            if (free_2d_array ((void **) current_data) != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: current_data\n",
+                              FUNC_NAME, FAILURE);
+            }
+            current_data = NULL;
         } /* END - NUM_ELEVATIONS loop */
     } /* END - num_points loop */
-    fclose (point_input_fd);
     fclose (used_points_fd);
 
     /* Free allocated memory */
@@ -1046,7 +1087,7 @@ fprintf (point_input_fd, "[%d][%d], y0 = %15.9f y1 = %15.9f, tau = %15.9f, lu = 
     }
     for (k = 0; k < points->num_points * NUM_ELEVATIONS; k++)
     {
-        fprintf (fd, "%f,%f,%f,%f,%f,%f\n",
+        fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
                  modtran_results[k][LST_LATITUDE],
                  modtran_results[k][LST_LONGITUDE],
                  modtran_results[k][LST_HEIGHT],
