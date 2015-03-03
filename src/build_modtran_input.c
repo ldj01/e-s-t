@@ -41,10 +41,10 @@ Date        Programmer       Reason
 *****************************************************************************/
 int convert_geopotential_geometric
 (
-    int num_points,        /* I: number of points */
-    float *lat,            /* I: latitude in degrees */
-    float **geo_potential, /* I: geo_potential height */
-    float **geo_metric     /* O: geo_metric height */
+    int num_points,         /* I: number of points */
+    double *lat,            /* I: latitude in degrees */
+    double **geo_potential, /* I: geo_potential height */
+    double **geo_metric     /* O: geo_metric height */
 )
 {
     char FUNC_NAME[] = "convert_geopotential_geometric";
@@ -156,53 +156,53 @@ Date        Programmer       Reason
 int convert_sh_rh
 (
     int num_points,   /* I: number of points */
-    float *lat,       /* I: latitude in degrees */
-    float **spec_hum,
-    float **temp_k,
-    float **pressure,
-    float **rh        /* O: relative humidity */
+    double *lat,       /* I: latitude in degrees */
+    double **spec_hum,
+    double **temp_k,
+    double **pressure,
+    double **rh        /* O: relative humidity */
 )
 {
     char FUNC_NAME[] = "convert_sh_rh";
     int i, j;
-    float mh20 = 18.01534;
-    float mdry = 28.9644;
+    double mh20 = 18.01534;
+    double mdry = 28.9644;
 
-    float a0w = 6.107799961;
-    float a1w = 4.436518521e-1;
-    float a2w = 1.428945805e-2;
-    float a3w = 2.650648471e-4;
-    float a4w = 3.0312403963e-6;
-    float a5w = 2.034080948e-8;
-    float a6w = 6.136820929e-11;
+    double a0w = 6.107799961;
+    double a1w = 4.436518521e-1;
+    double a2w = 1.428945805e-2;
+    double a3w = 2.650648471e-4;
+    double a4w = 3.0312403963e-6;
+    double a5w = 2.034080948e-8;
+    double a6w = 6.136820929e-11;
 
-    float **temp_c;
-    float **ewater;
-    float **goff;
-    float **ph20;
+    double **temp_c;
+    double **ewater;
+    double **goff;
+    double **ph20;
 
     /* Allocate memory */
-    temp_c = (float **) allocate_2d_array (P_LAYER, num_points,
-                                           sizeof (float));
+    temp_c = (double **) allocate_2d_array (P_LAYER, num_points,
+                                           sizeof (double));
     if (temp_c == NULL)
     {
         RETURN_ERROR ("Allocating temp_c memory", FUNC_NAME, FAILURE);
     }
 
-    ewater = (float **) allocate_2d_array (P_LAYER, num_points,
-                                           sizeof (float));
+    ewater = (double **) allocate_2d_array (P_LAYER, num_points,
+                                           sizeof (double));
     if (ewater == NULL)
     {
         RETURN_ERROR ("Allocating ewater memory", FUNC_NAME, FAILURE);
     }
 
-    goff = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
+    goff = (double **) allocate_2d_array (P_LAYER, num_points, sizeof (double));
     if (goff == NULL)
     {
         RETURN_ERROR ("Allocating goff memory", FUNC_NAME, FAILURE);
     }
 
-    ph20 = (float **) allocate_2d_array (P_LAYER, num_points, sizeof (float));
+    ph20 = (double **) allocate_2d_array (P_LAYER, num_points, sizeof (double));
     if (ph20 == NULL)
     {
         RETURN_ERROR ("Allocating  memory", FUNC_NAME, FAILURE);
@@ -282,10 +282,10 @@ RETURN: SUCCESS
 int read_std_mid_lat_summer_atmos
 (
     char *lst_data_dir,
-    float *stan_height,
-    float *stan_pre,
-    float *stan_temp,
-    float *stan_rh
+    double *stan_height,
+    double *stan_pre,
+    double *stan_temp,
+    double *stan_rh
 )
 {
     char FUNC_NAME[] = "read_std_mid_lat_summer_atmos";
@@ -313,7 +313,7 @@ int read_std_mid_lat_summer_atmos
 
     for (i = 0; i < STANDARD_LAYERS; i++)
     {
-        if (fscanf (fd, "%f %f %f %f", &stan_height[i], &stan_pre[i],
+        if (fscanf (fd, "%lf %lf %lf %lf", &stan_height[i], &stan_pre[i],
                     &stan_temp[i], &stan_rh[i]) == EOF)
         {
             RETURN_ERROR ("End of file (EOF) is met before STANDARD_LAYERS"
@@ -343,7 +343,7 @@ int read_narr_parameter_values
 (
     int *layers,
     char *parameter,
-    float **output_2d_array
+    double **output_2d_array
 )
 {
     char FUNC_NAME[] = "read_narr_parameter_values";
@@ -389,7 +389,7 @@ int read_narr_parameter_values
         /* Read the values into memory */
         for (j = 0; j < NARR_ROWS * NARR_COLS; j++)
         {
-            if (fscanf (fd, "%f", &output_2d_array[i][j]) == EOF)
+            if (fscanf (fd, "%lf", &output_2d_array[i][j]) == EOF)
             {
                 RETURN_ERROR ("End of file (EOF) is met before "
                               "NARR_ROWS * NARR_COLS lines",
@@ -434,25 +434,25 @@ int build_modtran_input
 )
 {
     char FUNC_NAME[] = "build_modtran_input";
-    float **hgt1;
-    float **spfh1;
-    float **tmp1;
-    float **hgt2;
-    float **spfh2;
-    float **tmp2;
-    float **narr_hgt1;
-    float **narr_spfh1;
-    float **narr_tmp1;
-    float **narr_hgt2;
-    float **narr_spfh2;
-    float **narr_tmp2;
-    float **narr_height;
-    float **narr_height1;
-    float **narr_height2;
-    float **narr_rh;
-    float **narr_rh1;
-    float **narr_rh2;
-    float **narr_tmp;
+    double **hgt1;
+    double **spfh1;
+    double **tmp1;
+    double **hgt2;
+    double **spfh2;
+    double **tmp2;
+    double **narr_hgt1;
+    double **narr_spfh1;
+    double **narr_tmp1;
+    double **narr_hgt2;
+    double **narr_spfh2;
+    double **narr_tmp2;
+    double **narr_height;
+    double **narr_height1;
+    double **narr_height2;
+    double **narr_rh;
+    double **narr_rh1;
+    double **narr_rh2;
+    double **narr_tmp;
     int row;
     int col;
     int layer;
@@ -465,26 +465,26 @@ int build_modtran_input
                             550, 500, 450, 400, 350,
                             300, 275, 250, 225, 200,
                             175, 150, 125, 100 };
-    float **pressure;
+    double **pressure;
     int rem1;
     int rem2;
-    float hour1;
-    float hour2;
-    float inv_hour_diff;
-    float time;
-    float time_diff;
+    double hour1;
+    double hour2;
+    double inv_hour_diff;
+    double time;
+    double time_diff;
     FILE *fd;
-    float *stan_height;
-    float *stan_pre;
-    float *stan_temp;
-    float *stan_rh;
-    float *temp_height;
-    float *temp_pressure;
-    float *temp_temp;
-    float *temp_rh;
-    float gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1,
+    double *stan_height;
+    double *stan_pre;
+    double *stan_temp;
+    double *stan_rh;
+    double *temp_height;
+    double *temp_pressure;
+    double *temp_temp;
+    double *temp_rh;
+    double gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1,
                                      2.6, 3.1, 3.6, 4.05 };
-    float inv_height_diff;
+    double inv_height_diff;
     int num_modtran_runs;
     char command[PATH_MAX];
     char current_gdalt[PATH_MAX];
@@ -494,14 +494,14 @@ int build_modtran_input
     char curr_path[PATH_MAX];
     int layer_below = 0;
     int layer_above = NUM_ELEVATIONS;
-    float new_height;
-    float new_pressure;
-    float new_temp;
-    float new_rh;
+    double new_height;
+    double new_pressure;
+    double new_temp;
+    double new_rh;
     int curr_layer, std_layer;
     int counter[STANDARD_LAYERS];
     char temp_strs[3][4] = { "273\0", "310\0", "000\0" };
-    float alb[3] = { 0.0, 0.0, 0.1 };
+    double alb[3] = { 0.0, 0.0, 0.1 };
     char *lst_data_dir = NULL;
     char *modtran_path = NULL;
     char *modtran_data_dir = NULL;
@@ -530,44 +530,44 @@ int build_modtran_input
     /* ==================================================================== */
 
     /* Dynamic allocate the 2d memory for time before Landsat Acq. */
-    hgt1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                         sizeof (float));
+    hgt1 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                         sizeof (double));
     if (hgt1 == NULL)
     {
         RETURN_ERROR ("Allocating HGT_1 memory", FUNC_NAME, FAILURE);
     }
 
-    spfh1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                          sizeof (float));
+    spfh1 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                          sizeof (double));
     if (spfh1 == NULL)
     {
         RETURN_ERROR ("Allocating SPFH_1 memory", FUNC_NAME, FAILURE);
     }
 
-    tmp1 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                         sizeof (float));
+    tmp1 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                         sizeof (double));
     if (tmp1 == NULL)
     {
         RETURN_ERROR ("Allocating TMP_1 memory", FUNC_NAME, FAILURE);
     }
 
     /* Dynamic allocate the 2d memory for time after Landsat Acq. */
-    hgt2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                         sizeof (float));
+    hgt2 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                         sizeof (double));
     if (hgt2 == NULL)
     {
         RETURN_ERROR ("Allocating HGT_2 memory", FUNC_NAME, FAILURE);
     }
 
-    spfh2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                          sizeof (float));
+    spfh2 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                          sizeof (double));
     if (spfh2 == NULL)
     {
         RETURN_ERROR ("Allocating SPFH_2 memory", FUNC_NAME, FAILURE);
     }
 
-    tmp2 = (float **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
-                                         sizeof (float));
+    tmp2 = (double **) allocate_2d_array (P_LAYER, NARR_ROWS * NARR_COLS,
+                                         sizeof (double));
     if (tmp2 == NULL)
     {
         RETURN_ERROR ("Allocating TMP_2 memory", FUNC_NAME, FAILURE);
@@ -611,45 +611,45 @@ int build_modtran_input
 
     /* ==================================================================== */
 
-    narr_hgt1 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                              sizeof (float));
+    narr_hgt1 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                              sizeof (double));
     if (narr_hgt1 == NULL)
     {
         RETURN_ERROR ("Allocating narr_hgt1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_hgt2 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                              sizeof (float));
+    narr_hgt2 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                              sizeof (double));
     if (narr_hgt2 == NULL)
     {
         RETURN_ERROR ("Allocating narr_hgt2 memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory for humidity of NARR points within the rectangular */
-    narr_spfh1 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                               sizeof (float));
+    narr_spfh1 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                               sizeof (double));
     if (narr_spfh1 == NULL)
     {
         RETURN_ERROR ("Allocating narr_spfh1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_spfh2 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                               sizeof (float));
+    narr_spfh2 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                               sizeof (double));
     if (narr_spfh2 == NULL)
     {
         RETURN_ERROR ("Allocating narr_spfh2 memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory for temperature of NARR points within the rectangular */
-    narr_tmp1 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                              sizeof (float));
+    narr_tmp1 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                              sizeof (double));
     if (narr_tmp1 == NULL)
     {
         RETURN_ERROR ("Allocating narr_tmp1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_tmp2 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                              sizeof (float));
+    narr_tmp2 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                              sizeof (double));
     if (narr_tmp2 == NULL)
     {
         RETURN_ERROR ("Allocating narr_tmp2 memory", FUNC_NAME, FAILURE);
@@ -718,8 +718,8 @@ int build_modtran_input
     /* ==================================================================== */
 
     /* Allocate memory */
-    pressure = (float **) allocate_2d_array (P_LAYER, num_points,
-                                             sizeof (float));
+    pressure = (double **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (double));
     if (pressure == NULL)
     {
         RETURN_ERROR ("Allocating pressure memory", FUNC_NAME, FAILURE);
@@ -735,29 +735,29 @@ int build_modtran_input
 
     /* ==================================================================== */
 
-    narr_height1 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                                 sizeof (float));
+    narr_height1 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                                 sizeof (double));
     if (narr_height1 == NULL)
     {
         RETURN_ERROR ("Allocating narr_height1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_height2 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                                 sizeof (float));
+    narr_height2 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                                 sizeof (double));
     if (narr_height2 == NULL)
     {
         RETURN_ERROR ("Allocating narr_height2 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_rh1 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                             sizeof (float));
+    narr_rh1 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (double));
     if (narr_rh1 == NULL)
     {
         RETURN_ERROR ("Allocating narr_rh1 memory", FUNC_NAME, FAILURE);
     }
 
-    narr_rh2 = (float **) allocate_2d_array (P_LAYER, num_points,
-                                             sizeof (float));
+    narr_rh2 = (double **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (double));
     if (narr_rh2 == NULL)
     {
         RETURN_ERROR ("Allocating narr_rh2 memory", FUNC_NAME, FAILURE);
@@ -829,8 +829,8 @@ int build_modtran_input
     /* TODO TODO TODO - Does not take into consideration day traversal..... */
     rem1 = input->meta.acq_date.hour % 3;
     rem2 = 3 - rem1;
-    hour1 = (float) (input->meta.acq_date.hour - rem1);
-    hour2 = (float) (input->meta.acq_date.hour + rem2);
+    hour1 = (double) (input->meta.acq_date.hour - rem1);
+    hour2 = (double) (input->meta.acq_date.hour + rem2);
     inv_hour_diff = 1.0 / (hour2 - hour1);
 
     /* Round to the nearest minute */
@@ -838,31 +838,31 @@ int build_modtran_input
         input->meta.acq_date.minute++;
 
     /* convert hour-min acquisition time to decimal time */
-    time = (float) input->meta.acq_date.hour
-           + (float) input->meta.acq_date.minute / 60.0F;
+    time = (double) input->meta.acq_date.hour
+           + (double) input->meta.acq_date.minute / 60.0F;
     time_diff = time - hour1;
 
     /* ==================================================================== */
 
     /* Allocate memory */
-    narr_height = (float **) allocate_2d_array (P_LAYER, num_points,
-                                                sizeof (float));
+    narr_height = (double **) allocate_2d_array (P_LAYER, num_points,
+                                                sizeof (double));
     if (narr_height == NULL)
     {
         RETURN_ERROR ("Allocating narr_height memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory */
-    narr_rh = (float **) allocate_2d_array (P_LAYER, num_points,
-                                            sizeof (float));
+    narr_rh = (double **) allocate_2d_array (P_LAYER, num_points,
+                                            sizeof (double));
     if (narr_rh == NULL)
     {
         RETURN_ERROR ("Allocating narr_rh memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory */
-    narr_tmp = (float **) allocate_2d_array (P_LAYER, num_points,
-                                             sizeof (float));
+    narr_tmp = (double **) allocate_2d_array (P_LAYER, num_points,
+                                             sizeof (double));
     if (narr_tmp == NULL)
     {
         RETURN_ERROR ("Allocating narr_tmp memory", FUNC_NAME, FAILURE);
@@ -931,25 +931,25 @@ int build_modtran_input
     /************************** Build tape 5 files **************************/
 
     /* Allocate memory */
-    stan_height = (float *) malloc (STANDARD_LAYERS * sizeof (float));
+    stan_height = (double *) malloc (STANDARD_LAYERS * sizeof (double));
     if (stan_height == NULL)
     {
         RETURN_ERROR ("Allocating stan_height memory", FUNC_NAME, FAILURE);
     }
 
-    stan_pre = (float *) malloc (STANDARD_LAYERS * sizeof (float));
+    stan_pre = (double *) malloc (STANDARD_LAYERS * sizeof (double));
     if (stan_pre == NULL)
     {
         RETURN_ERROR ("Allocating stan_pre memory", FUNC_NAME, FAILURE);
     }
 
-    stan_temp = (float *) malloc (STANDARD_LAYERS * sizeof (float));
+    stan_temp = (double *) malloc (STANDARD_LAYERS * sizeof (double));
     if (stan_temp == NULL)
     {
         RETURN_ERROR ("Allocating stan_temp memory", FUNC_NAME, FAILURE);
     }
 
-    stan_rh = (float *) malloc (STANDARD_LAYERS * sizeof (float));
+    stan_rh = (double *) malloc (STANDARD_LAYERS * sizeof (double));
     if (stan_rh == NULL)
     {
         RETURN_ERROR ("Allocating stan_rh memory", FUNC_NAME, FAILURE);
@@ -992,25 +992,25 @@ int build_modtran_input
     getcwd (curr_path, PATH_MAX);
 
     /* Allocate some temp memory */
-    temp_height = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    temp_height = (double *) malloc (MAX_MODTRAN_LAYER * sizeof (double));
     if (temp_height == NULL)
     {
         RETURN_ERROR ("Allocating temp_height memory", FUNC_NAME, FAILURE);
     }
 
-    temp_pressure = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    temp_pressure = (double *) malloc (MAX_MODTRAN_LAYER * sizeof (double));
     if (temp_pressure == NULL)
     {
         RETURN_ERROR ("Allocating temp_pressure memory", FUNC_NAME, FAILURE);
     }
 
-    temp_temp = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    temp_temp = (double *) malloc (MAX_MODTRAN_LAYER * sizeof (double));
     if (temp_temp == NULL)
     {
         RETURN_ERROR ("Allocating temp_temp memory", FUNC_NAME, FAILURE);
     }
 
-    temp_rh = (float *) malloc (MAX_MODTRAN_LAYER * sizeof (float));
+    temp_rh = (double *) malloc (MAX_MODTRAN_LAYER * sizeof (double));
     if (temp_rh == NULL)
     {
         RETURN_ERROR ("Allocating temp_rh memory", FUNC_NAME, FAILURE);

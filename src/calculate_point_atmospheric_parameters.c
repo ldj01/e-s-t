@@ -25,9 +25,9 @@ Date        Programmer       Reason
 ******************************************************************************/
 void planck_eq
 (
-    float *wavelength,  /* I: Each wavelength */
+    double *wavelength, /* I: Each wavelength */
     int num_elements,   /* I: Number of wavelengths to calculate */
-    float temperature,  /* I: The temperature to calculate for */
+    double temperature, /* I: The temperature to calculate for */
     double *bb_radiance /* I: the blackbody results for each wavelength */
 )
 {
@@ -82,12 +82,12 @@ Date        Programmer       Reason
 ******************************************************************************/
 int spline
 (
-    float *x,
-    float *y,
+    double *x,
+    double *y,
     int n,
-    float yp1,
-    float ypn,
-    float *y2
+    double yp1,
+    double ypn,
+    double *y2
 )
 {
     char FUNC_NAME[] = "spline";
@@ -181,12 +181,12 @@ static int splint_khi = -1;
 static double one_sixth = (1.0 / 6.0); /* To remove a division */
 void splint
 (
-    float *xa,
-    float *ya,
-    float *y2a,
+    double *xa,
+    double *ya,
+    double *y2a,
     int n,
-    float x,
-    float *y
+    double x,
+    double *y
 )
 {
     int k;
@@ -255,15 +255,15 @@ NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
 ******************************************************************************/
 int int_tabulated
 (
-    float *x,         /*I: Tabulated X-value data */
-    float *f,         /*I: Tabulated F-value data */
-    int nums,         /*I: Number of points */
-    float *result_out /*O: Integrated result */
+    double *x,         /*I: Tabulated X-value data */
+    double *f,         /*I: Tabulated F-value data */
+    int nums,          /*I: Number of points */
+    double *result_out /*O: Integrated result */
 )
 {
     char FUNC_NAME[] = "int_tabulated";
-    float *temp = NULL;
-    float *z = NULL;
+    double *temp = NULL;
+    double *z = NULL;
     double xmin;
     double xmax;
     int i;
@@ -289,13 +289,13 @@ int int_tabulated
     h = (xmax - xmin) / segments;
 
     /* Allocate memory */
-    temp = malloc (nums * sizeof (float));
+    temp = malloc (nums * sizeof (double));
     if (temp == NULL)
     {
         RETURN_ERROR ("Allocating temp memory", FUNC_NAME, FAILURE);
     }
 
-    z = malloc ((segments+1) * sizeof (float));
+    z = malloc ((segments+1) * sizeof (double));
     if (z == NULL)
     {
         RETURN_ERROR ("Allocating z memory", FUNC_NAME, FAILURE);
@@ -363,17 +363,17 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_lt
 (
-    float temperature,         /*I: temperature */
-    float **spectral_response, /*I: spectral response function */
-    int num_srs,               /*I: number of spectral response points */
-    float *radiance            /*O: blackbody radiance */
+    double temperature,         /*I: temperature */
+    double **spectral_response, /*I: spectral response function */
+    int num_srs,                /*I: number of spectral response points */
+    double *radiance            /*O: blackbody radiance */
 )
 {
     char FUNC_NAME[] = "calculate_lt";
     int i;
-    float rs_integral;
-    float temp_integral;
-    float *product;
+    double rs_integral;
+    double temp_integral;
+    double *product;
     double *blackbody_radiance;
 
     /* Allocate memory */
@@ -384,7 +384,7 @@ int calculate_lt
                       FAILURE);
     }
 
-    product = malloc (num_srs * sizeof (float));
+    product = malloc (num_srs * sizeof (double));
     if (product == NULL)
     {
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
@@ -435,12 +435,12 @@ RETURN: SUCCESS
 ******************************************************************************/
 void linear_interpolate_over_modtran
 (
-    float **modtran, /* I: The MODTRAN data - provides both the a and b */
-    int index,       /* I: The MODTRAN temperatur to use for a */
-    float *c,        /* I: The Landsat wavelength grid points */
-    int num_in,      /* I: Number of input data and grid points*/
-    int num_out,     /* I: Number of output grid points */
-    float *x         /* O: Interpolated output results */
+    double **modtran, /* I: The MODTRAN data - provides both the a and b */
+    int index,        /* I: The MODTRAN temperatur to use for a */
+    double *c,        /* I: The Landsat wavelength grid points */
+    int num_in,       /* I: Number of input data and grid points*/
+    int num_out,      /* I: Number of output grid points */
+    double *x         /* O: Interpolated output results */
 )
 {
     int i;
@@ -509,29 +509,29 @@ Date        Programmer       Reason
 ******************************************************************************/
 int calculate_lobs
 (
-    float **modtran,           /*I: MODTRAN results with wavelengths */
-    float **spectral_response, /*I: spectral response function */
-    int num_entries,           /*I: number of MODTRAN points */
-    int num_srs,               /*I: number of spectral response points */
-    int index,                 /*I: column index for data be used */
-    float *radiance            /*O: LOB outputs */
+    double **modtran,           /*I: MODTRAN results with wavelengths */
+    double **spectral_response, /*I: spectral response function */
+    int num_entries,            /*I: number of MODTRAN points */
+    int num_srs,                /*I: number of spectral response points */
+    int index,                  /*I: column index for data be used */
+    double *radiance            /*O: LOB outputs */
 )
 {
     char FUNC_NAME[] = "calculate_lobs";
     int i;
-    float *temp_rad;
-    float rs_integral;
-    float temp_integral;
-    float *product;
+    double *temp_rad;
+    double rs_integral;
+    double temp_integral;
+    double *product;
 
     /* Allocate memory */
-    temp_rad = malloc (num_srs * sizeof (float));
+    temp_rad = malloc (num_srs * sizeof (double));
     if (temp_rad == NULL)
     {
         RETURN_ERROR ("Allocating temp_rad memory", FUNC_NAME, FAILURE);
     }
 
-    product = malloc (num_srs * sizeof (float));
+    product = malloc (num_srs * sizeof (double));
     if (product == NULL)
     {
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
@@ -730,8 +730,8 @@ int calculate_point_atmospheric_parameters
 (
     Input_t *input,            /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    float albedo,              /* I: albedo */
-    float **modtran_results,   /* O: atmospheric parameter for modtarn run */
+    double albedo,             /* I: albedo */
+    double **modtran_results,  /* O: atmospheric parameter for modtarn run */
     bool verbose               /* I: value to indicate if intermediate
                                      messages should be printed */
 )
@@ -746,11 +746,11 @@ int calculate_point_atmospheric_parameters
     int k;
     int entry;
 
-    float **spectral_response = NULL;
-    float temp_radiance_0;
-    float obs_radiance_0;
-    float temp_radiance_273;
-    float temp_radiance_310;
+    double **spectral_response = NULL;
+    double temp_radiance_0;
+    double obs_radiance_0;
+    double temp_radiance_273;
+    double temp_radiance_310;
     int counter;
     int index;
     int num_entries;   /* Number of MODTRAN output results to read and use */
@@ -762,15 +762,15 @@ int calculate_point_atmospheric_parameters
     char srs_file_path[PATH_MAX];
     char msg[PATH_MAX];
 
-    float modtran_wavelength;
-    float modtran_radiance;
-    float zero_temp;
-    float **current_data;
-    float y_0;
-    float y_1;
-    float tau; /* Transmission */
-    float lu;  /* Upwelled Radiance */
-    float ld;  /* Downwelled Radiance */
+    double modtran_wavelength;
+    double modtran_radiance;
+    double zero_temp;
+    double **current_data;
+    double y_0;
+    double y_1;
+    double tau; /* Transmission */
+    double lu;  /* Upwelled Radiance */
+    double ld;  /* Downwelled Radiance */
     /* TODO TODO TODO - This emissivity/albedo is just for water which is all
                         that has been implemented.  But the goal is to be
                         doing LAND, so integration with the Aster data and
@@ -799,7 +799,7 @@ int calculate_point_atmospheric_parameters
 
     /* Allocate memory for maximum spectral response count */
     spectral_response =
-        (float **) allocate_2d_array (2, MAX_SRS_COUNT, sizeof (float));
+        (double **) allocate_2d_array (2, MAX_SRS_COUNT, sizeof (double));
     if (spectral_response == NULL)
     {
         RETURN_ERROR ("Allocating spectral_response memory",
@@ -847,7 +847,7 @@ int calculate_point_atmospheric_parameters
 
     for (i = 0; i < num_srs; i++)
     {
-        if (fscanf (fd, "%f %f%*c", &spectral_response[0][i],
+        if (fscanf (fd, "%lf %lf%*c", &spectral_response[0][i],
                     &spectral_response[1][i]) == EOF)
         {
             RETURN_ERROR ("Failed reading spectral response file",
@@ -926,7 +926,7 @@ int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
             /* Retrieve the temperature from this lowest atmospheric layer */
-            if (fscanf (fd, "%*s %f%*c", &zero_temp) != 1)
+            if (fscanf (fd, "%*s %lf%*c", &zero_temp) != 1)
             {
                 RETURN_ERROR ("End of file (EOF) is met before"
                               " reading TARGET_PIXEL_SURFACE_TEMPERATURE",
@@ -945,7 +945,7 @@ int calculate_point_atmospheric_parameters
                modtran runs, columns of array are organized:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
             current_data =
-                (float **) allocate_2d_array (num_entries, 4, sizeof (float));
+                (double **) allocate_2d_array (num_entries, 4, sizeof (double));
             if (current_data == NULL)
             {
                 RETURN_ERROR ("Allocating current_data memory",
@@ -968,7 +968,7 @@ int calculate_point_atmospheric_parameters
                 }
                 for (entry = 0; entry < num_entries; entry++)
                 {
-                    if (fscanf (fd, "%f %f%*c",
+                    if (fscanf (fd, "%lf %lf%*c",
                                 &modtran_wavelength, &modtran_radiance)
                         != 2)
                     {

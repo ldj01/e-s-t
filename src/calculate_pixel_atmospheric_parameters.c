@@ -25,7 +25,7 @@
 typedef struct
 {
     int index;
-    float distance;
+    double distance;
 } DISTANCE_ITEM;
 
 
@@ -48,8 +48,8 @@ int qsort_distance_compare_function
     const void *distance_item_b
 )
 {
-    float a = (*(DISTANCE_ITEM*)distance_item_a).distance;
-    float b = (*(DISTANCE_ITEM*)distance_item_b).distance;
+    double a = (*(DISTANCE_ITEM*)distance_item_a).distance;
+    double b = (*(DISTANCE_ITEM*)distance_item_b).distance;
 
     if (a < b)
         return -1;
@@ -85,25 +85,25 @@ NOTE: Simpson's Rule is applied for integrating the longitudinal distance
 #define INV_SIX (1.0 / 6.0)
 void distance_in_utm
 (
-    float e0,
-    float n0,
-    float e2,
-    float n2,
-    float *distance
+    double e0,
+    double n0,
+    double e2,
+    double n2,
+    double *distance
 )
 {
     /* The UTM coordinates we are using have the 500000 false easting applied
        to them, so we need to remove that before applying the distance
        calculation. */
-    float e0_adj;
-    float e1_term;
-    float e2_adj;
+    double e0_adj;
+    double e1_term;
+    double e2_adj;
 
-    float sr_e0;
-    float sr_e1;
-    float sr_e2;
+    double sr_e0;
+    double sr_e1;
+    double sr_e2;
 
-    float edist;
+    double edist;
 
     e0_adj = e0 - UTM_FALSE_EASTING;
     e1_term = (e0 + e2) * INV_TWO;
@@ -131,23 +131,23 @@ PURPOSE: Interpolate to height of current pixel
 ******************************************************************************/
 void interpolate_to_height
 (
-    float **modtran_results, /* I: results from MODTRAN runs for a point */
-    double interpolate_to,   /* I: current landsat pixel height */
-    float *at_height         /* O: interpolated height for point */
+    double **modtran_results, /* I: results from MODTRAN runs for a point */
+    double interpolate_to,    /* I: current landsat pixel height */
+    double *at_height         /* O: interpolated height for point */
 )
 {
     int i;
     int below = 0;
     int above = 0;
 
-    float below_parameters[NUM_PARAMETERS];
-    float above_parameters[NUM_PARAMETERS];
+    double below_parameters[NUM_PARAMETERS];
+    double above_parameters[NUM_PARAMETERS];
 
-    float slope;
-    float intercept;
+    double slope;
+    double intercept;
 
-    float above_height;
-    float inv_height_diff; /* To remove the multiple divisions */
+    double above_height;
+    double inv_height_diff; /* To remove the multiple divisions */
 
     /* Find the height to use that is below the interpolate_to height */
     for (i = 0; i < NUM_ELEVATIONS; i++)
@@ -225,12 +225,12 @@ PURPOSE: Interpolate to location of current pixel
 ******************************************************************************/
 void interpolate_to_location
 (
-    REANALYSIS_POINTS *points,  /* I: The coordinate points */
-    int *cell_vertices,         /* I: The vertices in the points to use */
-    float **at_height,          /* I: current height atmospheric results */
-    float interpolate_easting,  /* I: interpolate to easting */
-    float interpolate_northing, /* I: interpolate to northing */
-    float *parameters     /*O: interpolated pixel atmospheric parameters */
+    REANALYSIS_POINTS *points,   /* I: The coordinate points */
+    int *cell_vertices,          /* I: The vertices in the points to use */
+    double **at_height,          /* I: current height atmospheric results */
+    double interpolate_easting,  /* I: interpolate to easting */
+    double interpolate_northing, /* I: interpolate to northing */
+    double *parameters     /*O: interpolated pixel atmospheric parameters */
 )
 {
     int i, j;
@@ -288,7 +288,7 @@ RETURN: type = bool
 *****************************************************************************/
 bool point_is_left_of_line(int x0, int y0, int x1, int y1, int px, int py)
 {
-    float result = ((x1 - x0) * (py - y0)) - ((px - x0) * (y1 - y0));
+    double result = ((x1 - x0) * (py - y0)) - ((px - x0) * (y1 - y0));
 
     if (result > 0.0)
         return true;
@@ -314,7 +314,7 @@ int calculate_pixel_atmospheric_parameters
     char *xml_filename,        /* I: XML filename */
     char *dem_filename,        /* I: input DEM filename */
     char *emi_filename,        /* I: input Emissivity filename */
-    float **modtran_results,   /* I: results from MODTRAN runs */
+    double **modtran_results,  /* I: results from MODTRAN runs */
     bool verbose               /* I: value to indicate if intermediate
                                      messages be printed */
 )
@@ -328,8 +328,8 @@ int calculate_pixel_atmospheric_parameters
     int offset;                 /* offset in the raw binary DEM file to seek to
                                    to begin reading the window in the DEM */
     bool first_sample;
-    float current_easting;
-    float current_northing;
+    double current_easting;
+    double current_northing;
     DISTANCE_ITEM *distances = NULL;
 
     int point;
@@ -337,8 +337,8 @@ int calculate_pixel_atmospheric_parameters
     int current_index;
     int cell_vertices[NUM_CELL_POINTS];
 
-    float **at_height = NULL;
-    float parameters[NUM_PARAMETERS];
+    double **at_height = NULL;
+    double parameters[NUM_PARAMETERS];
 
     char *tmp_char = NULL;
     char scene_name[PATH_MAX];
@@ -449,8 +449,8 @@ int calculate_pixel_atmospheric_parameters
     }
 
     /* Allocate memory for at_height */
-    at_height = (float **) allocate_2d_array (NUM_CELL_POINTS, NUM_PARAMETERS,
-                                              sizeof (float));
+    at_height = (double **) allocate_2d_array (NUM_CELL_POINTS, NUM_PARAMETERS,
+                                               sizeof (double));
     if (at_height == NULL)
     {
         RETURN_ERROR ("Allocating at_height memory", FUNC_NAME, FAILURE);
@@ -542,6 +542,10 @@ snprintf (msg, sizeof (msg), "closest = %d", closest_point);
 LOG_MESSAGE (msg, FUNC_NAME);
 #endif
 
+/* TODO TODO TODO - Still need to validate if using the line method is correct
+                    or not.  May (and I mean MAY) only be correct for
+                    CONUS UTM. */
+
                     /* Now determine where we are in the point data cells */
                     if (point_is_left_of_line(
                         points->utm_easting[closest_point],
@@ -630,6 +634,10 @@ LOG_MESSAGE (msg, FUNC_NAME);
 
                        If not we need to advance to a different group of 4
                        points. */
+
+/* TODO TODO TODO - Still need to validate if using the line method is correct
+                    or not.  May (and I mean MAY) only be correct for
+                    CONUS UTM. */
 
                     if (! point_is_left_of_line(
                         points->utm_easting[cell_vertices[UR_POINT]],
@@ -754,7 +762,7 @@ if (line == 3500 && sample == 4000)
                     interpolate_to_height (&modtran_results[current_index],
                                            current_height,
                                            at_height[vertex]);
-//                                           &at_height[vertex][0]);
+
 if (line == 3500 && sample == 4000)
 {
     int bbbb;

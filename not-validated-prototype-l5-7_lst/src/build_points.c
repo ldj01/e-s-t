@@ -22,8 +22,8 @@ RETURN: SUCCESS
 int read_narr_coordinates
 (
     char *lst_data_dir,
-    float **lat,
-    float **lon
+    double **lat,
+    double **lon
 )
 {
     char FUNC_NAME[] = "read_narr_coordinates";
@@ -32,8 +32,8 @@ int read_narr_coordinates
     int count;
     int grid_row;
     int grid_col;
-    float grid_lat;
-    float grid_lon;
+    double grid_lat;
+    double grid_lon;
     char coord_file[PATH_MAX];
     FILE *fd = NULL;
 
@@ -62,7 +62,7 @@ int read_narr_coordinates
             /* File Format:
                Grid_Column Grid_Row Grid_Latitude Grid_Longitude
              */
-            if (fscanf (fd, "%d %d %f %f",
+            if (fscanf (fd, "%d %d %lf %lf",
                         &grid_col, &grid_row, &grid_lat, &grid_lon)
                 == EOF)
             {
@@ -122,27 +122,27 @@ void convert_ll_to_utm
 )
 {
     int point;
-    float a = UTM_EQUATORIAL_RADIUS; /* equatorial radius */
-    float b = UTM_POLAR_RADIUS;      /* polar radius */
-    float k0 = UTM_SCALE_FACTOR;     /* scale factor */
-    float ecc;                       /* eccentricity */
-    float ecc_prime_sqrd;            /* prime of eccentricity squared */
-    float n;
-    float nu;
-    float a0;
-    float b0;
-    float c0;
-    float d0;
-    float e0;
-    float ki;
-    float kii;
-    float kiii;
-    float kiv;
-    float kv;
-    float zone_cm;
-    float p;
-    float lat_rad;
-    float s;
+    double a = UTM_EQUATORIAL_RADIUS; /* equatorial radius */
+    double b = UTM_POLAR_RADIUS;      /* polar radius */
+    double k0 = UTM_SCALE_FACTOR;     /* scale factor */
+    double ecc;                       /* eccentricity */
+    double ecc_prime_sqrd;            /* prime of eccentricity squared */
+    double n;
+    double nu;
+    double a0;
+    double b0;
+    double c0;
+    double d0;
+    double e0;
+    double ki;
+    double kii;
+    double kiii;
+    double kiv;
+    double kv;
+    double zone_cm;
+    double p;
+    double lat_rad;
+    double s;
 
     /* Calculate zone central meridian in degrees and radians */
     zone_cm = (6.0 * input->meta.zone) - 183.0;
@@ -224,8 +224,8 @@ int build_points
     char *lst_data_dir = NULL;
     char msg[PATH_MAX];
 
-    float **lat;
-    float **lon;
+    double **lat;
+    double **lon;
 
     int row;
     int col;
@@ -237,10 +237,10 @@ int build_points
     int num_bytes;
     int index;
 
-    float buffered_ul_lat;
-    float buffered_ul_lon;
-    float buffered_lr_lat;
-    float buffered_lr_lon;
+    double buffered_ul_lat;
+    double buffered_ul_lon;
+    double buffered_lr_lat;
+    double buffered_lr_lon;
 
     /* Grab the environment path to the LST_DATA_DIR */
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -251,13 +251,13 @@ int build_points
     }
 
     /* Allocate 2d memory to hold the coordinates */
-    lat = (float **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (float));
+    lat = (double **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (double));
     if (lat == NULL)
     {
         RETURN_ERROR ("Allocating lat memory", FUNC_NAME, FAILURE);
     }
 
-    lon = (float **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (float));
+    lon = (double **) allocate_2d_array (NARR_ROWS, NARR_COLS, sizeof (double));
     if (lon == NULL)
     {
         RETURN_ERROR ("Allocating lon memory", FUNC_NAME, FAILURE);
@@ -347,41 +347,41 @@ int build_points
     points->modtran_runs = NULL;
 
     /* Determine the number of bytes for the memory allocations */
-    num_bytes = points->num_points * sizeof (float);
+    num_bytes = points->num_points * sizeof (double);
 
     /* Allocate memory for points within the rectangle */
-    points->row = (float *) malloc (num_bytes);
+    points->row = (double *) malloc (num_bytes);
     if (points->row == NULL)
     {
         RETURN_ERROR ("Allocating points row memory", FUNC_NAME, FAILURE);
     }
 
-    points->col = (float *) malloc (num_bytes);
+    points->col = (double *) malloc (num_bytes);
     if (points->col == NULL)
     {
         RETURN_ERROR ("Allocating points col memory", FUNC_NAME, FAILURE);
     }
 
-    points->lat = (float *) malloc (num_bytes);
+    points->lat = (double *) malloc (num_bytes);
     if (points->lat == NULL)
     {
         RETURN_ERROR ("Allocating points lat memory", FUNC_NAME, FAILURE);
     }
 
-    points->lon = (float *) malloc (num_bytes);
+    points->lon = (double *) malloc (num_bytes);
     if (points->lon == NULL)
     {
         RETURN_ERROR ("Allocating points lon memory", FUNC_NAME, FAILURE);
     }
 
-    points->utm_easting = (float *) malloc (num_bytes);
+    points->utm_easting = (double *) malloc (num_bytes);
     if (points->utm_easting == NULL)
     {
         RETURN_ERROR ("Allocating points utm_easting memory", FUNC_NAME,
                       FAILURE);
     }
 
-    points->utm_northing = (float *) malloc (num_bytes);
+    points->utm_northing = (double *) malloc (num_bytes);
     if (points->utm_northing == NULL)
     {
         RETURN_ERROR ("Allocating points utm_northing memory", FUNC_NAME,

@@ -16,7 +16,7 @@ int calculate_pixel_atmospheric_parameters
     char *xml_filename,        /* I: XML filename */
     char *dem_filename,        /* I: DEM filename */
     char *emi_filename,        /* I: Emissivity filename */
-    float **modtran_results,   /* I: atmospheric parameter for MODTRAN run */
+    double **modtran_results,  /* I: atmospheric parameter for MODTRAN run */
     bool verbose               /* I: value to indicate if intermediate
                                      messages will be printed */
 );

@@ -10,19 +10,19 @@ typedef struct
 {
     char path[PATH_MAX];
     char command[PATH_MAX];
-    float latitude;
-    float longitude;
-    float height;
+    double latitude;
+    double longitude;
+    double height;
     bool run_modtran;
 } MODTRAN_INFO;
 
 
 typedef struct
 {
-    float ul_lat;
-    float ul_lon;
-    float lr_lat;
-    float lr_lon;
+    double ul_lat;
+    double ul_lon;
+    double lr_lat;
+    double lr_lon;
 
     int min_row;
     int max_row;
@@ -36,12 +36,12 @@ typedef struct
 
     MODTRAN_INFO *modtran_runs;
 
-    float *row;
-    float *col;
-    float *lat;
-    float *lon;
-    float *utm_easting;
-    float *utm_northing;
+    double *row;
+    double *col;
+    double *lat;
+    double *lon;
+    double *utm_easting;
+    double *utm_northing;
     bool *use_point;
 } REANALYSIS_POINTS;
 

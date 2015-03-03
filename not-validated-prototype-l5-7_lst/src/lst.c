@@ -59,8 +59,8 @@ main (int argc, char *argv[])
 
     int modtran_run;
 
-    float alb = 0.1;
-    float **modtran_results = NULL;
+    double alb = 0.1;
+    double **modtran_results = NULL;
 
     char *tmp_env = NULL;
 
@@ -228,8 +228,8 @@ main (int argc, char *argv[])
 
     /* Allocate memory for MODTRAN results */
     modtran_results =
-        (float **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
-                                      LST_NUM_ELEMENTS, sizeof (float));
+        (double **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
+                                       LST_NUM_ELEMENTS, sizeof (double));
     if (modtran_results == NULL)
     {
         RETURN_ERROR ("Allocating MODTRAN results memory", FUNC_NAME,
