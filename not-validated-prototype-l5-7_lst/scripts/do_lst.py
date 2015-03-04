@@ -192,9 +192,9 @@ def extract_aux_data(args, base_aux_dir):
         logger.info("Using {0}".format(grb_1_path))
 
         # Build the source filenames for date 2
-        yyyymmdd = '{0:0>4}{1:0>2}{2:0>2}'.format(date_1.year,
-                                                  date_1.month,
-                                                  date_1.day)
+        yyyymmdd = '{0:0>4}{1:0>2}{2:0>2}'.format(date_2.year,
+                                                  date_2.month,
+                                                  date_2.day)
         logger.debug("Date 2 yyyymmdd = {0}".format(yyyymmdd))
 
         hdr_2_name = AUX_NAME_TEMPLATE.format(yyyymmdd, date_2.hour,
