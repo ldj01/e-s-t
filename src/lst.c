@@ -16,6 +16,9 @@
 #include "calculate_pixel_atmospheric_parameters.h"
 
 
+#define RUN_MODTRAN 0
+#define EXTRACT_TAPE6_RESULTS 0
+
 /******************************************************************************
 METHOD:  lst
 
@@ -177,7 +180,7 @@ main (int argc, char *argv[])
                    points.modtran_runs[modtran_run].command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if TEMP_TAKE_THIS_OUT_TO_SAVE_TIME
+#if RUN_MODTRAN
         if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
         {
             RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
@@ -217,7 +220,7 @@ main (int argc, char *argv[])
         snprintf (msg_str, sizeof(msg_str), "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if TEMP_TAKE_THIS_OUT_TO_SAVE_TIME
+#if EXTRACT_TAPE6_RESULTS
         if (system (command) != SUCCESS)
         {
             RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",

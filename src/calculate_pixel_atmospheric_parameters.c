@@ -16,6 +16,11 @@
 
 
 #define NUM_PARAMETERS 3
+#define NUM_INTERMEDIATE_BANDS 3
+
+
+#define OUTPUT_CELL_DESIGNATION_BAND 1
+#define OUTPUT_INTERMEDIATE_BANDS 1
 
 
 /* Defines the distance to the current pixel, along with the index of the
@@ -26,7 +31,7 @@ typedef struct
 {
     int index;
     double distance;
-} DISTANCE_ITEM;
+} GRID_ITEM;
 
 
 /* Defines index locations in the vertices array for the current cell to be
@@ -40,16 +45,30 @@ typedef enum
     NUM_CELL_POINTS
 } CELL_POINTS;
 
+typedef enum
+{
+    CC_GRID_POINT,
+    LL_GRID_POINT,
+    LC_GRID_POINT,
+    UL_GRID_POINT,
+    UC_GRID_POINT,
+    UR_GRID_POINT,
+    RC_GRID_POINT,
+    LR_GRID_POINT,
+    DC_GRID_POINT,
+    NUM_GRID_POINTS
+} GRID_POINTS;
 
-/* A qsort routine that can be used with the DISTANCE_ITEM items */
-int qsort_distance_compare_function
+
+/* A qsort routine that can be used with the GRID_ITEM items */
+int qsort_grid_compare_function
 (
-    const void *distance_item_a,
-    const void *distance_item_b
+    const void *grid_item_a,
+    const void *grid_item_b
 )
 {
-    double a = (*(DISTANCE_ITEM*)distance_item_a).distance;
-    double b = (*(DISTANCE_ITEM*)distance_item_b).distance;
+    double a = (*(GRID_ITEM*)grid_item_a).distance;
+    double b = (*(GRID_ITEM*)grid_item_b).distance;
 
     if (a < b)
         return -1;
@@ -65,7 +84,7 @@ METHOD:  distance_in_utm
 
 PURPOSE: Calculate distances between UTM coordiantes
 
-RETURN: NONE
+RETURN: double - The distance.
 
 NOTE: SR(x) = (scale_factor / cos ((x - false_easting) / equatorial_radius))
 
@@ -83,13 +102,12 @@ NOTE: Simpson's Rule is applied for integrating the longitudinal distance
 #define INV_UTM_EQUATORIAL_RADIUS (1.0 / UTM_EQUATORIAL_RADIUS)
 #define INV_TWO (0.5) // (1.0 / 2.0)
 #define INV_SIX (1.0 / 6.0)
-void distance_in_utm
+double distance_in_utm
 (
     double e0,
     double n0,
     double e2,
-    double n2,
-    double *distance
+    double n2
 )
 {
     /* The UTM coordinates we are using have the 500000 false easting applied
@@ -106,9 +124,8 @@ void distance_in_utm
     double edist;
 
     e0_adj = e0 - UTM_FALSE_EASTING;
-    e1_term = (e0 + e2) * INV_TWO;
     e2_adj = e2 - UTM_FALSE_EASTING;
-
+    e1_term = (e0_adj + e2_adj) * INV_TWO;
 
     sr_e0 = UTM_SCALE_FACTOR / (cos (e0_adj * INV_UTM_EQUATORIAL_RADIUS));
 
@@ -119,7 +136,7 @@ void distance_in_utm
     edist = ((e2 - e0) * INV_SIX)
             * (sr_e0 + 4.0 * sr_e1 + sr_e2);
 
-    *distance = sqrt (edist * edist + (n2 - n0) * (n2 - n0));
+    return sqrt (edist * edist + (n2 - n0) * (n2 - n0));
 }
 
 
@@ -136,7 +153,8 @@ void interpolate_to_height
     double *at_height         /* O: interpolated height for point */
 )
 {
-    int i;
+    int parameter;
+    int elevation;
     int below = 0;
     int above = 0;
 
@@ -150,11 +168,11 @@ void interpolate_to_height
     double inv_height_diff; /* To remove the multiple divisions */
 
     /* Find the height to use that is below the interpolate_to height */
-    for (i = 0; i < NUM_ELEVATIONS; i++)
+    for (elevation = 0; elevation < NUM_ELEVATIONS; elevation++)
     {
-        if (modtran_results[i][LST_HEIGHT] < interpolate_to)
+        if (modtran_results[elevation][LST_HEIGHT] < interpolate_to)
         {
-            below = i; /* Last match will always be the one we want */
+            below = elevation; /* Last match will always be the one we want */
         }
     }
 
@@ -204,14 +222,14 @@ void interpolate_to_height
         above_parameters[1] = modtran_results[above][LST_UPWELLED_RADIANCE];
         above_parameters[2] = modtran_results[above][LST_DOWNWELLED_RADIANCE];
 
-        for (i = 0; i < NUM_PARAMETERS; i++)
+        for (parameter = 0; parameter < NUM_PARAMETERS; parameter++)
         {
-            slope = (above_parameters[i] - below_parameters[i])
+            slope = (above_parameters[parameter] - below_parameters[parameter])
                     * inv_height_diff;
 
-            intercept = above_parameters[i] - slope * above_height;
+            intercept = above_parameters[parameter] - slope * above_height;
 
-            at_height[i] = slope * interpolate_to + intercept;
+            at_height[parameter] = slope * interpolate_to + intercept;
         }
     }
 }
@@ -298,6 +316,108 @@ bool point_is_left_of_line(int x0, int y0, int x1, int y1, int px, int py)
 
 
 /*****************************************************************************
+METHOD:  determine_grid_point_distances
+
+PURPOSE: Determines the distances for the current set of grid points.
+
+NOTE: The indexes of the grid points are assumed to be populated.
+
+RETURN: None
+*****************************************************************************/
+void determine_grid_point_distances
+(
+    REANALYSIS_POINTS *points, /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    int num_grid_points,       /* I: The number of grid points to operate on */
+    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
+                                       point */
+)
+{
+    int point;
+
+    /* Populate the distances to the grid points */
+    for (point = 0; point < num_grid_points; point++)
+    {
+        grid_points[point].distance = distance_in_utm (
+            points->utm_easting[grid_points[point].index],
+            points->utm_northing[grid_points[point].index],
+            easting, northing);
+    }
+}
+
+
+/*****************************************************************************
+METHOD:  determine_center_grid_point
+
+PURPOSE: Determines the index of the center point from the current set of grid
+         points.
+
+NOTE: The indexes of the grid points are assumed to be populated.
+
+RETURN: type = int
+    Value  Description
+    -----  -------------------------------------------------------------------
+    index  The index of the center point.
+*****************************************************************************/
+int determine_center_grid_point
+(
+    REANALYSIS_POINTS *points, /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    int num_grid_points,       /* I: The number of grid points to operate on */
+    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
+                                       point */
+)
+{
+    determine_grid_point_distances (points, easting, northing,
+                                    num_grid_points, grid_points);
+
+    /* Sort them to find the closest one */
+    qsort (grid_points, num_grid_points, sizeof (GRID_ITEM),
+           qsort_grid_compare_function);
+
+    return grid_points[0].index;
+}
+
+
+/*****************************************************************************
+METHOD:  determine_first_center_grid_point
+
+PURPOSE: Determines the index of the first center point to use for the current
+         line.  Only called when the fist valid point for a line is
+         encountered.  The point is determined from all of the available
+         points.
+
+RETURN: type = int
+    Value  Description
+    -----  -------------------------------------------------------------------
+    index  The index of the center point.
+*****************************************************************************/
+int determine_first_center_grid_point
+(
+    REANALYSIS_POINTS *points, /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    GRID_ITEM *grid_points     /* I/O: Memory passed in, polulated and
+                                       sorted to determine the center grid
+                                       point */
+)
+{
+    int point;
+
+    /* Assign the point indexes for all grid points */
+    for (point = 0; point < points->num_points; point++)
+    {
+        grid_points[point].index = point;
+    }
+
+    return determine_center_grid_point (points, easting, northing,
+                                        points->num_points, grid_points);
+}
+
+
+/*****************************************************************************
 METHOD:  calculate_pixel_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
@@ -324,38 +444,50 @@ int calculate_pixel_atmospheric_parameters
     int line;
     int sample;
     int status;
-    int closest_point;
     int offset;                 /* offset in the raw binary DEM file to seek to
                                    to begin reading the window in the DEM */
     bool first_sample;
-    double current_easting;
-    double current_northing;
-    DISTANCE_ITEM *distances = NULL;
+    double easting;
+    double northing;
+    GRID_ITEM *grid_points = NULL;
 
-    int point;
     int vertex;
     int current_index;
+    int center_point;
     int cell_vertices[NUM_CELL_POINTS];
 
     double **at_height = NULL;
     double parameters[NUM_PARAMETERS];
+    double avg_distance_ll;
+    double avg_distance_ul;
+    double avg_distance_ur;
+    double avg_distance_lr;
 
     char *tmp_char = NULL;
     char scene_name[PATH_MAX];
+
+#if OUTPUT_INTERMEDIATE_BANDS
     char thermal_filename[PATH_MAX];
     char upwelled_filename[PATH_MAX];
     char downwelled_filename[PATH_MAX];
     char transmittance_filename[PATH_MAX];
-
-    FILE *dem_fd = NULL;
     FILE *thermal_fd = NULL;
     FILE *transmittance_fd = NULL;
     FILE *upwelled_fd = NULL;
     FILE *downwelled_fd = NULL;
+#endif
 
+    FILE *dem_fd = NULL;
     int16_t *dem = NULL;        /* input DEM data in meters */
     float *thermal_data;
     float **landsat_results;
+
+#if OUTPUT_CELL_DESIGNATION_BAND
+    char cell_filename[PATH_MAX];
+    FILE *cell_fd = NULL;
+    uint8_t *cell_data;
+#endif
+
     double current_height;
     char msg[MAX_STR_LEN];
     char *lst_data_dir = NULL;
@@ -395,12 +527,28 @@ int calculate_pixel_atmospheric_parameters
                       FUNC_NAME, FAILURE);
     }
 
-    /* Figure out the filenames */
+#if OUTPUT_CELL_DESIGNATION_BAND
+    /* Allocate memory for one line of the CELL data */
+    cell_data = calloc (input->thermal.size.s, sizeof (uint8_t));
+    if (cell_data == NULL)
+    {
+        RETURN_ERROR ("Error allocating memory for the CELL data",
+                      FUNC_NAME, FAILURE);
+    }
+#endif
+
+    /* Figure out the scene name to apply to the filenames */
     snprintf (scene_name, sizeof (scene_name), input->thermal.filename);
     tmp_char = strchr (scene_name, '_');
     if (tmp_char != NULL)
         *tmp_char = '\0';
 
+#if OUTPUT_CELL_DESIGNATION_BAND
+    snprintf (cell_filename, sizeof (cell_filename),
+              "%s_%s.img", scene_name, "cells");
+#endif
+
+#if OUTPUT_INTERMEDIATE_BANDS
     snprintf (thermal_filename, sizeof (thermal_filename),
               "%s_%s.img", scene_name, LST_THERMAL_RADIANCE_PRODUCT_NAME);
     snprintf (upwelled_filename, sizeof (upwelled_filename),
@@ -409,9 +557,19 @@ int calculate_pixel_atmospheric_parameters
               "%s_%s.img", scene_name, LST_DOWNWELLED_RADIANCE_PRODUCT_NAME);
     snprintf (transmittance_filename, sizeof (transmittance_filename),
               "%s_%s.img", scene_name, LST_ATMOS_TRANS_PRODUCT_NAME);
+#endif
 
-    /* Open the intermediate binary files for writing
-       Note: Needs to be deleted before release */
+    /* Open the intermediate binary files for writing */
+#if OUTPUT_CELL_DESIGNATION_BAND
+    cell_fd = fopen (cell_filename, "wb");
+    if (cell_fd == NULL)
+    {
+        sprintf (msg, "Opening report file: %s", thermal_filename);
+        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
+    }
+#endif
+
+#if OUTPUT_INTERMEDIATE_BANDS
     thermal_fd = fopen (thermal_filename, "wb");
     if (thermal_fd == NULL)
     {
@@ -439,6 +597,7 @@ int calculate_pixel_atmospheric_parameters
         sprintf (msg, "Opening report file: %s", downwelled_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
+#endif
 
     /* Allocate memory for landsat_results */
     landsat_results = (float **) allocate_2d_array (3, input->thermal.size.s,
@@ -456,13 +615,12 @@ int calculate_pixel_atmospheric_parameters
         RETURN_ERROR ("Allocating at_height memory", FUNC_NAME, FAILURE);
     }
 
-    /* Allocate memory to hold the distances to the first sample of data for
+    /* Allocate memory to hold the grid_points to the first sample of data for
        the current line */
-    distances = malloc (num_points * sizeof (DISTANCE_ITEM));
-    if (distances == NULL)
+    grid_points = malloc (num_points * sizeof (GRID_ITEM));
+    if (grid_points == NULL)
     {
-        ERROR_MESSAGE ("Allocating distances memory",
-                       FUNC_NAME);
+        ERROR_MESSAGE ("Allocating grid_points memory", FUNC_NAME);
     }
 
     if (verbose)
@@ -509,250 +667,118 @@ int calculate_pixel_atmospheric_parameters
         {
             if (thermal_data[sample] != LST_NO_DATA_VALUE)
             {
-                /* determine UTM coordinates of current pixel */
-                current_easting = input->meta.ul_map_corner.x
+                /* Determine UTM coordinates for current line/sample */
+                easting = input->meta.ul_map_corner.x
                     + (sample * input->thermal.pixel_size[0]);
-                current_northing = input->meta.ul_map_corner.y
+                northing = input->meta.ul_map_corner.y
                     - (line * input->thermal.pixel_size[1]);
 
                 if (first_sample)
                 {
-                    /* compute distance between current pixel and each narr
-                       point in UTM coordinates
-
-                       Note: consider only calculating points within a small
-                       range nearby */
-                    for (point = 0; point < num_points; point++)
-                    {
-                        distance_in_utm (points->utm_easting[point],
-                                         points->utm_northing[point],
-                                         current_easting,
-                                         current_northing,
-                                         &distances[point].distance);
-
-                        distances[point].index = point;
-                    }
-
-                    /* find the closest point */
-                    qsort (distances, num_points, sizeof (DISTANCE_ITEM),
-                           qsort_distance_compare_function);
-                    closest_point = distances[0].index;
-#if 0
-snprintf (msg, sizeof (msg), "closest = %d", closest_point);
-LOG_MESSAGE (msg, FUNC_NAME);
-#endif
-
-/* TODO TODO TODO - Still need to validate if using the line method is correct
-                    or not.  May (and I mean MAY) only be correct for
-                    CONUS UTM. */
-
-                    /* Now determine where we are in the point data cells */
-                    if (point_is_left_of_line(
-                        points->utm_easting[closest_point],
-                        points->utm_northing[closest_point],
-                        points->utm_easting[closest_point + num_cols],
-                        points->utm_northing[closest_point + num_cols],
-                        current_easting,
-                        current_northing))
-                    {
-                        if (! point_is_left_of_line(
-                            points->utm_easting[closest_point],
-                            points->utm_northing[closest_point],
-                            points->utm_easting[closest_point - 1],
-                            points->utm_northing[closest_point - 1],
-                            current_easting,
-                            current_northing))
-                        {
-                            /* in quadrant top-left */
-                            closest_point--;
-                        }
-                        else if (! point_is_left_of_line(
-                            points->utm_easting[closest_point],
-                            points->utm_northing[closest_point],
-                            points->utm_easting[closest_point - num_cols],
-                            points->utm_northing[closest_point - num_cols],
-                            current_easting,
-                            current_northing))
-                        {
-                            /* in quadrant bottom-left */
-                            closest_point -= (num_cols + 1);
-                        }
-                        else
-                        {
-                            /* in quadrant bottom-right */
-                            closest_point -= num_cols;
-                        }
-                    }
-                    else if (! point_is_left_of_line(
-                        points->utm_easting[closest_point],
-                        points->utm_northing[closest_point],
-                        points->utm_easting[closest_point + 1],
-                        points->utm_northing[closest_point + 1],
-                        current_easting,
-                        current_northing))
-                    {
-                        if (point_is_left_of_line(
-                            points->utm_easting[closest_point],
-                            points->utm_northing[closest_point],
-                            points->utm_easting[closest_point - num_cols],
-                            points->utm_northing[closest_point - num_cols],
-                            current_easting,
-                            current_northing))
-                        {
-                            /* in quadrant bottom-right */
-                            closest_point -= num_cols;
-                        }
-                        else
-                        {
-                            /* in quadrant bottom-left */
-                            closest_point -= (num_cols + 1);
-                        }
-                    }
-                    /* else in quadrant top-right */
-
-                    /* determine index of four points in order to pull from
-                       MODTRAN results */
-                    /* LL */
-                    cell_vertices[LL_POINT] = closest_point;
-                    /* UL */
-                    cell_vertices[UL_POINT] =
-                        cell_vertices[LL_POINT] + num_cols;
-                    /* UR */
-                    cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
-                    /* LR */
-                    cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+                    /* Determine the first center point from all of the
+                       available points */
+                    center_point = determine_first_center_grid_point(
+                                       points, easting, northing, grid_points);
 
                     /* Set first_sample to be false */
                     first_sample = false;
                 }
                 else
                 {
-                    /* Make sure we are:
-                       left of LR->UR
-                       and
-                       below UR->UL
+                    /* Determine the center point from the current 9 grid
+                       points for the current line/sample */
+                    center_point = determine_center_grid_point(
+                                       points, easting, northing,
+                                       NUM_GRID_POINTS, grid_points);
+                }
 
-                       If not we need to advance to a different group of 4
-                       points. */
+                /* Fix the index values, since the points are from a new line
+                   or were messed up during determining the center point */
+                grid_points[CC_GRID_POINT].index = center_point;
+                grid_points[LL_GRID_POINT].index =
+                    center_point - 1 - num_cols;
+                grid_points[LC_GRID_POINT].index = center_point - 1;
+                grid_points[UL_GRID_POINT].index =
+                    center_point - 1 + num_cols;
+                grid_points[UC_GRID_POINT].index =
+                    center_point + num_cols;
+                grid_points[UR_GRID_POINT].index =
+                    center_point + 1 + num_cols;
+                grid_points[RC_GRID_POINT].index = center_point + 1;
+                grid_points[LR_GRID_POINT].index =
+                    center_point + 1 - num_cols;
+                grid_points[DC_GRID_POINT].index =
+                    center_point - num_cols;
 
-/* TODO TODO TODO - Still need to validate if using the line method is correct
-                    or not.  May (and I mean MAY) only be correct for
-                    CONUS UTM. */
+                /* Fix the distances, since the points are from a new line or
+                   were messed up during determining the center point */
+                determine_grid_point_distances (points, easting, northing,
+                                                NUM_GRID_POINTS, grid_points);
 
-                    if (! point_is_left_of_line(
-                        points->utm_easting[cell_vertices[UR_POINT]],
-                        points->utm_northing[cell_vertices[UR_POINT]],
-                        points->utm_easting[cell_vertices[UL_POINT]],
-                        points->utm_northing[cell_vertices[UL_POINT]],
-                        current_easting,
-                        current_northing))
-                    {
-                        /* We are above the line
-                           Adjust the points and then test the right edge */
+                /* Determine the average distances for each quadrant around
+                   the center point
+                   We only need to use the three outer grid points */
+                avg_distance_ll = (grid_points[DC_GRID_POINT].distance
+                                   + grid_points[LL_GRID_POINT].distance
+                                   + grid_points[LC_GRID_POINT].distance)
+                                  / 3.0;
 
-                        /* LL */
-                        cell_vertices[LL_POINT] = cell_vertices[UL_POINT];
-                        /* UL */
-                        cell_vertices[UL_POINT] =
-                            cell_vertices[LL_POINT] + num_cols;
-                        /* UR */
-                        cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
-                        /* LR */
-                        cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+                avg_distance_ul = (grid_points[LC_GRID_POINT].distance
+                                   + grid_points[UL_GRID_POINT].distance
+                                   + grid_points[UC_GRID_POINT].distance)
+                                  / 3.0;
 
-                        /* Now test the right edge */
-                        if (! point_is_left_of_line(
-                            points->utm_easting[cell_vertices[LR_POINT]],
-                            points->utm_northing[cell_vertices[LR_POINT]],
-                            points->utm_easting[cell_vertices[UR_POINT]],
-                            points->utm_northing[cell_vertices[UR_POINT]],
-                            current_easting,
-                            current_northing))
-                        {
-                            /* We are right of the line
-                               Adjust the points */
+                avg_distance_ur = (grid_points[UC_GRID_POINT].distance
+                                   + grid_points[UR_GRID_POINT].distance
+                                   + grid_points[RC_GRID_POINT].distance)
+                                  / 3.0;
 
-                            /* LL */
-                            cell_vertices[LL_POINT] = cell_vertices[LR_POINT];
-                            /* UL */
-                            cell_vertices[UL_POINT] =
-                                cell_vertices[LL_POINT] + num_cols;
-                            /* UR */
-                            cell_vertices[UR_POINT] =
-                                cell_vertices[UL_POINT] + 1;
-                            /* LR */
-                            cell_vertices[LR_POINT] =
-                                cell_vertices[LL_POINT] + 1;
-                        }
-                        /* ELSE WE ARE OK FOR NOW */
-                    }
-                    else if (! point_is_left_of_line(
-                        points->utm_easting[cell_vertices[LR_POINT]],
-                        points->utm_northing[cell_vertices[LR_POINT]],
-                        points->utm_easting[cell_vertices[UR_POINT]],
-                        points->utm_northing[cell_vertices[UR_POINT]],
-                        current_easting,
-                        current_northing))
-                    {
-                        /* We are right of the line
-                           Adjust the points and then test the top edge */
+                avg_distance_lr = (grid_points[RC_GRID_POINT].distance
+                                   + grid_points[LR_GRID_POINT].distance
+                                   + grid_points[DC_GRID_POINT].distance)
+                                  / 3.0;
 
-                        /* LL */
-                        cell_vertices[LL_POINT] = cell_vertices[LR_POINT];
-                        /* UL */
-                        cell_vertices[UL_POINT] =
-                            cell_vertices[LL_POINT] + num_cols;
-                        /* UR */
-                        cell_vertices[UR_POINT] =
-                            cell_vertices[UL_POINT] + 1;
-                        /* LR */
-                        cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+                /* Determine which quadrant is closer and setup the cell
+                   vertices to interpolate over based on that */
+                if (avg_distance_ll < avg_distance_ul
+                    && avg_distance_ll < avg_distance_ur
+                    && avg_distance_ll < avg_distance_lr)
+                { /* LL Cell */
+                    cell_vertices[LL_POINT] = center_point - 1 - num_cols;
+                }
+                else if (avg_distance_ul < avg_distance_ll
+                    && avg_distance_ul < avg_distance_ur
+                    && avg_distance_ul < avg_distance_lr)
+                { /* UL Cell */
+                    cell_vertices[LL_POINT] = center_point - 1;
+                }
+                else if (avg_distance_ur < avg_distance_ll
+                    && avg_distance_ur < avg_distance_ul
+                    && avg_distance_ur < avg_distance_lr)
+                { /* UR Cell */
+                    cell_vertices[LL_POINT] = center_point;
+                }
+                else
+                { /* LR Cell */
+                    cell_vertices[LL_POINT] = center_point - num_cols;
+                }
 
-                        if (! point_is_left_of_line(
-                            points->utm_easting[cell_vertices[UR_POINT]],
-                            points->utm_northing[cell_vertices[UR_POINT]],
-                            points->utm_easting[cell_vertices[UL_POINT]],
-                            points->utm_northing[cell_vertices[UL_POINT]],
-                            current_easting,
-                            current_northing))
-                        {
-                            /* LL */
-                            cell_vertices[LL_POINT] = cell_vertices[UL_POINT];
-                            /* UL */
-                            cell_vertices[UL_POINT] =
-                                cell_vertices[LL_POINT] + num_cols;
-                            /* UR */
-                            cell_vertices[UR_POINT] =
-                                cell_vertices[UL_POINT] + 1;
-                            /* LR */
-                            cell_vertices[LR_POINT] =
-                                cell_vertices[LL_POINT] + 1;
-                        }
-                        /* ELSE WE ARE OK FOR NOW */
-                    }
-                    /* ELSE WE ARE OK FOR NOW */
-                } /* END - Not first sample */
+                /* UL Point */
+                cell_vertices[UL_POINT] = cell_vertices[LL_POINT] + num_cols;
+                /* UR Point */
+                cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
+                /* LR Point */
+                cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
 
-#if 0
-snprintf (msg, sizeof (msg),
-          "[%d, %d] cell_vertices = LL[%d], UL[%d], UR[%d], LR[%d]",
-          line, sample, cell_vertices[LL_POINT], cell_vertices[UL_POINT],
-                        cell_vertices[UR_POINT], cell_vertices[LR_POINT]);
-LOG_MESSAGE (msg, FUNC_NAME);
+#if OUTPUT_CELL_DESIGNATION_BAND
+                cell_data[sample] = cell_vertices[LL_POINT];
 #endif
 
-                /* convert height from m to km */
-                current_height = (double) dem[sample] / 1000.0;
+                /* convert height from m to km -- Same as 1.0 / 1000.0 */
+                current_height = (double) dem[sample] * 0.001;
 
                 /* interpolate three parameters to that height at each of the
                    four closest points */
-
-if (line == 3500 && sample == 4000)
-{
-    printf ("\n\n");
-    printf ("easting [%lf]\n", current_easting);
-    printf ("northing [%lf]\n", current_northing);
-}
                 for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
                 {
                     current_index = cell_vertices[vertex] * NUM_ELEVATIONS;
@@ -762,62 +788,41 @@ if (line == 3500 && sample == 4000)
                     interpolate_to_height (&modtran_results[current_index],
                                            current_height,
                                            at_height[vertex]);
-
-if (line == 3500 && sample == 4000)
-{
-    int bbbb;
-    for (bbbb = 0; bbbb < NUM_ELEVATIONS; bbbb++)
-    {
-        printf ("%15.9f %15.9f %15.9f %15.9f %15.9f %15.9f\n",
-                modtran_results[current_index+bbbb][LST_LATITUDE],
-                modtran_results[current_index+bbbb][LST_LONGITUDE],
-                modtran_results[current_index+bbbb][LST_HEIGHT],
-                modtran_results[current_index+bbbb][LST_TRANSMISSION],
-                modtran_results[current_index+bbbb][LST_UPWELLED_RADIANCE],
-                modtran_results[current_index+bbbb][LST_DOWNWELLED_RADIANCE]);
-    }
-
-    printf ("at_height [%d][%d][%f] [%15.9f][%15.9f][%15.9f]\n",
-            current_index, cell_vertices[vertex], current_height,
-            at_height[vertex][0],
-            at_height[vertex][1],
-            at_height[vertex][2]);
-}
                 }
 
                 /* interpolate parameters at appropriate height to location of
                    current pixel */
                 interpolate_to_location (points, cell_vertices, at_height,
-                                         current_easting, current_northing,
-                                         &parameters[0]);
+                                         easting, northing, &parameters[0]);
 
                 /* convert radiances to W*m^(-2)*sr(-1) */
                 landsat_results[0][sample] = parameters[0];
                 landsat_results[1][sample] = parameters[1] * 10000.0;
                 landsat_results[2][sample] = parameters[2] * 10000.0;
-
-if (line == 3500 && sample == 4000)
-{
-    printf ("thermal [%f]\n", thermal_data[sample]);
-    printf ("transmittance [%f]\n", landsat_results[0][sample]);
-    printf ("transmittance [%f]\n", parameters[0]);
-    printf ("upwelled [%f]\n", landsat_results[1][sample]);
-    printf ("upwelled [%f]\n", parameters[1]);
-    printf ("downwelled [%f]\n", landsat_results[2][sample]);
-    printf ("downwelled [%f]\n", parameters[2]);
-    printf ("\n\n");
-}
             } /* END - if not FILL */
             else
             {
+#if OUTPUT_CELL_DESIGNATION_BAND
+                cell_data[sample] = 0;
+#endif
                 landsat_results[0][sample] = LST_NO_DATA_VALUE;
                 landsat_results[1][sample] = LST_NO_DATA_VALUE;
                 landsat_results[2][sample] = LST_NO_DATA_VALUE;
             }
         } /* END - for sample */
 
-        /* Write out the temporary binary output files
-           Note: They need to be deleted before release */
+        /* Write out the temporary binary output files */
+#if OUTPUT_CELL_DESIGNATION_BAND
+        status = fwrite (cell_data, sizeof (uint8_t),
+                         input->thermal.size.s, cell_fd);
+        if (status != input->thermal.size.s)
+        {
+            sprintf (msg, "Writing to %s", thermal_filename);
+            ERROR_MESSAGE (msg, FUNC_NAME);
+        }
+#endif
+
+#if OUTPUT_INTERMEDIATE_BANDS
         status = fwrite (thermal_data, sizeof (float),
                          input->thermal.size.s, thermal_fd);
         if (status != input->thermal.size.s)
@@ -849,11 +854,15 @@ if (line == 3500 && sample == 4000)
             sprintf (msg, "Writing to %s", downwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
+#endif
     } /* END - for line */
 
     /* Free allocated memory */
-    free (distances);
+    free (grid_points);
     free (dem);
+#if OUTPUT_CELL_DESIGNATION_BAND
+    free (cell_data);
+#endif
     free (thermal_data);
     thermal_data = NULL;
 
@@ -869,8 +878,17 @@ if (line == 3500 && sample == 4000)
         ERROR_MESSAGE ("Freeing memory: landsat_results\n", FUNC_NAME);
     }
 
-    /* Close the intermediate binary files
-       Note: needs to be deleted before release */
+    /* Close the intermediate binary files */
+#if OUTPUT_CELL_DESIGNATION_BAND
+    status = fclose (cell_fd);
+    if (status)
+    {
+        sprintf (msg, "Closing file %s", cell_filename);
+        ERROR_MESSAGE (msg, FUNC_NAME);
+    }
+#endif
+
+#if OUTPUT_INTERMEDIATE_BANDS
     status = fclose (thermal_fd);
     if (status)
     {
@@ -898,6 +916,7 @@ if (line == 3500 && sample == 4000)
         sprintf (msg, "Closing file %s", downwelled_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
+#endif
 
     if (add_lst_band_product(xml_filename,
                              input->thermal.band_name,
