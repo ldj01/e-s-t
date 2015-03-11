@@ -15,12 +15,23 @@
 #include "build_points.h"
 
 
-#define NUM_PARAMETERS 3
-#define NUM_INTERMEDIATE_BANDS 3
-
-
+/* These are for compile time debugging logic.
+   Set them to 0 to turn them off.
+   They need to be set to 0 for production/standard processing. */
 #define OUTPUT_CELL_DESIGNATION_BAND 1
 #define OUTPUT_INTERMEDIATE_BANDS 1
+
+
+/* Defines the index for the intermediate bands which are generated for the
+   follow-on processing */
+typedef enum
+{
+    BAND_TRANSMISSION,
+    BAND_UPWELLED_RADIANCE,
+    BAND_DOWNWELLED_RADIANCE,
+    BAND_THERMAL,
+    NUM_INTERMEDIATE_DATA_BANDS
+} INTERMEDIATE_DATA_BANDS;
 
 
 /* Defines the distance to the current pixel, along with the index of the
@@ -45,22 +56,18 @@ typedef enum
     NUM_CELL_POINTS
 } CELL_POINTS;
 
+
 typedef enum
 {
-    CC_GRID_POINT,
-    LL_GRID_POINT,
-    LC_GRID_POINT,
-    UL_GRID_POINT,
-    UC_GRID_POINT,
-    UR_GRID_POINT,
-    RC_GRID_POINT,
-    LR_GRID_POINT,
-    DC_GRID_POINT,
-    NUM_GRID_POINTS
-} GRID_POINTS;
+    AHP_TRANSMISSION,
+    AHP_UPWELLED_RADIANCE,
+    AHP_DOWNWELLED_RADIANCE,
+    AHP_NUM_PARAMETERS
+} AT_HEIGHT_PARAMETERS;
 
 
-/* A qsort routine that can be used with the GRID_ITEM items */
+/* A qsort routine that can be used with the GRID_ITEM items to sort by
+   distance */
 int qsort_grid_compare_function
 (
     const void *grid_item_a,
@@ -158,8 +165,8 @@ void interpolate_to_height
     int below = 0;
     int above = 0;
 
-    double below_parameters[NUM_PARAMETERS];
-    double above_parameters[NUM_PARAMETERS];
+    double below_parameters[AHP_NUM_PARAMETERS];
+    double above_parameters[AHP_NUM_PARAMETERS];
 
     double slope;
     double intercept;
@@ -170,7 +177,7 @@ void interpolate_to_height
     /* Find the height to use that is below the interpolate_to height */
     for (elevation = 0; elevation < NUM_ELEVATIONS; elevation++)
     {
-        if (modtran_results[elevation][LST_HEIGHT] < interpolate_to)
+        if (modtran_results[elevation][MGPE_HEIGHT] < interpolate_to)
         {
             below = elevation; /* Last match will always be the one we want */
         }
@@ -188,7 +195,7 @@ void interpolate_to_height
         /* Check to make sure that we are not less that the below height,
            indicating that our interpolate_to height is below the first
            height */
-        if (! (interpolate_to < modtran_results[above][LST_HEIGHT]))
+        if (! (interpolate_to < modtran_results[above][MGPE_HEIGHT]))
         {
             /* Use the next height, since it will be equal to or above our
                interpolate_to height */
@@ -200,29 +207,38 @@ void interpolate_to_height
     /* Else - We are at the last height, so use that for both above and
               below */
 
-    below_parameters[0] = modtran_results[below][LST_TRANSMISSION];
-    below_parameters[1] = modtran_results[below][LST_UPWELLED_RADIANCE];
-    below_parameters[2] = modtran_results[below][LST_DOWNWELLED_RADIANCE];
+    below_parameters[AHP_TRANSMISSION] =
+        modtran_results[below][MGPE_TRANSMISSION];
+    below_parameters[AHP_UPWELLED_RADIANCE] =
+        modtran_results[below][MGPE_UPWELLED_RADIANCE];
+    below_parameters[AHP_DOWNWELLED_RADIANCE] =
+        modtran_results[below][MGPE_DOWNWELLED_RADIANCE];
 
     if (above == below)
     {
         /* Use the below parameters since the same */
-        at_height[0] = below_parameters[0];
-        at_height[1] = below_parameters[1];
-        at_height[2] = below_parameters[2];
+        at_height[AHP_TRANSMISSION] =
+            below_parameters[AHP_TRANSMISSION];
+        at_height[AHP_UPWELLED_RADIANCE] =
+            below_parameters[AHP_UPWELLED_RADIANCE];
+        at_height[AHP_DOWNWELLED_RADIANCE] =
+            below_parameters[AHP_DOWNWELLED_RADIANCE];
     }
     else
     {
         /* Interpolate between the heights for each parameter */
-        above_height = modtran_results[above][LST_HEIGHT];
+        above_height = modtran_results[above][MGPE_HEIGHT];
         inv_height_diff = 1.0 / (above_height
-                                 - modtran_results[below][LST_HEIGHT]);
+                                 - modtran_results[below][MGPE_HEIGHT]);
 
-        above_parameters[0] = modtran_results[above][LST_TRANSMISSION];
-        above_parameters[1] = modtran_results[above][LST_UPWELLED_RADIANCE];
-        above_parameters[2] = modtran_results[above][LST_DOWNWELLED_RADIANCE];
+        above_parameters[AHP_TRANSMISSION] =
+            modtran_results[above][MGPE_TRANSMISSION];
+        above_parameters[AHP_UPWELLED_RADIANCE] =
+            modtran_results[above][MGPE_UPWELLED_RADIANCE];
+        above_parameters[AHP_DOWNWELLED_RADIANCE] =
+            modtran_results[above][MGPE_DOWNWELLED_RADIANCE];
 
-        for (parameter = 0; parameter < NUM_PARAMETERS; parameter++)
+        for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
         {
             slope = (above_parameters[parameter] - below_parameters[parameter])
                     * inv_height_diff;
@@ -244,47 +260,49 @@ PURPOSE: Interpolate to location of current pixel
 void interpolate_to_location
 (
     REANALYSIS_POINTS *points,   /* I: The coordinate points */
-    int *cell_vertices,          /* I: The vertices in the points to use */
+    int *vertices,               /* I: The vertices for the points to use */
     double **at_height,          /* I: current height atmospheric results */
     double interpolate_easting,  /* I: interpolate to easting */
     double interpolate_northing, /* I: interpolate to northing */
     double *parameters     /*O: interpolated pixel atmospheric parameters */
 )
 {
-    int i, j;
+    int point;
+    int parameter;
+
     double inv_h[NUM_CELL_POINTS];
     double w[NUM_CELL_POINTS];
     double total = 0.0;
 
     /* shepard's method */
-    for (i = 0; i < NUM_CELL_POINTS; i++)
+    for (point = 0; point < NUM_CELL_POINTS; point++)
     {
-        inv_h[i] = 1.0 / sqrt (((points->utm_easting[cell_vertices[i]]
-                                 - interpolate_easting)
-                                * (points->utm_easting[cell_vertices[i]]
-                                   - interpolate_easting))
-                               +
-                               ((points->utm_northing[cell_vertices[i]]
-                                 - interpolate_northing)
-                                * (points->utm_northing[cell_vertices[i]]
-                                   - interpolate_northing)));
+        inv_h[point] = 1.0 / sqrt (((points->utm_easting[vertices[point]]
+                                     - interpolate_easting)
+                                    * (points->utm_easting[vertices[point]]
+                                       - interpolate_easting))
+                                   +
+                                   ((points->utm_northing[vertices[point]]
+                                     - interpolate_northing)
+                                    * (points->utm_northing[vertices[point]]
+                                       - interpolate_northing)));
 
-        total += inv_h[i];
+        total += inv_h[point];
     }
 
     /* Determine the weights for each vertex */
-    for (i = 0; i < NUM_CELL_POINTS; i++)
+    for (point = 0; point < NUM_CELL_POINTS; point++)
     {
-        w[i] = inv_h[i] / total;
+        w[point] = inv_h[point] / total;
     }
 
     /* For each parameter apply each vertex's weighted value */
-    for (i = 0; i < NUM_PARAMETERS; i++)
+    for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
     {
-        parameters[i] = 0.0;
-        for (j = 0; j < NUM_CELL_POINTS; j++)
+        parameters[parameter] = 0.0;
+        for (point = 0; point < NUM_CELL_POINTS; point++)
         {
-            parameters[i] += (w[j] * at_height[j][i]);
+            parameters[parameter] += (w[point] * at_height[point][parameter]);
         }
     }
 }
@@ -457,7 +475,7 @@ int calculate_pixel_atmospheric_parameters
     int cell_vertices[NUM_CELL_POINTS];
 
     double **at_height = NULL;
-    double parameters[NUM_PARAMETERS];
+    double parameters[AHP_NUM_PARAMETERS];
     double avg_distance_ll;
     double avg_distance_ul;
     double avg_distance_ur;
@@ -479,8 +497,7 @@ int calculate_pixel_atmospheric_parameters
 
     FILE *dem_fd = NULL;
     int16_t *dem = NULL;        /* input DEM data in meters */
-    float *thermal_data;
-    float **landsat_results;
+    float **intermediate_bands;
 
 #if OUTPUT_CELL_DESIGNATION_BAND
     char cell_filename[PATH_MAX];
@@ -516,14 +533,6 @@ int calculate_pixel_atmospheric_parameters
     if (dem == NULL)
     {
         RETURN_ERROR ("Error allocating memory for the DEM data",
-                      FUNC_NAME, FAILURE);
-    }
-
-    /* Allocate memory for one line of the Thermal data */
-    thermal_data = calloc (input->thermal.size.s, sizeof (float));
-    if (thermal_data == NULL)
-    {
-        RETURN_ERROR ("Error allocating memory for the Thermal data",
                       FUNC_NAME, FAILURE);
     }
 
@@ -599,16 +608,19 @@ int calculate_pixel_atmospheric_parameters
     }
 #endif
 
-    /* Allocate memory for landsat_results */
-    landsat_results = (float **) allocate_2d_array (3, input->thermal.size.s,
-                                                    sizeof (float));
-    if (landsat_results == NULL)
+    /* Allocate memory for intermediate_bands */
+    intermediate_bands =
+        (float **) allocate_2d_array (NUM_INTERMEDIATE_DATA_BANDS,
+                                      input->thermal.size.s, sizeof (float));
+    if (intermediate_bands == NULL)
     {
-        RETURN_ERROR ("Allocating landsat_results memory", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Allocating intermediate_bands memory", FUNC_NAME,
+                      FAILURE);
     }
 
     /* Allocate memory for at_height */
-    at_height = (double **) allocate_2d_array (NUM_CELL_POINTS, NUM_PARAMETERS,
+    at_height = (double **) allocate_2d_array (NUM_CELL_POINTS,
+                                               AHP_NUM_PARAMETERS,
                                                sizeof (double));
     if (at_height == NULL)
     {
@@ -643,7 +655,8 @@ int calculate_pixel_atmospheric_parameters
         }
 
         /* Read the input thermal band data */
-        if (!GetInputThermLine (input, line, thermal_data))
+        if (!GetInputThermLine (input, line,
+                                &intermediate_bands[BAND_THERMAL][0]))
         {
             sprintf (msg, "Reading input thermal data for line %d", line);
             RETURN_ERROR (msg, FUNC_NAME, FAILURE);
@@ -665,7 +678,7 @@ int calculate_pixel_atmospheric_parameters
         first_sample = true;
         for (sample = 0; sample < input->thermal.size.s; sample++)
         {
-            if (thermal_data[sample] != LST_NO_DATA_VALUE)
+            if (intermediate_bands[BAND_THERMAL][sample] != LST_NO_DATA_VALUE)
             {
                 /* Determine UTM coordinates for current line/sample */
                 easting = input->meta.ul_map_corner.x
@@ -796,18 +809,24 @@ int calculate_pixel_atmospheric_parameters
                                          easting, northing, &parameters[0]);
 
                 /* convert radiances to W*m^(-2)*sr(-1) */
-                landsat_results[0][sample] = parameters[0];
-                landsat_results[1][sample] = parameters[1] * 10000.0;
-                landsat_results[2][sample] = parameters[2] * 10000.0;
+                intermediate_bands[BAND_TRANSMISSION][sample] =
+                    parameters[AHP_TRANSMISSION];
+                intermediate_bands[BAND_UPWELLED_RADIANCE][sample] =
+                    parameters[AHP_UPWELLED_RADIANCE] * 10000.0;
+                intermediate_bands[BAND_DOWNWELLED_RADIANCE][sample] =
+                    parameters[AHP_DOWNWELLED_RADIANCE] * 10000.0;
             } /* END - if not FILL */
             else
             {
 #if OUTPUT_CELL_DESIGNATION_BAND
                 cell_data[sample] = 0;
 #endif
-                landsat_results[0][sample] = LST_NO_DATA_VALUE;
-                landsat_results[1][sample] = LST_NO_DATA_VALUE;
-                landsat_results[2][sample] = LST_NO_DATA_VALUE;
+                intermediate_bands[BAND_TRANSMISSION][sample] =
+                    LST_NO_DATA_VALUE;
+                intermediate_bands[BAND_UPWELLED_RADIANCE][sample] =
+                    LST_NO_DATA_VALUE;
+                intermediate_bands[BAND_DOWNWELLED_RADIANCE][sample] =
+                    LST_NO_DATA_VALUE;
             }
         } /* END - for sample */
 
@@ -823,35 +842,36 @@ int calculate_pixel_atmospheric_parameters
 #endif
 
 #if OUTPUT_INTERMEDIATE_BANDS
-        status = fwrite (thermal_data, sizeof (float),
-                         input->thermal.size.s, thermal_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", thermal_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
-
-        status = fwrite (&landsat_results[0][0], sizeof (float),
-                         input->thermal.size.s, transmittance_fd);
+        status = fwrite (&intermediate_bands[BAND_TRANSMISSION][0],
+                         sizeof (float), input->thermal.size.s,
+                         transmittance_fd);
         if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", transmittance_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
-        status = fwrite (&landsat_results[1][0], sizeof (float),
-                         input->thermal.size.s, upwelled_fd);
+        status = fwrite (&intermediate_bands[BAND_UPWELLED_RADIANCE][0],
+                         sizeof (float), input->thermal.size.s, upwelled_fd);
         if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", upwelled_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 
-        status = fwrite (&landsat_results[2][0], sizeof (float),
-                         input->thermal.size.s, downwelled_fd);
+        status = fwrite (&intermediate_bands[BAND_DOWNWELLED_RADIANCE][0],
+                         sizeof (float), input->thermal.size.s, downwelled_fd);
         if (status != input->thermal.size.s)
         {
             sprintf (msg, "Writing to %s", downwelled_filename);
+            ERROR_MESSAGE (msg, FUNC_NAME);
+        }
+
+        status = fwrite (&intermediate_bands[BAND_THERMAL][0], sizeof (float),
+                         input->thermal.size.s, thermal_fd);
+        if (status != input->thermal.size.s)
+        {
+            sprintf (msg, "Writing to %s", thermal_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
 #endif
@@ -863,8 +883,6 @@ int calculate_pixel_atmospheric_parameters
 #if OUTPUT_CELL_DESIGNATION_BAND
     free (cell_data);
 #endif
-    free (thermal_data);
-    thermal_data = NULL;
 
     status = free_2d_array ((void **) at_height);
     if (status != SUCCESS)
@@ -872,10 +890,10 @@ int calculate_pixel_atmospheric_parameters
         ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
     }
 
-    status = free_2d_array ((void **) landsat_results);
+    status = free_2d_array ((void **) intermediate_bands);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: landsat_results\n", FUNC_NAME);
+        ERROR_MESSAGE ("Freeing memory: intermediate_bands\n", FUNC_NAME);
     }
 
     /* Close the intermediate binary files */

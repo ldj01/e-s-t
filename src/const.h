@@ -72,14 +72,31 @@
    Only required because a 2d-array was used instead of a data structure.
 */
 typedef enum {
-    LST_LATITUDE = 0,
-    LST_LONGITUDE,
-    LST_HEIGHT,
-    LST_TRANSMISSION,
-    LST_UPWELLED_RADIANCE,
-    LST_DOWNWELLED_RADIANCE,
-    LST_NUM_ELEMENTS
-} LST_RESULTS;
+    MGPE_LATITUDE = 0,
+    MGPE_LONGITUDE,
+    MGPE_HEIGHT,
+    MGPE_TRANSMISSION,
+    MGPE_UPWELLED_RADIANCE,
+    MGPE_DOWNWELLED_RADIANCE,
+    MGPE_NUM_ELEMENTS
+} MODTRAN_GRID_POINT_ELEMENTS;
+
+
+/* Defines index locations in the array of grid points that specify the nine
+   closest grid points */
+typedef enum
+{
+    CC_GRID_POINT,
+    LL_GRID_POINT,
+    LC_GRID_POINT,
+    UL_GRID_POINT,
+    UC_GRID_POINT,
+    UR_GRID_POINT,
+    RC_GRID_POINT,
+    LR_GRID_POINT,
+    DC_GRID_POINT,
+    NUM_GRID_POINTS
+} GRID_POINT_INDEXES;
 
 
 #endif

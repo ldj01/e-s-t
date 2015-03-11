@@ -274,7 +274,7 @@ int convert_sh_rh
 /******************************************************************************
 MODULE:  read_std_mid_lat_summer_atmos
 
-PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+PURPOSE: Reads the standard atmosphere into memory
 
 RETURN: SUCCESS
         FAILURE
@@ -334,7 +334,7 @@ int read_std_mid_lat_summer_atmos
 /******************************************************************************
 MODULE:  read_narr_parameter_values
 
-PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+PURPOSE: Reads the NARR parameter values into memory
 
 RETURN: SUCCESS
         FAILURE
@@ -413,7 +413,7 @@ int read_narr_parameter_values
 /******************************************************************************
 MODULE:  build_modtran_input
 
-PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
+PURPOSE: Creates directories and writes tape5 files
 
 RETURN: SUCCESS
         FAILURE
@@ -474,6 +474,7 @@ int build_modtran_input
     double time;
     double time_diff;
     FILE *fd;
+    FILE *point_list_fd;
     double *stan_height;
     double *stan_pre;
     double *stan_temp;
@@ -1016,6 +1017,14 @@ int build_modtran_input
         RETURN_ERROR ("Allocating temp_rh memory", FUNC_NAME, FAILURE);
     }
 
+    /* Create a point list / directory names that can be used later
+       to delete them */
+    point_list_fd = fopen ("point_list.txt", "w");
+    if (point_list_fd == NULL)
+    {
+        RETURN_ERROR ("Opening file: point_list.txt\n", FUNC_NAME, FAILURE);
+    }
+
     for (point = 0; point < num_points; point++)
     {
         /* ****************************************************************
@@ -1075,6 +1084,9 @@ int build_modtran_input
             }
         }
 
+        /* Save the directory name to the point list file */
+        fprintf (point_list_fd, "%s\n", current_point);
+
         /* determine latitude and longitude of current NARR point and insert
            into tail file */
         /* TODO - The sed commands could be combined into one to save
@@ -1083,11 +1095,11 @@ int build_modtran_input
                   "cat %s/modtran_tail.txt"
                   " | sed 's/latitu/%s/'"
                   " | sed 's/longit/%s/'"
-                  " | sed 's/jay/%d/' > newTail.txt",
+                  " | sed 's/jay/%d/' > new_tail.txt",
                   lst_data_dir, lat_str, lon_str, input->meta.acq_date.doy);
         if (system (command) != SUCCESS)
         {
-            RETURN_ERROR ("Failed creating newTail.txt", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Failed creating new_tail.txt", FUNC_NAME, FAILURE);
         }
 
         /* Clear the temp memory */
@@ -1274,10 +1286,10 @@ int build_modtran_input
 
             /* write atmospheric layers to a text file in format proper for
                tape5 file */
-            fd = fopen ("tempLayers.txt", "w");
+            fd = fopen ("temp_layers.txt", "w");
             if (fd == NULL)
             {
-                RETURN_ERROR ("Opening file: tempLayers.txt\n",
+                RETURN_ERROR ("Opening file: temp_layers.txt\n",
                               FUNC_NAME, FAILURE);
             }
 
@@ -1293,7 +1305,7 @@ int build_modtran_input
             /* Close the intermediate file */
             if (fclose (fd) != SUCCESS)
             {
-                RETURN_ERROR ("Closing file: tempLayers.txt\n",
+                RETURN_ERROR ("Closing file: temp_layers.txt\n",
                               FUNC_NAME, FAILURE);
             }
             fd = NULL;
@@ -1304,7 +1316,7 @@ int build_modtran_input
                       "cat %s/modtran_head.txt"
                       " | sed 's/nml/%d/'"
                       " | sed 's/gdalt/%5.3f/'"
-                      " > baseHead.txt",
+                      " > base_head.txt",
                       lst_data_dir, curr_layer, gndalt[elevation]);
             if (system (command) != SUCCESS)
             {
@@ -1359,9 +1371,9 @@ int build_modtran_input
                    location and ground altitude with variables for temperature
                    and albedo substituted file */
                 snprintf (command, sizeof (command),
-                          "cat baseHead.txt"
-                          " tempLayers.txt"
-                          " newTail.txt"
+                          "cat base_head.txt"
+                          " temp_layers.txt"
+                          " new_tail.txt"
                           " | sed 's/tmp/%s/'"
                           " | sed 's/alb/%4.2f/'"
                           " > %s/tape5",
@@ -1397,6 +1409,12 @@ int build_modtran_input
         } /* END - ground altitude ran by MODTRAN */
     } /* END - number of points */
 
+    /* Close the point_list.txt file */
+    if (fclose (point_list_fd) != SUCCESS)
+    {
+        RETURN_ERROR ("Closing file: point_list.txt\n", FUNC_NAME, FAILURE);
+    }
+
     /* Free the temp memory */
     free(temp_height);
     free(temp_pressure);
@@ -1419,42 +1437,46 @@ int build_modtran_input
 
     if (debug)
     {
-        /* write caseList to a file */
-        fd = fopen ("caseList", "w");
+        /* write case_list.txt to a file */
+        fd = fopen ("case_list.txt", "w");
         if (fd == NULL)
         {
-            RETURN_ERROR ("Opening file: caseList\n", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Opening file: case_list.txt\n",
+                          FUNC_NAME, FAILURE);
         }
 
-        /* Write out the caseList file */
+        /* Write out the case_list.txt file */
         for (index = 0; index < num_points * NUM_ELEVATIONS * 3; index++)
         {
             fprintf (fd, "%s\n", points->modtran_runs[index].path);
         }
 
-        /* Close the caseList file */
+        /* Close the case_list.txt file */
         if (fclose (fd) != SUCCESS)
         {
-            RETURN_ERROR ("Closing file: caseList\n", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Closing file: case_list.txt\n",
+                          FUNC_NAME, FAILURE);
         }
 
-        /* write commandList to a file */
-        fd = fopen ("commandList", "w");
+        /* write command_list.txt to a file */
+        fd = fopen ("command_list.txt", "w");
         if (fd == NULL)
         {
-            RETURN_ERROR ("Opening file: commandList\n", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Opening file: command_list.txt\n",
+                          FUNC_NAME, FAILURE);
         }
 
-        /* Write out the commandList file */
+        /* Write out the command_list.txt file */
         for (index = 0; index < num_modtran_runs; index++)
         {
             fprintf (fd, "%s\n", points->modtran_runs[index].command);
         }
 
-        /* Close the commandList file */
+        /* Close the command_list.txt file */
         if (fclose (fd) != SUCCESS)
         {
-            RETURN_ERROR ("Closing file: commandList\n", FUNC_NAME, FAILURE);
+            RETURN_ERROR ("Closing file: command_list.txt\n",
+                          FUNC_NAME, FAILURE);
         }
         fd = NULL;
     }

@@ -728,11 +728,11 @@ Date        Programmer       Reason
 #define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
 int calculate_point_atmospheric_parameters
 (
-    Input_t *input,            /* I: input structure */
+    Input_t *input,            /* I: Input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    double albedo,             /* I: albedo */
-    double **modtran_results,  /* O: atmospheric parameter for modtarn run */
-    bool verbose               /* I: value to indicate if intermediate
+    double albedo,             /* I: Albedo */
+    double **modtran_results,  /* O: Atmospheric parameters from modtran runs */
+    bool verbose               /* I: Value to indicate if intermediate
                                      messages should be printed */
 )
 {
@@ -902,11 +902,11 @@ int calculate_point_atmospheric_parameters
             result_loc = i * NUM_ELEVATIONS + j;
 
             /* put results into MODTRAN results array */
-            modtran_results[result_loc][LST_LATITUDE] =
+            modtran_results[result_loc][MGPE_LATITUDE] =
                 points->modtran_runs[counter].latitude;
-            modtran_results[result_loc][LST_LONGITUDE] =
+            modtran_results[result_loc][MGPE_LONGITUDE] =
                 points->modtran_runs[counter].longitude;
-            modtran_results[result_loc][LST_HEIGHT] =
+            modtran_results[result_loc][MGPE_HEIGHT] =
                 points->modtran_runs[counter].height;
 
             /* Read the lst_modtran.info file for the 000 execution
@@ -1050,9 +1050,9 @@ int calculate_point_atmospheric_parameters
                   - (temp_radiance_0 * emissivity)) * inv_albedo;
 
             /* Place results into MODTRAN results array */
-            modtran_results[result_loc][LST_TRANSMISSION] = tau;
-            modtran_results[result_loc][LST_UPWELLED_RADIANCE] = lu;
-            modtran_results[result_loc][LST_DOWNWELLED_RADIANCE] = ld;
+            modtran_results[result_loc][MGPE_TRANSMISSION] = tau;
+            modtran_results[result_loc][MGPE_UPWELLED_RADIANCE] = lu;
+            modtran_results[result_loc][MGPE_DOWNWELLED_RADIANCE] = ld;
 
             /* Free the allocated memory in the loop */
             if (free_2d_array ((void **) current_data) != SUCCESS)
@@ -1075,25 +1075,25 @@ int calculate_point_atmospheric_parameters
 
     /* Output the results to a file */
     snprintf (current_file, sizeof (current_file),
-              "atmosphericParameters.txt");
+              "atmospheric_parameters.txt");
     snprintf (msg, sizeof (msg),
               "Creating Atmospheric Parameters File = [%s]\n", current_file);
     LOG_MESSAGE (msg, FUNC_NAME);
     fd = fopen (current_file, "w");
     if (fd == NULL)
     {
-        RETURN_ERROR ("Can't open atmosphericParameters.txt file",
+        RETURN_ERROR ("Can't open atmospheric_parameters.txt file",
                       FUNC_NAME, FAILURE);
     }
     for (k = 0; k < points->num_points * NUM_ELEVATIONS; k++)
     {
         fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
-                 modtran_results[k][LST_LATITUDE],
-                 modtran_results[k][LST_LONGITUDE],
-                 modtran_results[k][LST_HEIGHT],
-                 modtran_results[k][LST_TRANSMISSION],
-                 modtran_results[k][LST_UPWELLED_RADIANCE],
-                 modtran_results[k][LST_DOWNWELLED_RADIANCE]);
+                 modtran_results[k][MGPE_LATITUDE],
+                 modtran_results[k][MGPE_LONGITUDE],
+                 modtran_results[k][MGPE_HEIGHT],
+                 modtran_results[k][MGPE_TRANSMISSION],
+                 modtran_results[k][MGPE_UPWELLED_RADIANCE],
+                 modtran_results[k][MGPE_DOWNWELLED_RADIANCE]);
     }
     fclose (fd);
 
