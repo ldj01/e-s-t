@@ -1,6 +1,7 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include <time.h>
 
 
@@ -16,8 +17,12 @@
 #include "calculate_pixel_atmospheric_parameters.h"
 
 
+/* These are for compile time debugging logic.
+   Set them to 0 to turn them off.
+   They need to be set to 1 for production/standard processing. */
 #define RUN_MODTRAN 0
 #define EXTRACT_TAPE6_RESULTS 0
+
 
 /******************************************************************************
 METHOD:  lst
@@ -33,12 +38,6 @@ SUCCESS         Processing was successful
 
 PROJECT:  Land Satellites Data System Science Research and Development (LSRD)
           at the USGS EROS
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-3/15/2013   Song Guo         Original Development
-
 ******************************************************************************/
 int
 main (int argc, char *argv[])
@@ -232,7 +231,7 @@ main (int argc, char *argv[])
     /* Allocate memory for MODTRAN results */
     modtran_results =
         (double **) allocate_2d_array (points.num_points * NUM_ELEVATIONS,
-                                       LST_NUM_ELEMENTS, sizeof (double));
+                                       MGPE_NUM_ELEMENTS, sizeof (double));
     if (modtran_results == NULL)
     {
         RETURN_ERROR ("Allocating MODTRAN results memory", FUNC_NAME,
@@ -336,45 +335,39 @@ main (int argc, char *argv[])
                       EXIT_FAILURE);
     }
 
-#if NOT_TESTED
-    /* Delete temporary file */
-    if (system ("rm newHead*") != SUCCESS)
+    if (!debug)
     {
-        RETURN_ERROR ("Deleting newHead* files\n", FUNC_NAME, EXIT_FAILURE);
-    }
+        /* Delete temporary file */
+        if (unlink ("atmospheric_parameters.txt") != SUCCESS)
+        {
+            RETURN_ERROR ("Deleting atmospheric_parameters.txt files\n",
+                          FUNC_NAME, EXIT_FAILURE);
+        }
 
-    if (system ("rm newTail*") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting newTail* files\n", FUNC_NAME, EXIT_FAILURE);
-    }
+        if (unlink ("base_head.txt") != SUCCESS)
+        {
+            RETURN_ERROR ("Deleting baseHead.txt files\n", FUNC_NAME,
+                          EXIT_FAILURE);
+        }
 
-    if (system ("rm tempLayers.txt") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting tempLayers file\n", FUNC_NAME, EXIT_FAILURE);
-    }
+        if (unlink ("new_tail.txt") != SUCCESS)
+        {
+            RETURN_ERROR ("Deleting newTail.txt files\n", FUNC_NAME,
+                          EXIT_FAILURE);
+        }
 
-    /* Delete temporary directories */
-    if (system ("\rm -r HGT*") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting HGT* directories\n", FUNC_NAME, EXIT_FAILURE);
-    }
+        if (unlink ("temp_layers.txt") != SUCCESS)
+        {
+            RETURN_ERROR ("Deleting tempLayers.txt file\n", FUNC_NAME,
+                          EXIT_FAILURE);
+        }
 
-    if (system ("\rm -r SHUM*") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting SHUM* directories\n", FUNC_NAME, EXIT_FAILURE);
+        if (unlink ("used_points.txt") != SUCCESS)
+        {
+            RETURN_ERROR ("Deleting used_points.txt file\n", FUNC_NAME,
+                          EXIT_FAILURE);
+        }
     }
-
-    if (system ("\rm -r TMP*") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting TMP* directories\n", FUNC_NAME, EXIT_FAILURE);
-    }
-
-    if (system ("\rm -r 4?.*_*") != SUCCESS)
-    {
-        RETURN_ERROR ("Deleting temporary directories\n", FUNC_NAME,
-                      EXIT_FAILURE);
-    }
-#endif
 
     time (&now);
     snprintf (msg_str, sizeof(msg_str),
