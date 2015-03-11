@@ -19,6 +19,8 @@
 
 import os
 import sys
+import shutil
+import glob
 import errno
 import re
 import commands
@@ -234,20 +236,7 @@ def process_lst(args, base_aux_dir):
     logger = logging.getLogger(__name__)
 
     # ------------------------------------------------------------------------
-    # Retrieve and initial processing of the required AUX data
-#    cmd = ['extract_aux_data.py', '--xml', args.xml_filename]
-#    cmd = ' '.join(cmd)
-#    output = ''
-#    try:
-#        logger.info("Calling [{0}]".format(cmd))
-#        output = execute_cmd(cmd)
-#    except Exception, e:
-#        logger.error("Failed processing lst_download_extract_aux_data.py")
-#        raise e
-#    finally:
-#        if len(output) > 0:
-#            logger.info(output)
-
+    # Retrieval and initial processing of the required AUX data
     try:
         logger.info("Extracting LST AUX data")
 
@@ -270,21 +259,21 @@ def process_lst(args, base_aux_dir):
     emi_filename = '{0}_emissivity.img'.format(product_id)
 
     # ------------------------------------------------------------------------
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emnissivity data needs to be retrieved here and
+    # TODO TODO TODO - The emissivity data needs to be retrieved here and
     # TODO TODO TODO - processed.  Processed to required input???
     # ------------------------------------------------------------------------
 
@@ -295,6 +284,9 @@ def process_lst(args, base_aux_dir):
            '--dem', dem_filename,
            '--emi', emi_filename,
            '--verbose']
+    if args.debug:
+        cmd.append('--debug')
+
     cmd = ' '.join(cmd)
     output = ''
     try:
@@ -308,7 +300,28 @@ def process_lst(args, base_aux_dir):
             logger.info(output)
 
     # ------------------------------------------------------------------------
-    # TODO TODO TODO - Don't know if anything here yet, except maybe cleanup
+    # Cleanup
+    if not args.debug:
+
+        # Remove the grib extraction directories
+        shutil.rmtree('HGT_1', ignore_errors=True)
+        shutil.rmtree('HGT_2', ignore_errors=True)
+        shutil.rmtree('SPFH_1', ignore_errors=True)
+        shutil.rmtree('SPFH_2', ignore_errors=True)
+        shutil.rmtree('TMP_1', ignore_errors=True)
+        shutil.rmtree('TMP_2', ignore_errors=True)
+
+        # Remove the point directories generated during the core processing
+        remove_dirs = set()
+        with open('point_list.txt', "r") as point_list_fd:
+            remove_dirs = set(list([line.strip()
+                                    for line in point_list_fd.readlines()]))
+
+        for dirname in remove_dirs:
+            shutil.rmtree(dirname, ignore_errors=False)
+
+        os.unlink('point_list.txt')
+
     # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
@@ -340,6 +353,11 @@ if __name__ == '__main__':
                         action='store_true', dest='only_extract_aux_data',
                         required=False, default=False,
                         help="Stop after extracting the AUX data")
+
+    parser.add_argument('--debug',
+                        action='store_true', dest='debug',
+                        required=False, default=False,
+                        help="Keep any debugging data")
 
     # Parse the command line parameters
     args = parser.parse_args()
