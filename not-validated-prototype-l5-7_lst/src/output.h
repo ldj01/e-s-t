@@ -2,13 +2,6 @@
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
-#include <stdbool.h>
-#include <stdint.h>
-
-#include "espa_metadata.h"
-
-#include "const.h"
-
 
 int
 add_lst_band_product
