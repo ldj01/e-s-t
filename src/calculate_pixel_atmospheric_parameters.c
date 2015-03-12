@@ -18,7 +18,7 @@
 /* These are for compile time debugging logic.
    Set them to 0 to turn them off.
    They need to be set to 0 for production/standard processing. */
-#define OUTPUT_CELL_DESIGNATION_BAND 1
+#define OUTPUT_CELL_DESIGNATION_BAND 0
 #define OUTPUT_INTERMEDIATE_BANDS 1
 
 
@@ -57,6 +57,7 @@ typedef enum
 } CELL_POINTS;
 
 
+/* Defines index locations for the parameters in the at_height array */
 typedef enum
 {
     AHP_TRANSMISSION,
@@ -107,7 +108,7 @@ NOTE: Simpson's Rule is applied for integrating the longitudinal distance
 
 ******************************************************************************/
 #define INV_UTM_EQUATORIAL_RADIUS (1.0 / UTM_EQUATORIAL_RADIUS)
-#define INV_TWO (0.5) // (1.0 / 2.0)
+#define INV_TWO (0.5)
 #define INV_SIX (1.0 / 6.0)
 double distance_in_utm
 (
@@ -340,7 +341,6 @@ PURPOSE: Determines the distances for the current set of grid points.
 
 NOTE: The indexes of the grid points are assumed to be populated.
 
-RETURN: None
 *****************************************************************************/
 void determine_grid_point_distances
 (
