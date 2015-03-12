@@ -222,7 +222,9 @@ int build_points
     char FUNC_NAME[] = "build_points";
 
     char *lst_data_dir = NULL;
+#if 0
     char msg[PATH_MAX];
+#endif
 
     double **lat;
     double **lon;
@@ -237,10 +239,10 @@ int build_points
     int num_bytes;
     int index;
 
-    double buffered_ul_lat;
-    double buffered_ul_lon;
-    double buffered_lr_lat;
-    double buffered_lr_lon;
+    double buffered_north_lat;
+    double buffered_south_lat;
+    double buffered_east_lon;
+    double buffered_west_lon;
 
     /* Grab the environment path to the LST_DATA_DIR */
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -266,7 +268,7 @@ int build_points
     /* Read the coordinates into memory */
     if (read_narr_coordinates (lst_data_dir, lat, lon) != SUCCESS)
     {
-        RETURN_ERROR ("Failed loading HGT_1 parameters", FUNC_NAME, FAILURE);
+        RETURN_ERROR ("Failed reading NARR coordinates", FUNC_NAME, FAILURE);
     }
 
     /* expand range to include NARR points outside image for edge pixels */
@@ -277,10 +279,10 @@ int build_points
               This is probably only a CONUS quick and dirty solution.
 
        NOTE - MERRA is even farther apart so this will not work for that. */
-    buffered_ul_lat = input->meta.ul_geo_corner.lat + 0.2;
-    buffered_ul_lon = input->meta.ul_geo_corner.lon - 0.2;
-    buffered_lr_lat = input->meta.lr_geo_corner.lat - 0.2;
-    buffered_lr_lon = input->meta.lr_geo_corner.lon + 0.2;
+    buffered_north_lat = input->meta.bounding_coords[ESPA_NORTH] + 0.2;
+    buffered_south_lat = input->meta.bounding_coords[ESPA_SOUTH] - 0.2;
+    buffered_east_lon = input->meta.bounding_coords[ESPA_EAST] - 0.2;
+    buffered_west_lon = input->meta.bounding_coords[ESPA_WEST] + 0.2;
 
     /* determine what points in the NARR dataset fall within our buffered
        Landsat area using logical operators lessThanLat and greaterThanLat
@@ -296,10 +298,10 @@ int build_points
     {
         for (col = 0; col < NARR_COLS; col++)
         {
-            if ((buffered_ul_lat > lat[row][col])
-                && (buffered_lr_lat < lat[row][col])
-                && (buffered_ul_lon < lon[row][col])
-                && (buffered_lr_lon > lon[row][col]))
+            if ((buffered_north_lat > lat[row][col])
+                && (buffered_south_lat < lat[row][col])
+                && (buffered_west_lon < lon[row][col])
+                && (buffered_east_lon > lon[row][col]))
             {
                 min_row = min (min_row, row);
                 max_row = max (max_row, row);
@@ -310,10 +312,10 @@ int build_points
     }
 
     /* Save these in the points structure */
-    points->ul_lat = buffered_ul_lat;
-    points->ul_lon = buffered_ul_lon;
-    points->lr_lat = buffered_lr_lat;
-    points->lr_lon = buffered_lr_lon;
+    points->buffered_coords[ESPA_NORTH] = buffered_north_lat;
+    points->buffered_coords[ESPA_SOUTH] = buffered_south_lat;
+    points->buffered_coords[ESPA_EAST] = buffered_east_lon;
+    points->buffered_coords[ESPA_WEST] = buffered_west_lon;
     points->min_row = min_row;
     points->max_row = max_row;
     points->min_col = min_col;
@@ -322,6 +324,7 @@ int build_points
     points->num_cols = max_col - min_col + 1;
     points->num_points = points->num_rows * points->num_cols;
 
+#if 0
     snprintf (msg, sizeof (msg), "min_row = %d\n", points->min_row);
     LOG_MESSAGE (msg, FUNC_NAME);
 
@@ -342,6 +345,7 @@ int build_points
 
     snprintf (msg, sizeof (msg), "num_points = %d\n", points->num_points);
     LOG_MESSAGE (msg, FUNC_NAME);
+#endif
 
     /* Initialize this pointer */
     points->modtran_runs = NULL;
@@ -398,6 +402,7 @@ int build_points
             /* Row and col are not used, but maintained for debugging */
             points->row[index] = row;
             points->col[index] = col;
+
             points->lat[index] = lat[row][col];
             points->lon[index] = lon[row][col];
 
