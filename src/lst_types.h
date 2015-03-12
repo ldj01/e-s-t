@@ -1,8 +1,8 @@
+
 #ifndef LST_TYPES_H
 #define LST_TYPES_H
 
 
-#include <stdbool.h>
 #include <limits.h>
 
 
@@ -13,16 +13,12 @@ typedef struct
     double latitude;
     double longitude;
     double height;
-    bool run_modtran;
 } MODTRAN_INFO;
 
 
 typedef struct
 {
-    double ul_lat;
-    double ul_lon;
-    double lr_lat;
-    double lr_lon;
+    double buffered_coords[4];
 
     int min_row;
     int max_row;
@@ -42,7 +38,6 @@ typedef struct
     double *lon;
     double *utm_easting;
     double *utm_northing;
-    bool *use_point;
 } REANALYSIS_POINTS;
 
 
