@@ -430,8 +430,6 @@ MODULE:  linear_interpolate_over_modtran
 
 PURPOSE: Simulate IDL (interpol) function for LST.
 
-RETURN: SUCCESS
-        FAILURE
 ******************************************************************************/
 void linear_interpolate_over_modtran
 (
@@ -577,7 +575,6 @@ METHOD:  matrix_transpose_2x2
 
 PURPOSE: Transposes a 2x2 matrix, producing a 2x2 result.
 
-RETURN: None
 *****************************************************************************/
 void matrix_transpose_2x2(double *A, double *out)
 {
@@ -609,7 +606,6 @@ METHOD:  matrix_inverse_2x2
 
 PURPOSE: Inverts a 2x2 matrix, producing a 2x2 result.
 
-RETURN: None
 *****************************************************************************/
 void matrix_inverse_2x2(double *A, double *out)
 {
@@ -645,7 +641,6 @@ METHOD:  matrix_multiply_2x2_2x2
 
 PURPOSE: Multiply a 2x2 matrix with a 2x2 matrix, producing a 2x2 result.
 
-RETURN: None
 *****************************************************************************/
 void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
 {
@@ -682,7 +677,6 @@ METHOD:  matrix_multiply_2x2_2x1
 
 PURPOSE: Multiply a 2x2 matrix with a 2x1 matrix, producing a 2x1 result.
 
-RETURN: None
 *****************************************************************************/
 void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 {
