@@ -1,3 +1,4 @@
+
 #ifndef INPUT_H
 #define INPUT_H
 
@@ -75,6 +76,7 @@ typedef struct
     Geo_coord_t lr_geo_corner;  /* Geo projection coordinates of the lower
                                    right corner of the pixel in the lower right
                                    corner of the image */
+    double bounding_coords[4];  /* Bounding Coordinates */
 } Input_meta_t;
 
 

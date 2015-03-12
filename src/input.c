@@ -2,17 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+
 #include "const.h"
 #include "utilities.h"
 #include "input.h"
 
 
-/* Functions */
-Input_t *
-OpenInput
-(
-    Espa_internal_meta_t *metadata
-)
 /*****************************************************************************
 
 Description: 'OpenInput' sets up the 'input' data structure, opens the
@@ -24,9 +19,12 @@ Input Parameters:
 Output Parameters:
     (returns)      'input' data structure or NULL when an error occurs
 
-Team Unique Header:
-
 *****************************************************************************/
+Input_t *
+OpenInput
+(
+    Espa_internal_meta_t *metadata
+)
 {
     char FUNC_NAME[] = "OpenInput";
     Input_t *input = NULL;
@@ -197,8 +195,6 @@ GetInputThermLine
 }
 
 
-bool
-CloseInput (Input_t *input)
 /*****************************************************************************
 
 Description: 'CloseInput' ends SDS access and closes the input file.
@@ -214,6 +210,8 @@ Output Parameters:
                'false' = error return
 
 *****************************************************************************/
+bool
+CloseInput (Input_t *input)
 {
     char FUNC_NAME[] = "CloseInput";
 
@@ -233,8 +231,6 @@ Output Parameters:
 }
 
 
-bool
-FreeInput (Input_t *input)
 /*****************************************************************************
 
 Description: 'FreeInput' frees the 'input' data structure memory.
@@ -247,6 +243,8 @@ Output Parameters:
                   'true' = okay (always returned)
 
 *****************************************************************************/
+bool
+FreeInput (Input_t *input)
 {
     free (input->thermal.filename);
     input->thermal.filename = NULL;
@@ -266,8 +264,6 @@ Output Parameters:
 #define INVALID_INSTRUMENT_COMBO ("invalid insturment/satellite combination")
 
 
-bool
-GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
 /*****************************************************************************
 
 Description: 'GetXMLInput' pulls input values from the XML structure.
@@ -285,6 +281,8 @@ Design Notes:
     1. This replaces the previous GetInputMeta so the input values are pulled
        from the XML file instead of the HDF and MTL files.
 *****************************************************************************/
+bool
+GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
 {
     char FUNC_NAME[] = "GetXMLInput";
     char acq_date[DATE_STRING_LEN + 1];
@@ -358,7 +356,6 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-//        snprintf (band_name, sizeof (band_name), "band6");
         input->thermal.band_name = strdup ("band6");
     }
     else if (input->meta.instrument == INST_ETM)
@@ -369,7 +366,6 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-//        snprintf (band_name, sizeof (band_name), "band61");
         input->thermal.band_name = strdup ("band61");
     }
     else if (input->meta.instrument == INST_OLI_TIRS)
@@ -380,7 +376,6 @@ Design Notes:
         }
 
         /* Specify the band name for the thermal band to use */
-//        snprintf (band_name, sizeof (band_name), "band10");
         input->thermal.band_name = strdup ("band10");
     }
 
@@ -430,6 +425,16 @@ Design Notes:
     input->meta.lr_geo_corner.lat = metadata->global.lr_corner[0];
     input->meta.lr_geo_corner.lon = metadata->global.lr_corner[1];
     input->meta.lr_geo_corner.is_fill = true;
+
+    /* Get the bounding coordinates */
+    input->meta.bounding_coords[ESPA_NORTH] =
+        metadata->global.bounding_coords[ESPA_NORTH];
+    input->meta.bounding_coords[ESPA_SOUTH] =
+        metadata->global.bounding_coords[ESPA_SOUTH];
+    input->meta.bounding_coords[ESPA_EAST] =
+        metadata->global.bounding_coords[ESPA_EAST];
+    input->meta.bounding_coords[ESPA_WEST] =
+        metadata->global.bounding_coords[ESPA_WEST];
 
     /* Convert the acquisition date/time values */
     snprintf (acq_date, sizeof (acq_date), global->acquisition_date);
