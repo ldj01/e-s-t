@@ -1,3 +1,4 @@
+
 #ifndef BUILD_MODTRAN_INPUT_H
 #define BUILD_MODTRAN_INPUT_H
 

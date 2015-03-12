@@ -102,10 +102,6 @@ int convert_geopotential_geometric
         cos_2lat = cos (2.0 * radlat[i]);
 
         /* Determine the radius at the latitude in meters */
-        /* TODO TODO TODO - if the r_min and r_max were meters to start with,
-                            then we would not have to multiply by 1000.0 here
-                            to get meters.  Or at least that is what I
-                            currently assume is happening. */
         radius[i] = 1000.0
                     * sqrt (1.0 / (((cos_lat * cos_lat) * inv_r_max_sqrd)
                                    + ((sin_lat * sin_lat) * inv_r_min_sqrd)));
@@ -164,7 +160,8 @@ int convert_sh_rh
 )
 {
     char FUNC_NAME[] = "convert_sh_rh";
-    int i, j;
+    int layer;
+    int point;
     double mh20 = 18.01534;
     double mdry = 28.9644;
 
@@ -208,41 +205,46 @@ int convert_sh_rh
         RETURN_ERROR ("Allocating  memory", FUNC_NAME, FAILURE);
     }
 
-    for (i = 0; i < P_LAYER; i++)
+    for (layer = 0; layer < P_LAYER; layer++)
     {
-        for (j = 0; j < num_points; j++)
+        for (point = 0; point < num_points; point++)
         {
             /* Convert temperature to C */
-            temp_c[i][j] = temp_k[i][j] - 273.15;
+            temp_c[layer][point] = temp_k[layer][point] - 273.15;
 
-            /* calculate vapor pressure at given temperature */
-            ewater[i][j] = a0w + temp_c[i][j]
-                           * (a1w + temp_c[i][j]
-                              * (a2w + temp_c[i][j]
-                                 * (a3w + temp_c[i][j]
-                                    * (a4w + temp_c[i][j]
-                                       * (a5w + temp_c[i][j]
-                                          * (a6w * temp_c[i][j]))))));/* hpa */
+            /* calculate vapor pressure at given temperature - hpa */
+            ewater[layer][point] = a0w + temp_c[layer][point]
+                           * (a1w + temp_c[layer][point]
+                              * (a2w + temp_c[layer][point]
+                                 * (a3w + temp_c[layer][point]
+                                    * (a4w + temp_c[layer][point]
+                                       * (a5w + temp_c[layer][point]
+                                          * (a6w * temp_c[layer][point]))))));
 
-            goff[i][j] = -7.90298 * (373.16 / temp_k[i][j] - 1.0)
-                         + 5.02808 * log10 (373.16 / temp_k[i][j])
-                         - 1.3816e-7 * pow (10.0, (11.344
-                                                   * (1.0
-                                                      - (temp_k[i][j]
+            goff[layer][point] = -7.90298 * (373.16 / temp_k[layer][point]
+                                             - 1.0)
+                                 + 5.02808 * log10 (373.16
+                                                    / temp_k[layer][point])
+                                 - 1.3816e-7
+                                 * pow (10.0, (11.344
+                                               * (1.0 - (temp_k[layer][point]
                                                          / 373.16)))
-                                                  - 1.0)
-                         + 8.1328e-3 * pow (10.0, (-3.49149
-                                                   * (373.16 / temp_k[i][j]
-                                                      - 1.0))
-                                                  - 1.0)
-                         + log10 (1013.246); /* hPa */
+                                        - 1.0)
+                                 + 8.1328e-3
+                                 * pow (10.0, (-3.49149
+                                               * (373.16 / temp_k[layer][point]
+                                                  - 1.0))
+                                        - 1.0)
+                                 + log10 (1013.246); /* hPa */
 
-            ph20[i][j] = (spec_hum[i][j] * pressure[i][j] * mdry)
-                         / (mh20
-                            - spec_hum[i][j] * mh20
-                            + spec_hum[i][j] * mdry);
+            ph20[layer][point] = (spec_hum[layer][point]
+                                  * pressure[layer][point] * mdry)
+                                 / (mh20
+                                    - spec_hum[layer][point] * mh20
+                                    + spec_hum[layer][point] * mdry);
 
-            rh[i][j] = (ph20[i][j] / pow (10.0, goff[i][j])) * 100.0;
+            rh[layer][point] = (ph20[layer][point]
+                                / pow (10.0, goff[layer][point])) * 100.0;
         }
     }
 
@@ -289,7 +291,7 @@ int read_std_mid_lat_summer_atmos
 )
 {
     char FUNC_NAME[] = "read_std_mid_lat_summer_atmos";
-    int i;
+    int layer;
     int count;
     char atmos_file[PATH_MAX];
     FILE *fd = NULL;
@@ -311,10 +313,11 @@ int read_std_mid_lat_summer_atmos
                       FUNC_NAME, FAILURE);
     }
 
-    for (i = 0; i < STANDARD_LAYERS; i++)
+    for (layer = 0; layer < STANDARD_LAYERS; layer++)
     {
-        if (fscanf (fd, "%lf %lf %lf %lf", &stan_height[i], &stan_pre[i],
-                    &stan_temp[i], &stan_rh[i]) == EOF)
+        if (fscanf (fd, "%lf %lf %lf %lf",
+                    &stan_height[layer], &stan_pre[layer],
+                    &stan_temp[layer], &stan_rh[layer]) == EOF)
         {
             RETURN_ERROR ("End of file (EOF) is met before STANDARD_LAYERS"
                           " lines", FUNC_NAME, FAILURE);
@@ -349,17 +352,19 @@ int read_narr_parameter_values
     char FUNC_NAME[] = "read_narr_parameter_values";
     char msg_str[MAX_STR_LEN];
     char parm_filename[PATH_MAX];
-    int i, j;
+    int layer;
+    int point;
     int count;
-    int file_rows, file_cols;
+    int file_rows;
+    int file_cols;
     FILE *fd = NULL;
 
     /* Read each layers parameter file into memory */
-    for (i = 0; i < P_LAYER; i++)
+    for (layer = 0; layer < P_LAYER; layer++)
     {
         /* Build the full path to the parameter file */
         count = snprintf (parm_filename, sizeof (parm_filename),
-                           "%s/%d%s", parameter, layers[i], ".txt");
+                           "%s/%d%s", parameter, layers[layer], ".txt");
         if (count < 0 || count >= sizeof (parm_filename))
         {
             RETURN_ERROR ("Failed initializing parm_filename variable for"
@@ -387,9 +392,9 @@ int read_narr_parameter_values
         }
 
         /* Read the values into memory */
-        for (j = 0; j < NARR_ROWS * NARR_COLS; j++)
+        for (point = 0; point < NARR_ROWS * NARR_COLS; point++)
         {
-            if (fscanf (fd, "%lf", &output_2d_array[i][j]) == EOF)
+            if (fscanf (fd, "%lf", &output_2d_array[layer][point]) == EOF)
             {
                 RETURN_ERROR ("End of file (EOF) is met before "
                               "NARR_ROWS * NARR_COLS lines",
@@ -401,7 +406,7 @@ int read_narr_parameter_values
         if (fclose (fd) != SUCCESS)
         {
             snprintf(msg_str, sizeof (msg_str),
-                     "Closing file: %s/%d.txt\n", parameter, layers[i]);
+                     "Closing file: %s/%d.txt\n", parameter, layers[layer]);
             RETURN_ERROR (msg_str, FUNC_NAME, FAILURE);
         }
     }
@@ -434,6 +439,7 @@ int build_modtran_input
 )
 {
     char FUNC_NAME[] = "build_modtran_input";
+
     double **hgt1;
     double **spfh1;
     double **tmp1;
