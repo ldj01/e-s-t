@@ -178,8 +178,10 @@ GetInputThermLine
                     (float) ((input->thermal.toa_gain * line_uint8[sample])
                              + input->thermal.toa_bias);
 
-                /* If L5 data, it needs some adjustment, I don't know why...
-                   ???? it was in the original code ???? */
+                /* If L5 data, it needs some adjustment.
+                   TODO - Whenever CALVAL gets around to fixing the CPF, then
+                          we will no longer need to perform this operation
+                          since the CPF will take care of it.  */
                 if (input->meta.instrument == INST_TM
                     && input->meta.satellite == SAT_LANDSAT_5)
                 {
