@@ -20,8 +20,8 @@
 /* These are for compile time debugging logic.
    Set them to 0 to turn them off.
    They need to be set to 1 for production/standard processing. */
-#define RUN_MODTRAN 0
-#define EXTRACT_TAPE6_RESULTS 0
+#define RUN_MODTRAN 1
+#define EXTRACT_TAPE6_RESULTS 1
 
 
 /******************************************************************************
