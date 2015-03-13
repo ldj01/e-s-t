@@ -505,7 +505,8 @@ class AUX_Processor(object):
 if __name__ == '__main__':
     '''
     Description:
-        Performs gathers input parameters and performs the LST processing.
+        Downloads, processes, and archives NARR auxillary data for LST
+        processing.
     '''
 
     # Create a command line arugment parser
