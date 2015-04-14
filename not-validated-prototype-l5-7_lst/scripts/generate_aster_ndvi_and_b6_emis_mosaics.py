@@ -37,12 +37,30 @@ NO_DATA_VALUE = -9999
 SCAN_GAP_DATA_VALUE = 0
 
 
+class LandsatInfo(object):
+    '''
+    Description:
+        Used as a data structure to cleanup parameter passing to routines.
+    '''
+
+    north = None
+    south = None
+    east = None
+    west = None
+    x_pixel_size = None
+    y_pixel_size = None
+    min_x_extent = None
+    max_x_extent = None
+    min_y_extent = None
+    max_y_extent = None
+
+
 # ============================================================================
 def execute_cmd(cmd):
     '''
     Description:
-      Execute a command line and return the terminal output or raise an
-      exception
+        Execute a command line and return the terminal output or raise an
+        exception
 
     Returns:
         output - The stdout and/or stderr from the executed command.
@@ -342,9 +360,7 @@ def mosaic_all_tiles_into_one_raster(src_names, dest_name):
 # ============================================================================
 def warp_raster_to_match_landsat_data(src_name, dest_name,
                                       src_proj4, dest_proj4,
-                                      x_pixel_size, y_pixel_size,
-                                      min_x_utm, min_y_utm,
-                                      max_x_utm, max_y_utm):
+                                      ls_info):
     '''
     Description:
         Executes gdalwarp on the supplied source name to generate a warped
@@ -355,12 +371,13 @@ def warp_raster_to_match_landsat_data(src_name, dest_name,
     logger = logging.getLogger(__name__)
 
     cmd = ['gdalwarp', '-wm', '2048', '-multi',
-           '-tr', str(x_pixel_size), str(y_pixel_size),
+           '-tr', str(ls_info.x_pixel_size), str(ls_info.y_pixel_size),
            '-s_srs', "'" + src_proj4 + "'",
            '-t_srs', "'" + dest_proj4 + "'",
            '-of', 'GTiff',
            '-overwrite', '-te',
-           str(min_x_utm), str(min_y_utm), str(max_x_utm), str(max_y_utm),
+           str(ls_info.min_x_extent), str(ls_info.min_y_extent),
+           str(ls_info.max_x_extent), str(ls_info.max_y_extent),
            '-srcnodata', str(NO_DATA_VALUE),
            '-dstnodata', str(NO_DATA_VALUE)]
     cmd.append(src_name)
@@ -380,9 +397,7 @@ def warp_raster_to_match_landsat_data(src_name, dest_name,
             logger.info(output)
 
 
-def build_b6_emis_data(driver, dest_proj4, north, south, east, west,
-                       x_pixel_size, y_pixel_size,
-                       min_x_utm, max_x_utm, min_y_utm, max_y_utm):
+def build_b6_emis_data(driver, dest_proj4, ls_info):
     '''
     Description:
         Download the ASTER GED tiles that encompass our Landsat scene and
@@ -409,8 +424,8 @@ def build_b6_emis_data(driver, dest_proj4, north, south, east, west,
     # - Generate the B6 EMIS Landsat from the 13 and 14 band data
     eLandsat_b6_emis_filenames = list()
     aster_ndvi_filenames = list()
-    for lat in xrange(int(south), int(north)+1):
-        for lon in xrange(int(west), int(east)+1):
+    for lat in xrange(int(ls_info.south), int(ls_info.north)+1):
+        for lon in xrange(int(ls_info.west), int(ls_info.east)+1):
             # Build the base filename using the positive or negative format
             filename = ''
             if lon < 0:
@@ -474,8 +489,9 @@ def build_b6_emis_data(driver, dest_proj4, north, south, east, west,
 
             # Remove the HDF5 tile since we have extracted all the info we
             # need from it
-            if os.path.exists(h5_file_path):
-                os.unlink(h5_file_path)
+# TODO TODO TODO - TEMP KEEP THEM AROUND
+#            if os.path.exists(h5_file_path):
+#                os.unlink(h5_file_path)
 
             # ----------------------------------------------------------------
             # Determine the minimum and maximum latitude and longitude
@@ -611,22 +627,12 @@ def build_b6_emis_data(driver, dest_proj4, north, south, east, west,
         if os.path.exists(ndvi_filename):
             os.unlink(ndvi_filename)
 
-    # Adjust the UTM coordinates for image extents becuse they are in center
-    # of pixel, and we need to supply the warping with actual extents
-    min_x_utm = min_x_utm - x_pixel_size * 0.5
-    max_x_utm = max_x_utm + x_pixel_size * 0.5
-    min_y_utm = min_y_utm - y_pixel_size * 0.5
-    max_y_utm = max_y_utm + y_pixel_size * 0.5
-
     # Warp estimated Landsat B6 EMIS to match the Landsat data
     try:
         logger.info("Warping estimated Landsat B6 EMIS to match Landsat data")
         warp_raster_to_match_landsat_data(temp_eLandsat_b6_emis_name,
                                           warped_eLandsat_b6_emis_name,
-                                          src_proj4, dest_proj4,
-                                          x_pixel_size, y_pixel_size,
-                                          min_x_utm, min_y_utm,
-                                          max_x_utm, max_y_utm)
+                                          src_proj4, dest_proj4, ls_info)
     except Exception:
         logger.exception("Warping B6 EMIS to match Landsat data")
         raise
@@ -636,10 +642,7 @@ def build_b6_emis_data(driver, dest_proj4, north, south, east, west,
         logger.info("Warping ASTER NDVI to match Landsat data")
         warp_raster_to_match_landsat_data(temp_aster_ndvi_name,
                                           warped_aster_ndvi_name,
-                                          src_proj4, dest_proj4,
-                                          x_pixel_size, y_pixel_size,
-                                          min_x_utm, min_y_utm,
-                                          max_x_utm, max_y_utm)
+                                          src_proj4, dest_proj4, ls_info)
     except Exception:
         logger.exception("Warping ASTER NDVI to match Landsat data")
         raise
@@ -676,8 +679,8 @@ def process(args):
     # Grab the bands metadata object
     bands = espa_xml.get_bands()
 
-    x_pixel_size = -1
-    y_pixel_size = -1
+    ls_info = LandsatInfo()
+
     dest_proj4 = ''
     toa_bt_name = ''
     toa_green_name = ''
@@ -708,8 +711,8 @@ def process(args):
 
         if band.product == "toa_bt" and band.category == "image":
             # Get the output pixel size
-            x_pixel_size = band.pixel_size.x
-            y_pixel_size = band.pixel_size.y
+            ls_info.x_pixel_size = band.pixel_size.x
+            ls_info.y_pixel_size = band.pixel_size.y
 
             toa_bt_name = band.get_file_name()
 
@@ -730,23 +733,26 @@ def process(args):
 
     # Determine the bounding geographic coordinates for the ASTER tiles we
     # will need
-    east = math.ceil(gm.bounding_coordinates.east)
-    west = math.floor(gm.bounding_coordinates.west)
-    north = math.ceil(gm.bounding_coordinates.north)
-    south = math.floor(gm.bounding_coordinates.south)
+    ls_info.north = math.ceil(gm.bounding_coordinates.north)
+    ls_info.south = math.floor(gm.bounding_coordinates.south)
+    ls_info.east = math.ceil(gm.bounding_coordinates.east)
+    ls_info.west = math.floor(gm.bounding_coordinates.west)
 
     # Determine the UTM projection corner points
-    min_x_utm = 0
-    max_x_utm = 0
-    min_y_utm = 0
-    max_y_utm = 0
     for cp in gm.projection_information.corner_point:
         if cp.location == 'UL':
-            min_x_utm = cp.x
-            max_y_utm = cp.y
+            ls_info.min_x_extent = cp.x
+            ls_info.max_y_extent = cp.y
         if cp.location == 'LR':
-            max_x_utm = cp.x
-            min_y_utm = cp.y
+            ls_info.max_x_extent = cp.x
+            ls_info.min_y_extent = cp.y
+
+    # Adjust the UTM coordinates for image extents becuse they are in center
+    # of pixel, and we need to supply the warping with actual extents
+    ls_info.min_x_extent = ls_info.min_x_extent - ls_info.x_pixel_size * 0.5
+    ls_info.max_x_extent = ls_info.max_x_extent + ls_info.x_pixel_size * 0.5
+    ls_info.min_y_extent = ls_info.min_y_extent - ls_info.y_pixel_size * 0.5
+    ls_info.max_y_extent = ls_info.max_y_extent + ls_info.y_pixel_size * 0.5
 
     # Save for later
     satellite = gm.satellite
@@ -857,11 +863,7 @@ def process(args):
     # For convenience the ASTER NDVI is also extracted and warped to the
     # Landsat scenes projection and image extents
     (warped_eLandsat_b6_emis_name,
-     warped_aster_ndvi_name) = build_b6_emis_data(driver, dest_proj4,
-                                                  north, south, east, west,
-                                                  x_pixel_size, y_pixel_size,
-                                                  min_x_utm, max_x_utm,
-                                                  min_y_utm, max_y_utm)
+     warped_aster_ndvi_name) = build_b6_emis_data(driver, dest_proj4, ls_info)
 
     # Load the warped estimated Landsat B6 EMIS into memory
     ds = gdal.Open(warped_eLandsat_b6_emis_name)
