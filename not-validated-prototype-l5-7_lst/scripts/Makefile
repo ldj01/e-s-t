@@ -12,7 +12,7 @@ install:
 	install -m 755 do_lst.py $(PREFIX)/bin
 	install -m 755 download_narr_aux_data.py $(PREFIX)/bin
 	install -m 755 lst_extract_modtran_results.py $(PREFIX)/bin
-	install -m 755 generate_aster_ndvi_and_b6_emis_mosaics.py $(PREFIX)/bin
+	install -m 755 estimate_landsat_emissivity_from_aster_ged.py $(PREFIX)/bin
 
 clean:
 
