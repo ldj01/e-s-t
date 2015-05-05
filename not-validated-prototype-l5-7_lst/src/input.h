@@ -89,8 +89,8 @@ typedef struct
     int band_index;       /* Index in the metadata */
     char *band_name;      /* Band name in the metadata */
     Img_coord_int_t size; /* (line/sample) size */
-    float toa_gain;       /* TOA gain */
-    float toa_bias;       /* TOA bias */
+    float rad_gain;       /* Thermal radiance gain */
+    float rad_bias;       /* Thermal radiance bias */
     int fill_value;       /* Fill value */
     float pixel_size[2];  /* Pixel size (x,y) */
 } Input_band_t;

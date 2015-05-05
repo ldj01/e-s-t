@@ -132,7 +132,7 @@ main (int argc, char *argv[])
 
         printf ("Thermal Band -->\n");
         printf ("  therm_gain: %f\n  therm_bias: %f\n",
-                input->thermal.toa_gain, input->thermal.toa_bias);
+                input->thermal.rad_gain, input->thermal.rad_bias);
 
         printf ("Year, Month, Day, Hour, Minute, Second:"
                 " %d, %d, %d, %d, %d, %f\n",

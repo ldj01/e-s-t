@@ -133,8 +133,8 @@ GetInputThermLine
             else
             {
                 thermal_data[sample] =
-                    (float) ((input->thermal.toa_gain * line_int16[sample])
-                             + input->thermal.toa_bias);
+                    (float) ((input->thermal.rad_gain * line_int16[sample])
+                             + input->thermal.rad_bias);
             }
         }
 
@@ -175,8 +175,8 @@ GetInputThermLine
             else
             {
                 thermal_data[sample] =
-                    (float) ((input->thermal.toa_gain * line_uint8[sample])
-                             + input->thermal.toa_bias);
+                    (float) ((input->thermal.rad_gain * line_uint8[sample])
+                             + input->thermal.rad_bias);
 
                 /* If L5 data, it needs some adjustment.
                    TODO - Whenever CALVAL gets around to fixing the CPF, then
@@ -305,8 +305,8 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     input->thermal.band_name = NULL;
     input->thermal.size.s = -1;
     input->thermal.size.l = -1;
-    input->thermal.toa_gain = GAIN_BIAS_FILL;
-    input->thermal.toa_bias = GAIN_BIAS_FILL;
+    input->thermal.rad_gain = GAIN_BIAS_FILL;
+    input->thermal.rad_bias = GAIN_BIAS_FILL;
     input->thermal.fill_value = INPUT_FILL;
 
     /* Determine satellite */
@@ -394,8 +394,8 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
                 input->thermal.filename =
                     strdup (metadata->band[index].file_name);
 
-                input->thermal.toa_gain = metadata->band[index].toa_gain;
-                input->thermal.toa_bias = metadata->band[index].toa_bias;
+                input->thermal.rad_gain = metadata->band[index].rad_gain;
+                input->thermal.rad_bias = metadata->band[index].rad_bias;
 
                 input->thermal.size.s = metadata->band[index].nsamps;
                 input->thermal.size.l = metadata->band[index].nlines;
@@ -420,7 +420,7 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     input->meta.lr_map_corner.y = metadata->global.proj_info.lr_corner[1];
     input->meta.lr_map_corner.is_fill = true;
 
-    /* Get the geo graphic coordinates */
+    /* Get the geographic coordinates */
     input->meta.ul_geo_corner.lat = metadata->global.ul_corner[0];
     input->meta.ul_geo_corner.lon = metadata->global.ul_corner[1];
     input->meta.ul_geo_corner.is_fill = true;
