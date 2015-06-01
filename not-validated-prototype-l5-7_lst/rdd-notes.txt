@@ -1,0 +1,73 @@
+
+
+
+Phase 1:
+    Retrieve and convert the L1T LPGS product to our internal format.
+
+    How:  Just like we do for processing today.
+        convert_lpgs_to_espa --mtl ????_MTL.txt --xml ????.xml
+
+
+Phase 2:
+    do_lst.py --xml LT40460281992231XXX02.xml
+
+    Phase 1:
+        Extract the NARR data located in the AUX archive.
+
+        How:  extract_aux_data.py --xml LT40460281992231XXX02.xml
+
+    Phase 2:
+        Build/Generate the DEM.
+
+        How:  do_create_dem.py --xml LT40460281992231XXX02.xml
+                               --dem LT50460282002042EDC01_dem.img
+
+    Phase 3:
+        Retrieve emissivity data.
+
+        How:  ??
+
+    Phase 4:
+        Generate the tape5 files.
+
+        How:  ??
+
+    Phase 5:
+        Run MODTRAN on the tape5 to generate tape6 results.
+
+        HOW:  ??
+
+    Phase 6:
+        Generate radiative transfer parameters.
+
+        HOW:  ??
+
+    Phase 7:
+        Generate the emissivity parameters.
+
+        HOW:  ??
+
+    Phase 8:
+        Generate the LST product.
+
+        HOW:  ??
+
+    Phase 9:
+        Generate the uncertainty product.
+
+        HOW:  ??
+
+Phase 10:
+    Generate and deliver the product.
+
+
+==============================================================================
+Phase ??
+Phase ??
+Phase ??
+Phase ??
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+    I'm sure many more things are needed.
+

@@ -1,0 +1,24 @@
+#------------------------------------------------------------------------------
+# Makefile.static
+#
+# Simple makefile for statically building and installing
+# land-surface-temperature.
+#------------------------------------------------------------------------------
+
+SUBDIRS	= scripts src static_data
+
+all:
+	@for dir in $(SUBDIRS); do \
+        echo "make all in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile.static); done
+
+install: all
+	@for dir in $(SUBDIRS); do \
+        echo "make install in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile.static install); done
+
+clean:
+	@for dir in $(SUBDIRS); do \
+        echo "make clean in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile.static clean); done
+

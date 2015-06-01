@@ -1,0 +1,1 @@
+cmake .. -DBUILD_STATIC:BOOL=TRUE -DCMAKE_INSTALL_PREFIX=$PREFIX -DCMAKE_BUILD_TYPE="LSTE - Land Surface Temperature and Emissivity -- Static"
