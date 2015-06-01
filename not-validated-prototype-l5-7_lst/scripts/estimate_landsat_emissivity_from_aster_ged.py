@@ -13,9 +13,8 @@ from argparse import ArgumentParser
 from osgeo import gdal, osr
 from time import sleep
 
-# espa-common objects and methods
-from espa_constants import EXIT_FAILURE
-from espa_constants import EXIT_SUCCESS
+
+# Import the metadata api found in the espa-common project
 import metadata_api
 
 
@@ -30,6 +29,8 @@ import metadata_api
       AG100.v003.44.077.0001.h5   (Positive Longitude)
 '''
 # Setup some formats to generate the URL to retrieve an ASTER GED tile
+# TODO TODO TODO - To make this operational, the server needs to be specified
+# TODO TODO TODO - on the fly through another method
 SERVER = 'http://e4ftl01.cr.usgs.gov'
 SERVER_PATH = '/ASTT/AG100.003/2000.01.01/'
 FILE_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
@@ -41,8 +42,6 @@ FILE_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
  for the ASTER data we extract and use
 '''
 NO_DATA_VALUE = -9999
-# Specify the L7 scan gap value
-SCAN_GAP_DATA_VALUE = 0
 
 
 # ============================================================================
@@ -686,19 +685,22 @@ def build_b6_emis_data(driver, ls_info):
         raise
 
     # Cleanup the estimated Landsat B6 EMIS tiles
-    for emis_filename in eLandsat_b6_emis_filenames:
-        if os.path.exists(emis_filename):
-            os.unlink(emis_filename)
+# TODO TODO TODO - TEMP KEEP THEM AROUND
+#    for emis_filename in eLandsat_b6_emis_filenames:
+#        if os.path.exists(emis_filename):
+#            os.unlink(emis_filename)
 
     # Cleanup the ASTER NDVI tiles
-    for ndvi_filename in aster_ndvi_filenames:
-        if os.path.exists(ndvi_filename):
-            os.unlink(ndvi_filename)
+# TODO TODO TODO - TEMP KEEP THEM AROUND
+#    for ndvi_filename in aster_ndvi_filenames:
+#        if os.path.exists(ndvi_filename):
+#            os.unlink(ndvi_filename)
 
     # Cleanup the ASTER Land Water Map tiles
-    for land_water_filename in aster_land_water_filenames:
-        if os.path.exists(land_water_filename):
-            os.unlink(land_water_filename)
+# TODO TODO TODO - TEMP KEEP THEM AROUND
+#    for land_water_filename in aster_land_water_filenames:
+#        if os.path.exists(land_water_filename):
+#            os.unlink(land_water_filename)
 
     # Warp estimated Landsat B6 EMIS to match the Landsat data
     try:
@@ -843,6 +845,7 @@ def read_info_from_metadata(xml_filename):
 #                  SOMETHING ELSE
 
 # NEED TO TEST THIS, BECAUSE I HOPE TO HAVE IMPLEMENTED A SOLUTION
+# To date, I have not found a scene the has this condition.
 
 # TODO TODO TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER
 #                  TILE DATA FOR SOME OF THE SCENE AND WILL NEED TO DO
@@ -1136,6 +1139,6 @@ if __name__ == '__main__':
         if hasattr(e, 'output'):
             logger.error("Output [%s]" % e.output)
         logger.exception("Processing failed")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
-    sys.exit(EXIT_SUCCESS)
+    sys.exit(0)  # EXIT SUCCESS
