@@ -281,8 +281,8 @@ int build_points
        NOTE - MERRA is even farther apart so this will not work for that. */
     buffered_north_lat = input->meta.bounding_coords[ESPA_NORTH] + 0.2;
     buffered_south_lat = input->meta.bounding_coords[ESPA_SOUTH] - 0.2;
-    buffered_east_lon = input->meta.bounding_coords[ESPA_EAST] - 0.2;
-    buffered_west_lon = input->meta.bounding_coords[ESPA_WEST] + 0.2;
+    buffered_east_lon = input->meta.bounding_coords[ESPA_EAST] + 0.2;
+    buffered_west_lon = input->meta.bounding_coords[ESPA_WEST] - 0.2;
 
     /* determine what points in the NARR dataset fall within our buffered
        Landsat area using logical operators lessThanLat and greaterThanLat
@@ -411,7 +411,7 @@ int build_points
         }
     }
 
-    /* Convert lat/lon to UTM northing/easting*/
+    /* Convert lat/lon to UTM northing/easting */
     convert_ll_to_utm (input, points);
 
     /* Free memory only used locally */
