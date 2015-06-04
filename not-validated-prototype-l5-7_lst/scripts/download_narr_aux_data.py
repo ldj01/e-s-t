@@ -254,7 +254,7 @@ class AUX_Processor(object):
             for extraction of certain bytes from the source file.
 
         Returns: (str, list)
-            bytes      - A string containing the byte range information.
+            byte_range  - A string containing the byte range information.
         '''
 
         start_bytes = list()
@@ -284,9 +284,9 @@ class AUX_Processor(object):
 
         # Combine the ranges into a comma separated string ready for applying
         # into the Range http header parameter
-        bytes = ','.join(['{0}-{1}'.format(s, e) for s, e in grib_ranges])
+        byte_range = ','.join(['{0}-{1}'.format(s, e) for s, e in grib_ranges])
 
-        return bytes
+        return byte_range
 
     # ------------------------------------------------------------------------
     def retrieve_aux_data(self, year, month, day, hour):
@@ -347,10 +347,10 @@ class AUX_Processor(object):
             logger.info("Retrieving = {0} parameter values".format(parm))
 
             # Determine the specific sections of the grib file to download
-            bytes = self.determine_grib_bytes(inv_name, parm)
+            byte_range = self.determine_grib_bytes(inv_name, parm)
 
             # Setup the headers
-            headers = {'Range': 'bytes=%s' % bytes}
+            headers = {'Range': 'bytes=%s' % byte_range}
 
             # Figure out the local filename to create
             grb_file = grb_name.replace('.grb', '_{0}.grb'.format(parm))
