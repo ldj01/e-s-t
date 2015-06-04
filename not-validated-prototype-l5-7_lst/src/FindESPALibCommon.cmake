@@ -1,7 +1,7 @@
 
 find_path ( LibESPA_INCLUDE_DIR
   NAMES
-    common.h
+    espa_common.h
   PATHS
     ENV ESPAINC
 )
