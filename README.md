@@ -27,25 +27,15 @@ See git tag [land-surface-temperature_v0.0.1]
 
     - All sensor applications can be built and installed from the top-level directory, or at the users choice only a single individual sensors applications could be built and installed.
 
-    - Available sensor options are:
+      - Available sensor options are: **l5-7_lst**
 
-    l5-7_lst
+    - To build all sensor applications: ```make all```
 
-    - To build all sensor applications.
+    - To install all sensor applications: ```make install```
 
-    make all
+    - To build a single sensor application: ```make <sensor>```
 
-    - To install all sensor applications.
-
-    make install
-
-    - To build a single sensor application
-
-    make <sensor>
-
-    - To install a single sensor application
-
-   make <sensor>-install
+    - To install a single sensor application: ```make <sensor>-install```
 
 ### Dependencies
   * ESPA raw binary and ESPA common libraries from ESPA product formatter and associated dependencies
