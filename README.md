@@ -1,9 +1,5 @@
-
-Installation Instructions:
-
-
 ## Land Surface Temperature 0.0.1 Release Notes
-Release Date: December 3, 2014
+Release Date: MONTH DAY, YEAR
 
 This project contains application source code for producgin Land Surface Temperature products.  It currently only supports Landsat 5-7, as prototype output products that have not been validated.  Algorithms for specific sensors, where warranted, are located in sensor specific sub-directories.  See the sensor specific sub-directories for more details and usage examples.
 
@@ -12,8 +8,9 @@ This project is hosted by the US Geological Survey (USGS) Earth Resources Observ
 
 ### Downloads
 Land Surface Temperature source code
-
+```
     git clone https://github.com/USGS-EROS/espa-land-surface-temperature.git
+```
 
 See git tag [land-surface-temperature_v0.0.1]
 
@@ -24,31 +21,25 @@ See git tag [land-surface-temperature_v0.0.1]
     export PREFIX="path_to_directory_for_build_data"
 ```
 
-  * Download (from Github USGS-EROS spectral-indices project) and install source files. The following build will create an executable file under $PREFIX/bin: spectral_indices (tested in Linux with the gcc compiler). It will also copy the Python scripts for running spectral indices from the scripts directory up the the $PREFIX/bin directory.
+  * Download (from Github USGS-EROS spectral-indices project) and install source files.
 
-    - All sensor applications can be built and installed from the top-level
+  * Build - The following build will create an executable file under $PREFIX/bin: lst (tested in Linux with the gcc compiler). It will also copy the Python scripts for running Land Surface Temperature the $PREFIX/bin directory.
+
+- All sensor applications can be built and installed from the top-level
       directory, or at the users choice only a single individual sensors
       applications could be built and installed.
 
-    - To build all sensor applications.
-```
+- To build all sensor applications.
         make all
-```
 
-    - To install all sensor applications.
-```
+- To install all sensor applications.
         make install
-```
 
-    - To build a single sensor application
-```
+- To build a single sensor application
         make <sensor>
-```
 
-    - To install a single sensor application
-```
+- To install a single sensor application
         make <sensor>-install
-```
 
     Available sensor options are:
 
@@ -79,5 +70,4 @@ A python script exists in the scripts directory to assist in running the Land Su
 
 ## Changes From Previous Version
 #### Updates on MONTH DAY, YEAR - USGS EROS
-  * src
-    1. Modified to do something.
+  * DESCRIBE WHAT WAS MODIFIED HERE
