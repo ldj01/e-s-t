@@ -23,7 +23,7 @@ See git tag [land-surface-temperature_v0.0.1]
 
   * Download: (from Github USGS-EROS land-surface-temperature project) and install source files.
 
-  * Build: The following build will create an executable file under $PREFIX/bin: lst (tested in Linux with the gcc compiler). It will also copy the Python scripts for running Land Surface Temperature the $PREFIX/bin directory.
+  * Build/Install: The following build will create an executable file under $PREFIX/bin: lst (tested in Linux with the gcc compiler). It will also copy the Python scripts for running Land Surface Temperature the $PREFIX/bin directory.
 
     - All sensor applications can be built and installed from the top-level directory, or at the users choice only a single individual sensors applications could be built and installed.
 
