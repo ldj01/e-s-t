@@ -15,39 +15,37 @@ Land Surface Temperature source code
 See git tag [land-surface-temperature_v0.0.1]
 
 ### Installation
-  * Install dependent libraries - ESPA product formatter (https://github.com/USGS-EROS/espa-product-formatter)
-  * Set up environment variables.  Can create an environment shell file or add the following to your bash shell.  For C shell, use 'setenv VAR "directory"'.
+  * Install dependent libraries: ESPA product formatter (https://github.com/USGS-EROS/espa-product-formatter)
+  * Set up environment variables: Can create an environment shell file or add the following to your bash shell.  For C shell, use 'setenv VAR "directory"'.
 ```
     export PREFIX="path_to_directory_for_build_data"
 ```
 
-  * Download (from Github USGS-EROS spectral-indices project) and install source files.
+  * Download: (from Github USGS-EROS land-surface-temperature project) and install source files.
 
-  * Build - The following build will create an executable file under $PREFIX/bin: lst (tested in Linux with the gcc compiler). It will also copy the Python scripts for running Land Surface Temperature the $PREFIX/bin directory.
+  * Build: The following build will create an executable file under $PREFIX/bin: lst (tested in Linux with the gcc compiler). It will also copy the Python scripts for running Land Surface Temperature the $PREFIX/bin directory.
 
-- All sensor applications can be built and installed from the top-level
-      directory, or at the users choice only a single individual sensors
-      applications could be built and installed.
+    - All sensor applications can be built and installed from the top-level directory, or at the users choice only a single individual sensors applications could be built and installed.
 
-- To build all sensor applications.
-        make all
+    - Available sensor options are:
 
-- To install all sensor applications.
-        make install
+    l5-7_lst
 
-- To build a single sensor application
-        make <sensor>
+    - To build all sensor applications.
 
-- To install a single sensor application
-        make <sensor>-install
+    make all
 
-    Available sensor options are:
+    - To install all sensor applications.
 
-        l5-7_lst
+    make install
 
-  * Test -
+    - To build a single sensor application
 
-  * Check output -
+    make <sensor>
+
+    - To install a single sensor application
+
+   make <sensor>-install
 
 ### Dependencies
   * ESPA raw binary and ESPA common libraries from ESPA product formatter and associated dependencies
