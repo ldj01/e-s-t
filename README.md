@@ -1,3 +1,5 @@
+## NOTE - Since we are still in the very early stages of development, the information contained in this README may not be correct, however it will be updated from time to time.
+
 ## Land Surface Temperature 0.0.1 Release Notes
 Release Date: MONTH DAY, YEAR
 
