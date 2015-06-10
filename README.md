@@ -22,7 +22,9 @@ For current proto-type version, see git tag [land-surface-temperature_v0.0.1]
 
   * Set up environment variables: Can create an environment shell file or add the following to your bash shell.  For C shell, use 'setenv VAR "directory"'.
 ```
-    export PREFIX="path_to_directory_for_build_data"
+    export PREFIX="path/to/directory/for/build/data"
+    export ASTER_GED_SERVER_NAME="server.name.where.the.GED.data.resides"
+    export ASTER_GED_SERVER_PATH="/path/on/server/to/the/data/"
 ```
 
   * Download: (from Github USGS-EROS/espa-land-surface-temperature project)
