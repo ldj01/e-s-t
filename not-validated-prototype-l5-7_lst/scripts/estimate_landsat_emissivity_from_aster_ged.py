@@ -1,5 +1,34 @@
 #! /usr/bin/env python
 
+'''
+    FILE: estimate_landsat_emissivity_from_aster_ged.py
+
+    PURPOSE: Estimates a Landsat Emissivity product from ASTER Emissivity and
+             NDVI.  The results are meant to be used for generation of a Land
+             Surface Temperature product.
+
+    PROJECT: Land Satellites Data Systems (LSDS) Science Research and
+             Development (LSRD) at the USGS EROS
+
+    LICENSE: NASA Open Source Agreement 1.3
+
+    Algorithm Authors:
+
+        Glynn C. Hulley
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: glynn.hulley@nasa.gov
+
+        Simon J. Hook
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: Simon.J.Hook@jpl.nasa.gov
+
+    Date              Programmer               Reason
+    ----------------  ------------------------ -------------------------------
+    January/2015      Ron Dilley               Initial implementation
+'''
+
 import os
 import sys
 import glob
@@ -14,8 +43,12 @@ from osgeo import gdal, osr
 from time import sleep
 
 
-# Import the metadata api found in the espa-common project
+# Import the metadata api found in the espa-product-formatter project
 import metadata_api
+
+
+# Import local modules
+import lst_utilities as util
 
 
 '''
@@ -31,7 +64,7 @@ import metadata_api
 # Setup some formats to generate the URL to retrieve an ASTER GED tile
 # TODO TODO TODO - To make this operational, the server needs to be specified
 # TODO TODO TODO - on the fly through another method
-SERVER = 'http://e4ftl01.cr.usgs.gov'
+SERVER_NAME = 'e4ftl01.cr.usgs.gov'
 SERVER_PATH = '/ASTT/AG100.003/2000.01.01/'
 FILE_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
 FILE_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
@@ -62,118 +95,6 @@ class LandsatInfo(object):
     min_y_extent = None
     max_y_extent = None
     dest_proj4 = None
-
-
-# ============================================================================
-def execute_cmd(cmd):
-    '''
-    Description:
-        Execute a command line and return the terminal output or raise an
-        exception
-
-    Returns:
-        output - The stdout and/or stderr from the executed command.
-    '''
-
-    output = ''
-
-    (status, output) = commands.getstatusoutput(cmd)
-
-    if status < 0:
-        message = "Application terminated by signal [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if status != 0:
-        message = "Application failed to execute [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if os.WEXITSTATUS(status) != 0:
-        message = "Application [%s] returned error code [%d]" \
-                  % (cmd, os.WEXITSTATUS(status))
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    return output
-
-
-# ============================================================================
-def http_transfer_file(download_url, destination_file):
-    '''
-    Description:
-        Using http transfer a file from a source location to a destination
-        file on the localhost.
-
-    Returns:
-        status_code - One of the following
-                    - 200, requests.codes['ok']
-                    - 404, requests.codes['not_found']:
-                    - 503, requests.codes['service_unavailable']:
-
-    Notes:
-        If a 503 is returned, the logged exception should be reviewed to
-        determine the real cause of the error.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    logger.info(download_url)
-
-    session = requests.Session()
-
-    session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
-
-    status_code = requests.codes['ok']
-    retry_attempt = 0
-    done = False
-    while not done:
-        status_code = requests.codes['ok']
-        req = None
-        try:
-            req = session.get(url=download_url, timeout=300.0)
-
-            if not req.ok:
-                msg = "HTTP - Transfer of [{0}] - FAILED".format(download_url)
-                logger.error(msg)
-                # The raise_for_status gets caught by this try's except block
-                req.raise_for_status()
-
-            # Write the downloaded data to the destination file
-            with open(destination_file, 'wb') as local_fd:
-                local_fd.write(req.content)
-
-            # Break the looping
-            done = True
-            logger.info("HTTP - Transfer Complete")
-
-        except:
-            logger.exception("HTTP - Transfer Issue")
-
-            if req is not None:
-                status_code = req.status_code
-
-            if status_code != requests.codes['not_found']:
-                if retry_attempt > 3:
-                    msg = "HTTP - Transfer Failed - exceeded retry limit"
-                    logger.info(msg)
-                    done = True
-                else:
-                    retry_attempt += 1
-                    sleep(int(1.5 * retry_attempt))
-            else:
-                # Not Found - So break the looping because we are done
-                done = True
-
-        finally:
-            if req is not None:
-                req.close()
-
-    return status_code
 
 
 # ============================================================================
@@ -216,8 +137,7 @@ def update_envi_header(hdr_file_path, no_data_value):
 
 
 # ============================================================================
-def extract_aster_data(emis_ds_name, ndvi_ds_name, land_water_ds_name,
-                       lat_ds_name, lon_ds_name):
+def extract_aster_data(emis_ds_name, ndvi_ds_name, lat_ds_name, lon_ds_name):
 
     '''
     Description:
@@ -228,7 +148,6 @@ def extract_aster_data(emis_ds_name, ndvi_ds_name, land_water_ds_name,
         aster_b13_data - Aster Emissivity band 13 data.
         aster_b14_data - Aster Emissivity band 14 data.
         aster_ndvi_data - Aster NDVI band data.
-        aster_land_water_data - Aster Land Water Map band data.
         aster_lat_data - Geolocation Lattitude data.
         aster_lon_data - Geolocation Longitude data.
         x_dim - Number of columns of the data.
@@ -245,12 +164,6 @@ def extract_aster_data(emis_ds_name, ndvi_ds_name, land_water_ds_name,
         ndvi_sds = gdal.Open(ndvi_ds_name)
         if ndvi_sds is None:
             raise RuntimeError("GDAL failed to open {0}".format(ndvi_sds_name))
-
-        # Open the Land Water sub-dataset
-        land_water_sds = gdal.Open(land_water_ds_name)
-        if land_water_sds is None:
-            raise RuntimeError("GDAL failed to open"
-                               " {0}".format(land_water_sds_name))
 
         # Open the Latitude sub-dataset
         lat_sds = gdal.Open(lat_ds_name)
@@ -281,11 +194,6 @@ def extract_aster_data(emis_ds_name, ndvi_ds_name, land_water_ds_name,
                                                                 x_dim, y_dim)
         del (ndvi_sds)
 
-        # Retrieve the Land Water band data from the HDF5 input
-        aster_land_water_data = \
-            land_water_sds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        del (land_water_sds)
-
         # Retrieve the Latitude data from the HDF5 input
         aster_lat_data = lat_sds.GetRasterBand(1).ReadAsArray(0, 0,
                                                               x_dim, y_dim)
@@ -299,8 +207,7 @@ def extract_aster_data(emis_ds_name, ndvi_ds_name, land_water_ds_name,
     except Exception:
         raise
 
-    return (aster_b13_data, aster_b14_data,
-            aster_ndvi_data, aster_land_water_data,
+    return (aster_b13_data, aster_b14_data, aster_ndvi_data,
             aster_lat_data, aster_lon_data, x_dim, y_dim)
 
 
@@ -381,7 +288,7 @@ def mosaic_all_tiles_into_one_raster(src_names, dest_name):
     output = ''
     try:
         logger.info("Executing [{0}]".format(cmd))
-        output = execute_cmd(cmd)
+        output = util.execute_cmd(cmd)
     except Exception:
         logger.error("Failed to mosaic tiles")
         raise
@@ -420,7 +327,7 @@ def warp_raster_to_match_landsat_data(src_name, dest_name,
     output = ''
     try:
         logger.info("Executing [{0}]".format(cmd))
-        output = execute_cmd(cmd)
+        output = util.execute_cmd(cmd)
     except Exception:
         logger.error("Failed during warping to match Landsat")
         raise
@@ -430,7 +337,7 @@ def warp_raster_to_match_landsat_data(src_name, dest_name,
 
 
 # ============================================================================
-def build_b6_emis_data(driver, ls_info):
+def build_landsat_emis_data(args, driver, ls_info):
     '''
     Description:
         Download the ASTER GED tiles that encompass our Landsat scene and
@@ -441,9 +348,9 @@ def build_b6_emis_data(driver, ls_info):
         Landsat scenes projection and image extents
 
     Returns:
-        warped_eLandsat_b6_emis_name
+        landsat_emis_warped_name
           - The name of the reprojected Landsat Emissivity data.
-        warped_aster_ndvi_name
+        aster_ndvi_warped_name
           - The name of the reprojected ASTER NDVI data.
     '''
 
@@ -451,14 +358,16 @@ def build_b6_emis_data(driver, ls_info):
     ds_srs = osr.SpatialReference()
     ds_srs.ImportFromEPSG(4326)
 
+    # Specify the base URL to use for retrieving the ASTER GED data
+    base_url_path = ''.join(['http://', SERVER_NAME, SERVER_PATH])
+
     # Process through the lattitude and longitude ASTER tiles which cover the
     # Landsat scene we are processing
     # - Download them
     # - Extract the Emissivity bands 13 and 14 as well as the NDVI
-    # - Generate the B6 EMIS Landsat from the 13 and 14 band data
-    eLandsat_b6_emis_filenames = list()
-    aster_ndvi_filenames = list()
-    aster_land_water_filenames = list()
+    # - Generate the Landsat EMIS from the 13 and 14 band data
+    landsat_emis_mean_filenames = list()
+    aster_ndvi_mean_filenames = list()
     for lat in xrange(int(ls_info.south), int(ls_info.north)+1):
         for lon in xrange(int(ls_info.west), int(ls_info.east)+1):
             # Build the base filename using the positive or negative format
@@ -472,8 +381,8 @@ def build_b6_emis_data(driver, ls_info):
             h5_file_path = ''.join([filename, '.h5'])
 
             # Build the URL and download the tile
-            url_path = ''.join([SERVER, SERVER_PATH, h5_file_path])
-            status_code = http_transfer_file(url_path, h5_file_path)
+            url_path = ''.join([base_url_path, h5_file_path])
+            status_code = util.http_transfer_file(url_path, h5_file_path)
 
             # Check for and handle tiles that are not available in the ASTER
             # data
@@ -486,15 +395,12 @@ def build_b6_emis_data(driver, ls_info):
 
             # ----------------------------------------------------------------
             # Build the output tile names
-            eLandsat_b6_emis_tile_name = ''.join([filename,
-                                                  '_eLandsat_b6_emis.tif'])
+            landsat_emis_tile_name = ''.join([filename, '_emis.tif'])
             aster_ndvi_tile_name = ''.join([filename, '_ndvi.tif'])
-            aster_land_water_tile_name = ''.join([filename, '_lw_map.tif'])
 
             # Add the tile names to the list for mosaic building and warping
-            eLandsat_b6_emis_filenames.append(eLandsat_b6_emis_tile_name)
-            aster_ndvi_filenames.append(aster_ndvi_tile_name)
-            aster_land_water_filenames.append(aster_land_water_tile_name)
+            landsat_emis_mean_filenames.append(landsat_emis_tile_name)
+            aster_ndvi_mean_filenames.append(aster_ndvi_tile_name)
 
             # Get the sub-dataset name for Emissivity-Mean
             emis_ds_name = ''.join(['HDF5:"', h5_file_path,
@@ -502,9 +408,6 @@ def build_b6_emis_data(driver, ls_info):
             # Get the sub-dataset name for NDVI-ean
             ndvi_ds_name = ''.join(['HDF5:"', h5_file_path,
                                     '"://NDVI/Mean'])
-            # Get the sub-dataset name for Land Water Map
-            land_water_ds_name = ''.join(['HDF5:"', h5_file_path,
-                                          '"://Land_Water_Map/LWmap'])
             # Get the sub-dataset name for Lattitude
             lat_ds_name = ''.join(['HDF5:"', h5_file_path,
                                    '"://Geolocation/Latitude'])
@@ -514,17 +417,14 @@ def build_b6_emis_data(driver, ls_info):
 
             logger.debug(emis_ds_name)
             logger.debug(ndvi_ds_name)
-            logger.debug(land_water_ds_name)
             logger.debug(lat_ds_name)
             logger.debug(lon_ds_name)
 
             # ----------------------------------------------------------------
             try:
-                (aster_b13_data, aster_b14_data,
-                 aster_ndvi_data, aster_land_water_data,
+                (aster_b13_data, aster_b14_data, aster_ndvi_data,
                  aster_lat_data, aster_lon_data, x_dim, y_dim) = \
                     extract_aster_data(emis_ds_name, ndvi_ds_name,
-                                       land_water_ds_name,
                                        lat_ds_name, lon_ds_name)
             except Exception:
                 logger.exception("Extracting ASTER data from tile")
@@ -532,9 +432,9 @@ def build_b6_emis_data(driver, ls_info):
 
             # Remove the HDF5 tile since we have extracted all the info we
             # need from it
-# TODO TODO TODO - TEMP KEEP THEM AROUND
-#            if os.path.exists(h5_file_path):
-#                os.unlink(h5_file_path)
+            if not args.keep_intermediate_data:
+                if os.path.exists(h5_file_path):
+                    os.unlink(h5_file_path)
 
             # ----------------------------------------------------------------
             # Determine the minimum and maximum latitude and longitude
@@ -562,7 +462,7 @@ def build_b6_emis_data(driver, ls_info):
             aster_b14_scaled = aster_b14_masked * 0.001
 
             # Re-make the masks for B13 and B14 as a combined mask so the
-            # estimated Landsat B6 EMIS has the correct mask
+            # estimated Landsat EMIS has the correct mask
             mask = np.ma.mask_or(np.ma.getmask(aster_b13_scaled),
                                  np.ma.getmask(aster_b14_scaled))
             aster_b13_scaled = np.ma.masked_where(mask, aster_b13_scaled)
@@ -575,10 +475,10 @@ def build_b6_emis_data(driver, ls_info):
             del (aster_b13_masked)
             del (aster_b14_masked)
 
-            # Create the estimated Landsat B6 EMIS data
-            eLandsat_b6_emis = (0.44 * aster_b13_scaled
-                                + 0.4 * aster_b14_scaled
-                                + 0.156)
+            # Create the estimated Landsat EMIS data
+            landsat_emis_data = (0.44 * aster_b13_scaled
+                                 + 0.4 * aster_b14_scaled
+                                 + 0.156)
 
             # Memory cleanup
             del (aster_b13_scaled)
@@ -594,23 +494,23 @@ def build_b6_emis_data(driver, ls_info):
             del (aster_ndvi_masked)
 
             # numpy array them so they are no longer masked
-            eLandsat_b6_emis_numpy = np.array(eLandsat_b6_emis)
+            landsat_emis_numpy = np.array(landsat_emis_data)
             aster_ndvi_numpy = np.array(aster_ndvi_scaled)
 
             # Memory cleanup
-            del (eLandsat_b6_emis)
+            del (landsat_emis_data)
             del (aster_ndvi_scaled)
 
             # ----------------------------------------------------------------
-            # Create the estimated Landsat B6 EMIS raster output tile
+            # Create the estimated Landsat EMIS raster output tile
             try:
-                logger.info("Creating an estimated Landsat B6 EMIS tile")
-                generate_raster_file(driver, eLandsat_b6_emis_tile_name,
-                                     x_dim, y_dim, eLandsat_b6_emis_numpy,
+                logger.info("Creating an estimated Landsat EMIS tile")
+                generate_raster_file(driver, landsat_emis_tile_name,
+                                     x_dim, y_dim, landsat_emis_numpy,
                                      geo_transform, ds_srs.ExportToWkt(),
                                      NO_DATA_VALUE, gdal.GDT_Float32)
             except Exception:
-                logger.exception("Creating eLandsat B6 EMIS tile")
+                logger.exception("Creating Landsat EMIS tile")
                 raise
 
             # ----------------------------------------------------------------
@@ -625,126 +525,83 @@ def build_b6_emis_data(driver, ls_info):
                 logger.exception("Creating ASTER NDVI tile")
                 raise
 
-            # ----------------------------------------------------------------
-            # Create the ASTER Land Water Map raster output tile
-            try:
-                logger.info("Creating an ASTER Land Water Map tile")
-                generate_raster_file(driver, aster_land_water_tile_name,
-                                     x_dim, y_dim, aster_land_water_data,
-                                     geo_transform, ds_srs.ExportToWkt(),
-                                     NO_DATA_VALUE, gdal.GDT_Int16)
-            except Exception:
-                logger.exception("Creating ASTER Land Water Map tile")
-                raise
-
             # Memory cleanup
-            del (eLandsat_b6_emis_numpy)
+            del (landsat_emis_numpy)
             del (aster_ndvi_numpy)
-            del (aster_land_water_data)
 
     # Check to see that we downloaded at least one ASTER tile for processing.
-    if len(eLandsat_b6_emis_filenames) == 0:
+    if len(landsat_emis_mean_filenames) == 0:
         raise Exception("No ASTER tiles were downloaded")
 
     # Save the source proj4 string to use during warping
     src_proj4 = ds_srs.ExportToProj4()
 
     # Define the temporary names
-    temp_eLandsat_b6_emis_name = 'temp_eLandsat_b6_emis.tif'
-    temp_aster_ndvi_name = 'temp_aster_ndvi.tif'
-    temp_aster_land_water_name = 'temp_aster_lw_map.tif'
-    warped_eLandsat_b6_emis_name = 'warped_elandsat_b6_emis.tif'
-    warped_aster_ndvi_name = 'warped_aster_ndvi.tif'
-    warped_aster_land_water_name = 'warped_aster_lw_map.tif'
+    landsat_emis_mosaic_name = 'landsat_emis_mosaic.tif'
+    landsat_emis_warped_name = 'landsat_emis_warped.tif'
+    aster_ndvi_mosaic_name = 'aster_ndvi_mosaic.tif'
+    aster_ndvi_warped_name = 'aster_ndvi_warped.tif'
 
-    # Mosaic the estimated Landsat B6 EMIS tiles into the temp EMIS
+    # Mosaic the estimated Landsat EMIS tiles into the temp EMIS
     try:
-        logger.info("Building mosaic for estimated Landsat B6 EMIS")
-        mosaic_all_tiles_into_one_raster(eLandsat_b6_emis_filenames,
-                                         temp_eLandsat_b6_emis_name)
+        logger.info("Building mosaic for estimated Landsat EMIS")
+        mosaic_all_tiles_into_one_raster(landsat_emis_mean_filenames,
+                                         landsat_emis_mosaic_name)
     except Exception:
-        logger.exception("Mosaicing B6 EMIS tiles")
+        logger.exception("Mosaicing EMIS tiles")
         raise
 
     # Mosaic the ASTER NDVI tiles into the temp NDVI
     try:
         logger.info("Building mosaic for ASTER NDVI")
-        mosaic_all_tiles_into_one_raster(aster_ndvi_filenames,
-                                         temp_aster_ndvi_name)
+        mosaic_all_tiles_into_one_raster(aster_ndvi_mean_filenames,
+                                         aster_ndvi_mosaic_name)
     except Exception:
         logger.exception("Mosaicing ASTER NDVI tiles")
         raise
 
-    # Mosaic the ASTER Land Water Map tiles into the temp Land Water Map
-    try:
-        logger.info("Building mosaic for ASTER Land Water Map")
-        mosaic_all_tiles_into_one_raster(aster_land_water_filenames,
-                                         temp_aster_land_water_name)
-    except Exception:
-        logger.exception("Mosaicing ASTER Land Water Map tiles")
-        raise
-
-    # Cleanup the estimated Landsat B6 EMIS tiles
-# TODO TODO TODO - TEMP KEEP THEM AROUND
-#    for emis_filename in eLandsat_b6_emis_filenames:
-#        if os.path.exists(emis_filename):
-#            os.unlink(emis_filename)
+    # Cleanup the estimated Landsat EMIS tiles
+    if not args.keep_intermediate_data:
+        for emis_filename in landsat_emis_mean_filenames:
+            if os.path.exists(emis_filename):
+                os.unlink(emis_filename)
 
     # Cleanup the ASTER NDVI tiles
-# TODO TODO TODO - TEMP KEEP THEM AROUND
-#    for ndvi_filename in aster_ndvi_filenames:
-#        if os.path.exists(ndvi_filename):
-#            os.unlink(ndvi_filename)
+    if not args.keep_intermediate_data:
+        for ndvi_filename in aster_ndvi_mean_filenames:
+            if os.path.exists(ndvi_filename):
+                os.unlink(ndvi_filename)
 
-    # Cleanup the ASTER Land Water Map tiles
-# TODO TODO TODO - TEMP KEEP THEM AROUND
-#    for land_water_filename in aster_land_water_filenames:
-#        if os.path.exists(land_water_filename):
-#            os.unlink(land_water_filename)
-
-    # Warp estimated Landsat B6 EMIS to match the Landsat data
+    # Warp estimated Landsat EMIS to match the Landsat data
     try:
-        logger.info("Warping estimated Landsat B6 EMIS to match Landsat data")
-        warp_raster_to_match_landsat_data(temp_eLandsat_b6_emis_name,
-                                          warped_eLandsat_b6_emis_name,
+        logger.info("Warping estimated Landsat EMIS to match Landsat data")
+        warp_raster_to_match_landsat_data(landsat_emis_mosaic_name,
+                                          landsat_emis_warped_name,
                                           src_proj4, ls_info)
     except Exception:
-        logger.exception("Warping B6 EMIS to match Landsat data")
+        logger.exception("Warping EMIS to match Landsat data")
         raise
 
     # Warp ASTER NDVI to match the Landsat data
     try:
         logger.info("Warping ASTER NDVI to match Landsat data")
-        warp_raster_to_match_landsat_data(temp_aster_ndvi_name,
-                                          warped_aster_ndvi_name,
+        warp_raster_to_match_landsat_data(aster_ndvi_mosaic_name,
+                                          aster_ndvi_warped_name,
                                           src_proj4, ls_info)
     except Exception:
         logger.exception("Warping ASTER NDVI to match Landsat data")
         raise
 
-    # Warp ASTER Land Water Map to match the Landsat data
-    try:
-        logger.info("Warping ASTER Land Water Map to match Landsat data")
-        warp_raster_to_match_landsat_data(temp_aster_land_water_name,
-                                          warped_aster_land_water_name,
-                                          src_proj4, ls_info)
-    except Exception:
-        logger.exception("Warping ASTER Land Water Map to match Landsat data")
-        raise
-
     # Cleanup the temp files
-    if os.path.exists(temp_eLandsat_b6_emis_name):
-        os.unlink(temp_eLandsat_b6_emis_name)
-    if os.path.exists(temp_aster_ndvi_name):
-        os.unlink(temp_aster_ndvi_name)
-    if os.path.exists(temp_aster_land_water_name):
-        os.unlink(temp_aster_land_water_name)
+    if os.path.exists(landsat_emis_mosaic_name):
+        os.unlink(landsat_emis_mosaic_name)
+    if os.path.exists(aster_ndvi_mosaic_name):
+        os.unlink(aster_ndvi_mosaic_name)
 
-    return (warped_eLandsat_b6_emis_name,
-            warped_aster_ndvi_name,
-            warped_aster_land_water_name)
+    return (landsat_emis_warped_name, aster_ndvi_warped_name)
 
 
+# ============================================================================
 def read_info_from_metadata(xml_filename):
     # Read the XML metadata
     espa_xml = metadata_api.parse(xml_filename, silence=True)
@@ -840,18 +697,12 @@ def read_info_from_metadata(xml_filename):
             toa_nir_scale_factor, toa_swir1_scale_factor, satellite)
 
 
-# TODO TODO TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER
-#                  TILE DATA FOR SOME OF THE SCENE AND WILL NEED TO DO
-#                  SOMETHING ELSE
-
-# NEED TO TEST THIS, BECAUSE I HOPE TO HAVE IMPLEMENTED A SOLUTION
-# To date, I have not found a scene the has this condition.
-
-# TODO TODO TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER
-#                  TILE DATA FOR SOME OF THE SCENE AND WILL NEED TO DO
-#                  SOMETHING ELSE
-
-
+# ============================================================================
+# TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER TILE DATA
+#        FOR SOME OF THE SCENE AND WILL NEED TO DO SOMETHING ELSE
+#      - I have implemented a solution for this, but have not been able to
+#        test it.  I have not been able to find a scene that has this
+#        condition.
 # ============================================================================
 def process(args):
 
@@ -868,9 +719,11 @@ def process(args):
 
     # Register all the gdal drivers and choose the GeoTiff for our temp output
     gdal.AllRegister()
-    driver = gdal.GetDriverByName('GTiff')
+    geotiff_driver = gdal.GetDriverByName('GTiff')
+    envi_driver = gdal.GetDriverByName('ENVI')
 
     # Read the Landsat bands into memory
+    logger.info("Loading Landsat TOA input bands")
     # GREEN
     ds = gdal.Open(toa_green_name)
     x_dim = ds.RasterXSize  # They are all the same size
@@ -938,10 +791,12 @@ def process(args):
     landsat_swir1_masked = np.ma.masked_where(mask, landsat_swir1_masked)
 
     # Build the Landsat TOA NDVI data
+    logger.info("Building TOA based NDVI for Landsat data")
     landsat_ndvi_masked = ((landsat_nir_masked - landsat_red_masked)
                            / (landsat_nir_masked + landsat_red_masked))
 
     # Build the Landsat TOA NDSI data
+    logger.info("Building TOA based NDSI for Landsat data")
     landsat_ndsi_masked = ((landsat_green_masked - landsat_swir1_masked)
                            / (landsat_green_masked + landsat_swir1_masked))
 
@@ -958,47 +813,49 @@ def process(args):
     landsat_ndvi_masked[landsat_ndvi_masked < 0] = 0
 
     # Save the locations for the specfied snow pixels
+    logger.info("Determine snow pixel locations")
     selected_snow_locations = np.where(landsat_ndsi_masked > 0.4)
 
     # Memory cleanup
     del (landsat_ndsi_masked)
 
-    # Build the estimated Landsat B6 EMIS data from the ASTER GED data and
+    # Build the estimated Landsat EMIS data from the ASTER GED data and
     # warp it to the Landsat scenes projection and image extents
     # For convenience the ASTER NDVI is also extracted and warped to the
     # Landsat scenes projection and image extents
-    (warped_eLandsat_b6_emis_name,
-     warped_aster_ndvi_name,
-     warped_aster_land_water_name) = build_b6_emis_data(driver, ls_info)
+    logger.info("Build thermal emissivity band and retrieve ASTER NDVI")
+    (landsat_emis_warped_name,
+     aster_ndvi_warped_name) = build_landsat_emis_data(args, geotiff_driver,
+                                                       ls_info)
 
-    # Load the warped estimated Landsat B6 EMIS into memory
-    ds = gdal.Open(warped_eLandsat_b6_emis_name)
-    eLandsat_b6_emis = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-    eLandsat_b6_emis_masked = np.ma.masked_equal(eLandsat_b6_emis,
-                                                 NO_DATA_VALUE)
+    # Load the warped estimated Landsat EMIS into memory
+    ds = gdal.Open(landsat_emis_warped_name)
+    landsat_emis_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+    landsat_emis_masked = np.ma.masked_equal(landsat_emis_data, NO_DATA_VALUE)
     # Harden the mask so it does not change
-    eLandsat_b6_emis_masked = eLandsat_b6_emis_masked.harden_mask()
+    landsat_emis_masked = landsat_emis_masked.harden_mask()
 
     # Load the warped ASTER NDVI into memory
-    ds = gdal.Open(warped_aster_ndvi_name)
+    ds = gdal.Open(aster_ndvi_warped_name)
     aster_ndvi_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
     aster_ndvi_masked = np.ma.masked_equal(aster_ndvi_data, NO_DATA_VALUE)
     # Harden the mask so it does not change
     aster_ndvi_masked = aster_ndvi_masked.harden_mask()
 
-    # Save the locations of the gaps in the estimated Landsat B6 EMIS
+    # Save the locations of the gaps in the estimated Landsat EMIS
     # and Aster NDVI data
-    aster_b6_emis_gap_locations = np.where(eLandsat_b6_emis == 0)
-    aster_b6_emis_no_data_locations = \
-        np.where(eLandsat_b6_emis == NO_DATA_VALUE)
+    landsat_emis_gap_locations = np.where(landsat_emis_data == 0)
+    landsat_emis_no_data_locations = \
+        np.where(landsat_emis_data == NO_DATA_VALUE)
     aster_ndvi_gap_locations = np.where(aster_ndvi_data == 0)
     aster_ndvi_no_data_locations = np.where(aster_ndvi_data == NO_DATA_VALUE)
 
     # Memory cleanup
     del (ds)
-    del (eLandsat_b6_emis)
+    del (landsat_emis_data)
     del (aster_ndvi_data)
 
+    logger.info("Normalizing Landsat and ASTER NDVI")
     # Normalize Landsat NDVI by max value
     min_ls_ndvi = landsat_ndvi_masked.min()
     max_ls_ndvi = landsat_ndvi_masked.max()
@@ -1010,6 +867,7 @@ def process(args):
     aster_ndvi_masked = aster_ndvi_masked / float(max_aster_ndvi)
 
     # Calculate fractional vegetation cover for both Landsat and ASTER NDVI
+    logger.info("Calculating fractional vegetation cover")
     fv_Landsat = 1.0 - ((max_ls_ndvi - landsat_ndvi_masked)
                         / (max_ls_ndvi - min_ls_ndvi))
     fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_masked)
@@ -1021,29 +879,30 @@ def process(args):
 
     landsat_soil = None
     landsat_mod = None
-    landsat_emis = None
-    # Adjust estimated Landsat B6 EMIS for vegetation and snow
+    landsat_emis_final = None
+    # Adjust estimated Landsat EMIS for vegetation and snow, to generate
+    # the final Landsat EMIS data
     if satellite == 'LANDSAT_7':
-        logger.info("Adjusting estimated Landsat 7 B6 EMIS"
+        logger.info("Adjusting estimated Landsat 7 EMIS"
                     " for vegetation and snow")
-        landsat_soil = ((eLandsat_b6_emis_masked - 0.975 * fv_Aster)
+        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster)
                         / (1.0 - fv_Aster))
         landsat_mod = 0.9848 * fv_Landsat + landsat_soil * (1.0 - fv_Landsat)
 
         # Create a copy as a non-masked array
-        landsat_emis = np.array(landsat_mod)
-        landsat_emis[selected_snow_locations] = 0.9869  # Medium snow
+        landsat_emis_final = np.array(landsat_mod)
+        landsat_emis_final[selected_snow_locations] = 0.9869  # Medium snow
 
     elif satellite == 'LANDSAT_5':
-        logger.info("Adjusting estimated Landsat 5 B6 EMIS"
+        logger.info("Adjusting estimated Landsat 5 EMIS"
                     " for vegetation and snow")
-        landsat_soil = ((eLandsat_b6_emis_masked - 0.975 * fv_Aster)
+        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster)
                         / (1.0 - fv_Aster))
         landsat_mod = 0.9851 * fv_Landsat + landsat_soil * (1.0 - fv_Landsat)
 
         # Create a copy as a non-masked array
-        landsat_emis = np.array(landsat_mod)
-        landsat_emis[selected_snow_locations] = 0.9851  # Medium snow
+        landsat_emis_final = np.array(landsat_mod)
+        landsat_emis_final[selected_snow_locations] = 0.9851  # Medium snow
 
     # Memory cleanup
     del (fv_Landsat)
@@ -1054,18 +913,20 @@ def process(args):
 
     # Add the fill and scan gaps and ASTER gaps back into the results, since
     # they may have been lost
-    landsat_emis[aster_b6_emis_no_data_locations] = NO_DATA_VALUE
-    landsat_emis[aster_b6_emis_gap_locations] = NO_DATA_VALUE
-    landsat_emis[aster_ndvi_no_data_locations] = NO_DATA_VALUE
-    landsat_emis[aster_ndvi_gap_locations] = NO_DATA_VALUE
-    landsat_emis[landsat_green_no_data_locations] = NO_DATA_VALUE
-    landsat_emis[landsat_red_no_data_locations] = NO_DATA_VALUE
-    landsat_emis[landsat_nir_no_data_locations] = NO_DATA_VALUE
-    landsat_emis[landsat_swir1_no_data_locations] = NO_DATA_VALUE
+    logger.info("Adding fill and data gaps back into the Landsat emissivity"
+                " results")
+    landsat_emis_final[landsat_emis_no_data_locations] = NO_DATA_VALUE
+    landsat_emis_final[landsat_emis_gap_locations] = NO_DATA_VALUE
+    landsat_emis_final[aster_ndvi_no_data_locations] = NO_DATA_VALUE
+    landsat_emis_final[aster_ndvi_gap_locations] = NO_DATA_VALUE
+    landsat_emis_final[landsat_green_no_data_locations] = NO_DATA_VALUE
+    landsat_emis_final[landsat_red_no_data_locations] = NO_DATA_VALUE
+    landsat_emis_final[landsat_nir_no_data_locations] = NO_DATA_VALUE
+    landsat_emis_final[landsat_swir1_no_data_locations] = NO_DATA_VALUE
 
     # Memory cleanup
-    del (aster_b6_emis_no_data_locations)
-    del (aster_b6_emis_gap_locations)
+    del (landsat_emis_no_data_locations)
+    del (landsat_emis_gap_locations)
     del (aster_ndvi_no_data_locations)
     del (aster_ndvi_gap_locations)
     del (landsat_green_no_data_locations)
@@ -1073,39 +934,29 @@ def process(args):
     del (landsat_nir_no_data_locations)
     del (landsat_swir1_no_data_locations)
 
-    generate_raster_file(driver, 'landsat_emis.tif', x_dim, y_dim,
-                         landsat_emis, ds_tmp_transform,
+    product_id = args.xml_filename.split('.xml')[0]
+    landsat_emis_img_filename = ''.join([product_id, '_emis', '.img'])
+    landsat_emis_hdr_filename = ''.join([product_id, '_emis', '.hdr'])
+
+    logger.info("Creating {0}".format(landsat_emis_img_filename))
+    generate_raster_file(envi_driver, landsat_emis_img_filename, x_dim, y_dim,
+                         landsat_emis_final, ds_tmp_transform,
                          ds_tmp_srs.ExportToWkt(), NO_DATA_VALUE,
                          gdal.GDT_Float32)
 
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - Do I create an output product for Landsat Emissivity?
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
-
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - What else needs to be done?
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
-
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - Do I create the LST output product here and now, or not?
-    # TODO TODO TODO - ??????????????????????
-    # TODO TODO TODO - ??????????????????????
+    logger.info("Updating {0}".format(landsat_emis_hdr_filename))
+    update_envi_header(landsat_emis_hdr_filename, NO_DATA_VALUE)
 
     # Memory cleanup
-    del (landsat_emis)
+    del (landsat_emis_final)
 
 
 # ============================================================================
 if __name__ == '__main__':
     '''
     Description:
-      Generate B6 EMIS and ASTER NDVI from ASTER GED tiles for the specified
-      Landsat scene.
+      Generate Landsat EMIS and ASTER NDVI from ASTER GED tiles for the
+      specified Landsat scene.
     '''
 
     # Build the command line argument parser
@@ -1118,6 +969,12 @@ if __name__ == '__main__':
                         action='store', dest='xml_filename', required=True,
                         help="The XML metadata file to use")
 
+    # Optional parameters
+    parser.add_argument('--keep-intermediate-data',
+                        action='store_true', dest='keep_intermediate_data',
+                        required=False, default=False,
+                        help="Keep any intermediate data generated")
+
     # Parse the command line arguments
     args = parser.parse_args()
 
@@ -1127,7 +984,6 @@ if __name__ == '__main__':
                                 ' %(filename)s:%(lineno)d:%(funcName)s'
                                 ' -- %(message)s'),
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        filename='aster.log',
                         level=logging.DEBUG)
 
     logger = logging.getLogger(__name__)
