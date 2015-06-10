@@ -37,117 +37,15 @@ from time import sleep
 from datetime import datetime, timedelta
 
 
-# espa-common objects and methods
-from espa_constants import EXIT_FAILURE
-from espa_constants import EXIT_SUCCESS
+# Import the metadata api found in the espa-product-formatter project
 import metadata_api
 
 
-# ============================================================================
-def execute_cmd(cmd):
-    '''
-    Description:
-      Execute a command line and return the terminal output or raise an
-      exception
-
-    Returns:
-        output - The stdout and/or stderr from the executed command.
-    '''
-
-    output = ''
-
-    (status, output) = commands.getstatusoutput(cmd)
-
-    if status < 0:
-        message = "Application terminated by signal [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if status != 0:
-        message = "Application failed to execute [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if os.WEXITSTATUS(status) != 0:
-        message = "Application [%s] returned error code [%d]" \
-                  % (cmd, os.WEXITSTATUS(status))
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    return output
+# Import local modules
+import lst_utilities as util
 
 
 # ============================================================================
-def create_directory(directory):
-    '''
-    Description:
-        Create the specified directory with some error checking.
-    '''
-
-    # Create/Make sure the directory exists
-    try:
-        os.makedirs(directory, mode=0755)
-    except OSError as ose:
-        if ose.errno == errno.EEXIST and os.path.isdir(directory):
-            pass
-        else:
-            raise
-
-
-# ============================================================================
-def http_transfer_file(download_url, destination_file, headers=None):
-    '''
-    Description:
-        Using http transfer a file from a source location to a destination
-        file on the localhost.
-
-        HTTP headers can be specified to modify how the download happens.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    logger.info("Transfering {0}".format(download_url))
-
-    session = requests.Session()
-
-    session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
-
-    retry_attempt = 0
-    done = False
-    while not done:
-        req = None
-        try:
-            req = session.get(url=download_url, headers=headers,
-                              timeout=60.0)
-
-            if not req.ok:
-                logger.error("Transfer Failed - HTTP")
-                req.raise_for_status()
-
-            with open(destination_file, 'wb') as local_fd:
-                local_fd.write(req.content)
-
-            done = True
-
-        except:
-            logger.exception("Transfer Issue - HTTP")
-            if retry_attempt > 3:
-                raise Exception("Transfer Failed - HTTP"
-                                " - exceeded retry limit")
-            retry_attempt += 1
-            sleep(int(1.5 * retry_attempt))
-
-        finally:
-            if req is not None:
-                req.close()
-
-    logger.info("Transfer Complete - HTTP")
-
-
 class AUX_Processor(object):
     '''
     Description:
@@ -219,7 +117,7 @@ class AUX_Processor(object):
                 '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0])
             logger.info("Dir Name = {0}".format(dir_name))
 
-            create_directory(dir_name)
+            util.create_directory(dir_name)
 
             index = 1
             for pressure in mb_numbers:
@@ -235,7 +133,7 @@ class AUX_Processor(object):
                 output = ''
                 try:
                     logger.debug("Executing: [{0}]".format(cmd))
-                    output = execute_cmd(cmd)
+                    output = util.execute_cmd(cmd)
                 except Exception, e:
                     logger.error("Failed to unpack data")
                     raise e
@@ -340,7 +238,7 @@ class AUX_Processor(object):
             return None
 
         # Download the inv file
-        http_transfer_file(inv_src, inv_name)
+        util.http_transfer_file(inv_src, inv_name)
 
         grb_info = dict()
         for parm in self._parms_to_extract:
@@ -357,7 +255,7 @@ class AUX_Processor(object):
 
             # Download the specific sections for the current parameter
             logger.info("Destination Filename = {0}".format(grb_file))
-            http_transfer_file(grb_src, grb_file, headers=headers)
+            util.http_transfer_file(grb_src, grb_file, headers=headers)
 
             grb_info[parm] = grb_file
 
@@ -403,7 +301,7 @@ class AUX_Processor(object):
             output = ''
             try:
                 logger.debug("Executing: [{0}]".format(cmd))
-                output = execute_cmd(cmd)
+                output = util.execute_cmd(cmd)
             except Exception:
                 logger.error("Failed reading {0} file".format(grb_file))
                 raise
@@ -431,7 +329,7 @@ class AUX_Processor(object):
 
         logger.info("Archiving into [{0}]".format(dest_path))
 
-        create_directory(dest_path)
+        util.create_directory(dest_path)
 
         for parm in self._parms_to_extract:
 
@@ -548,17 +446,17 @@ if __name__ == '__main__':
     base_aux_dir = os.environ.get('LST_AUX_DIR')
     if base_aux_dir is None:
         logger.info("Missing environment variable LST_AUX_DIR")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)
 
     if not os.path.isdir(base_aux_dir):
         logger.info("LST_AUX_DIR directory does not exist")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)
 
     # Validate the start date is present if the end date was supplied
     if ((args.end_date is not None) and (args.start_date is None)):
         logger.error("--start-date must be specified"
                      " if --end-date is specified")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)
 
     # If the start date was not specified, default to the current UTC time
     if args.start_date is None:
@@ -578,7 +476,7 @@ if __name__ == '__main__':
         length = len(start_date)
         if length < 7 or length > 10:
             logger.error("Invalid --start-date")
-            sys.exit(EXIT_FAILURE)
+            sys.exit(1)
 
         if length == 7:
             start_date = ''.join([start_date, 'UTC'])
@@ -587,13 +485,13 @@ if __name__ == '__main__':
             start_date = datetime.strptime(start_date, '%Y%j%Z')
         except Exception:
             logger.exception("Invalid --start-date")
-            sys.exit(EXIT_FAILURE)
+            sys.exit(1)
 
     if type(end_date) == str:
         length = len(end_date)
         if length < 7 or length > 10:
             logger.error("Invalid --end-date")
-            sys.exit(EXIT_FAILURE)
+            sys.exit(1)
 
         if length == 7:
             end_date = ''.join([end_date, 'UTC'])
@@ -602,11 +500,11 @@ if __name__ == '__main__':
             end_date = datetime.strptime(end_date, '%Y%j%Z')
         except Exception:
             logger.exception("Invalid --end-date")
-            sys.exit(EXIT_FAILURE)
+            sys.exit(1)
 
     if end_date < start_date:
         logger.error("--end-date must be after --start-date")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)
 
     try:
         logger.info("Downloading and extracting LST AUX data")
@@ -618,7 +516,7 @@ if __name__ == '__main__':
     except Exception:
         logger.exception("Error processing LST AUX data."
                          "  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)
 
     logger.info("LST AUX data downloaded and extracted")
-    sys.exit(EXIT_SUCCESS)
+    sys.exit(0)
