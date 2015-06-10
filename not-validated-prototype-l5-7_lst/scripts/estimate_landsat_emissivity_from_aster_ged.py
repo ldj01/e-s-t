@@ -110,8 +110,8 @@ def update_envi_header(hdr_file_path, no_data_value):
             line = tmp_fd.readline()
             if not line:
                 break
-            if (line.startswith('data ignore value')
-                    or line.startswith('description')):
+            if (line.startswith('data ignore value') or
+                    line.startswith('description')):
                 pass
             else:
                 sb.write(line)
@@ -122,12 +122,12 @@ def update_envi_header(hdr_file_path, no_data_value):
                 if not line.strip().endswith('}'):
                     while 1:
                         next_line = tmp_fd.readline()
-                        if (not next_line
-                                or next_line.strip().endswith('}')):
+                        if (not next_line or
+                                next_line.strip().endswith('}')):
                             break
                 sb.write('description = {ESPA-generated file}\n')
-            elif (line.startswith('data type')
-                  and (no_data_value is not None)):
+            elif (line.startswith('data type') and
+                  (no_data_value is not None)):
                 sb.write('data ignore value = %s\n' % no_data_value)
 
     # Do the actual replace here
@@ -475,9 +475,9 @@ def build_landsat_emis_data(args, driver, ls_info):
             del (aster_b14_masked)
 
             # Create the estimated Landsat EMIS data
-            landsat_emis_data = (0.44 * aster_b13_scaled
-                                 + 0.4 * aster_b14_scaled
-                                 + 0.156)
+            landsat_emis_data = (0.44 * aster_b13_scaled +
+                                 0.4 * aster_b14_scaled +
+                                 0.156)
 
             # Memory cleanup
             del (aster_b13_scaled)
@@ -791,13 +791,13 @@ def process(args):
 
     # Build the Landsat TOA NDVI data
     logger.info("Building TOA based NDVI for Landsat data")
-    landsat_ndvi_masked = ((landsat_nir_masked - landsat_red_masked)
-                           / (landsat_nir_masked + landsat_red_masked))
+    landsat_ndvi_masked = ((landsat_nir_masked - landsat_red_masked) /
+                           (landsat_nir_masked + landsat_red_masked))
 
     # Build the Landsat TOA NDSI data
     logger.info("Building TOA based NDSI for Landsat data")
-    landsat_ndsi_masked = ((landsat_green_masked - landsat_swir1_masked)
-                           / (landsat_green_masked + landsat_swir1_masked))
+    landsat_ndsi_masked = ((landsat_green_masked - landsat_swir1_masked) /
+                           (landsat_green_masked + landsat_swir1_masked))
 
     # Memory cleanup
     del (mask)
@@ -867,10 +867,10 @@ def process(args):
 
     # Calculate fractional vegetation cover for both Landsat and ASTER NDVI
     logger.info("Calculating fractional vegetation cover")
-    fv_Landsat = 1.0 - ((max_ls_ndvi - landsat_ndvi_masked)
-                        / (max_ls_ndvi - min_ls_ndvi))
-    fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_masked)
-                      / (max_aster_ndvi - min_aster_ndvi))
+    fv_Landsat = 1.0 - ((max_ls_ndvi - landsat_ndvi_masked) /
+                        (max_ls_ndvi - min_ls_ndvi))
+    fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_masked) /
+                      (max_aster_ndvi - min_aster_ndvi))
 
     # Memory cleanup
     del (landsat_ndvi_masked)
@@ -884,8 +884,8 @@ def process(args):
     if satellite == 'LANDSAT_7':
         logger.info("Adjusting estimated Landsat 7 EMIS"
                     " for vegetation and snow")
-        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster)
-                        / (1.0 - fv_Aster))
+        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster) /
+                        (1.0 - fv_Aster))
         landsat_mod = 0.9848 * fv_Landsat + landsat_soil * (1.0 - fv_Landsat)
 
         # Create a copy as a non-masked array
@@ -895,8 +895,8 @@ def process(args):
     elif satellite == 'LANDSAT_5':
         logger.info("Adjusting estimated Landsat 5 EMIS"
                     " for vegetation and snow")
-        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster)
-                        / (1.0 - fv_Aster))
+        landsat_soil = ((landsat_emis_masked - 0.975 * fv_Aster) /
+                        (1.0 - fv_Aster))
         landsat_mod = 0.9851 * fv_Landsat + landsat_soil * (1.0 - fv_Landsat)
 
         # Create a copy as a non-masked array
