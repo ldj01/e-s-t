@@ -61,11 +61,10 @@ import lst_utilities as util
       or
       AG100.v003.44.077.0001.h5   (Positive Longitude)
 '''
+# Variables to hold the server name and path retrieved from the environment
+SERVER_NAME = ''
+SERVER_PATH = ''
 # Setup some formats to generate the URL to retrieve an ASTER GED tile
-# TODO TODO TODO - To make this operational, the server needs to be specified
-# TODO TODO TODO - on the fly through another method
-SERVER_NAME = 'e4ftl01.cr.usgs.gov'
-SERVER_PATH = '/ASTT/AG100.003/2000.01.01/'
 FILE_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
 FILE_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
 
@@ -989,6 +988,17 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     try:
+        # Grab the server name from the environment
+        if 'ASTER_GED_SERVER_NAME' not in os.environ:
+            raise Exception("Environment variable ASTER_GED_SERVER_NAME is"
+                            " not defined")
+        else:
+            SERVER_NAME = os.environ.get('ASTER_GED_SERVER_NAME')
+
+        # Grab the server path from the environment or default it
+        SERVER_PATH = os.environ.get('ASTER_GED_SERVER_PATH',
+                                     '/ASTT/AG100.003/2000.01.01/')
+
         # Call the main processing routine
         process(args)
     except Exception, e:
