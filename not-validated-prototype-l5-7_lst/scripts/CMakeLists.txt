@@ -11,3 +11,5 @@ install ( PROGRAMS do_lst.py
                    lst.py
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
 
+install ( FILES lst_utilities.py
+          DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
