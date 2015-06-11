@@ -301,6 +301,24 @@ def process_lst(args, base_aux_dir):
             logger.info(output)
 
     # ------------------------------------------------------------------------
+    # Generate extimated Landsat emissivity band
+    cmd = ['l5-7_landsat_emissivity_from_aster_ged.py',
+           '--xml', args.xml_filename,
+           '--verbose']
+
+    cmd = ' '.join(cmd)
+    output = ''
+    try:
+        logger.info("Calling [{0}]".format(cmd))
+        output = execute_cmd(cmd)
+    except Exception, e:
+        logger.error("Failed processing scene_based_lst")
+        raise e
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+    # ------------------------------------------------------------------------
     # Cleanup
     if not args.debug:
 

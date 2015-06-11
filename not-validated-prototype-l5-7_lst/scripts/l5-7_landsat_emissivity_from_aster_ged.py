@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: estimate_landsat_emissivity_from_aster_ged.py
+    FILE: l5-7_landsat_emissivity_from_aster_ged.py
 
     PURPOSE: Estimates a Landsat Emissivity product from ASTER Emissivity and
              NDVI.  The results are meant to be used for generation of a Land
@@ -53,7 +53,7 @@ import lst_utilities as util
 
 
 # Version of the software to be used for reporting and in the XML metadata
-VERSION = 'lst_0.0.1'
+VERSION = '0.0.1'
 
 
 '''
@@ -1008,7 +1008,7 @@ def process(args):
 
     emis_band.set_production_date(production_date)
 
-    emis_band.set_app_version(VERSION)
+    emis_band.set_app_version('_'.join(['l5-7_lst', VERSION]))
 
     bands.add_band(emis_band)
 

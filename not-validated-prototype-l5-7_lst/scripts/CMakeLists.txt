@@ -7,8 +7,8 @@ find_package ( PythonLibs 2.7.0 REQUIRED )
 install ( PROGRAMS l5-7_lst.py
                    download_narr_aux_data.py
                    lst_extract_modtran_results.py
-                   estimate_landsat_emissivity_from_aster_ged.py
-                   lst.py
+                   l5-7_landsat_emissivity_from_aster_ged.py
+                   lst-prototype.py
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
 
 install ( FILES lst_utilities.py
