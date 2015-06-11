@@ -42,12 +42,12 @@ MATHLIB = -lm
 LOADLIB = $(EXLIB) $(MATHLIB)
 
 # Define the executable
-EXE = lst
+EXE = l5-7_intermedtiate_data
 
 # Target for the executable
 all: $(EXE)
 
-lst: $(OBJ) $(INC)
+l5-7_intermedtiate_data: $(OBJ) $(INC)
 	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
 
 install:

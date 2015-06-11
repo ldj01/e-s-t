@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: do_lst.py
+    FILE: l5-7_lst.py
 
     PURPOSE: Calls the executables required to generate the LST products.
 
@@ -278,8 +278,9 @@ def process_lst(args, base_aux_dir):
     # ------------------------------------------------------------------------
 
     # ------------------------------------------------------------------------
-    # Call the scene based lst
-    cmd = ['lst',
+    # Generate the thermal, upwelled, and downwelled radiance bands as well as
+    # the atmospheric transmittance band
+    cmd = ['l5-7_intermedtiate_data',
            '--xml', args.xml_filename,
            '--dem', dem_filename,
            '--emi', emi_filename,
