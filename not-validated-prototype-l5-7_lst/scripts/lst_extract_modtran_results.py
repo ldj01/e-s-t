@@ -110,11 +110,11 @@ def process_tape6_results(args):
                 continue
 
             # Skip empty and header lines
-            if (not line
-                    or line.startswith('RADIANCE')
-                    or line.startswith('FREQ')
-                    or line.startswith('EMISSION')
-                    or line.startswith('(CM-1)')):
+            if (not line or
+                    line.startswith('RADIANCE') or
+                    line.startswith('FREQ') or
+                    line.startswith('EMISSION') or
+                    line.startswith('(CM-1)')):
                 continue
 
             # Skip the remainding of the file

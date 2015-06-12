@@ -213,10 +213,10 @@ def extract_aux_data(args, base_aux_dir):
         logger.info("Using {0}".format(grb_2_path))
 
         # Verify that the files we need exist
-        if (not os.path.exists(hdr_1_path)
-                or not os.path.exists(hdr_2_path)
-                or not os.path.exists(grb_1_path)
-                or not os.path.exists(grb_2_path)):
+        if (not os.path.exists(hdr_1_path) or
+                not os.path.exists(hdr_2_path) or
+                not os.path.exists(grb_1_path) or
+                not os.path.exists(grb_2_path)):
             raise Exception("Required LST AUX files are missing")
 
         output_dir = '{0}_1'.format(parm)
