@@ -256,26 +256,7 @@ def process_lst(args, base_aux_dir):
     mtl_filename = '{0}_MTL.txt'.format(product_id)
     # ESPA creates the DEM for us
     dem_filename = '{0}_dem.img'.format(product_id)
-    emi_filename = '{0}_emissivity.img'.format(product_id)
-
-    # ------------------------------------------------------------------------
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # TODO TODO TODO - The emissivity data needs to be retrieved here and
-    # TODO TODO TODO - processed.  Processed to required input???
-    # ------------------------------------------------------------------------
+    emi_filename = '{0}_emis.img'.format(product_id)
 
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
@@ -303,8 +284,7 @@ def process_lst(args, base_aux_dir):
     # ------------------------------------------------------------------------
     # Generate extimated Landsat emissivity band
     cmd = ['l5-7_landsat_emissivity_from_aster_ged.py',
-           '--xml', args.xml_filename,
-           '--verbose']
+           '--xml', args.xml_filename]
 
     cmd = ' '.join(cmd)
     output = ''
@@ -317,6 +297,12 @@ def process_lst(args, base_aux_dir):
     finally:
         if len(output) > 0:
             logger.info(output)
+
+    # ------------------------------------------------------------------------
+    # TODO TODO TODO - Generate the LST product here
+    # TODO TODO TODO - Generate the LST product here
+    # TODO TODO TODO - Generate the LST product here
+    # TODO TODO TODO - Generate the LST product here
 
     # ------------------------------------------------------------------------
     # Cleanup
@@ -341,8 +327,6 @@ def process_lst(args, base_aux_dir):
 
         os.unlink('point_list.txt')
 
-    # TODO TODO TODO
-    # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
