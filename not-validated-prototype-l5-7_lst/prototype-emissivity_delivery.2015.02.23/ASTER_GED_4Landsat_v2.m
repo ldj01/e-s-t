@@ -32,91 +32,91 @@ e6t = cell(1,length(lats));
 nvt = cell(1,length(lats));
 
 for r = 1:length(lats)      % Loop over all ASTER GED tiles
-    
+
     latin = lats(r);
-    
+
     e6 = cell(1,length(lons));
     nv = cell(1,length(lons));
-   
+
     for c = 1:length(lons);
-        
+
         lonin = lons(c);
-        
-        
+
+
         if abs(lonin)<100 && abs(lonin)>=10
-            
+
             if lonin<0
                 fileopen = [dataloc,'\AST_L3_',resfolder,'\asterged.v',vers,'.',num2str(latin),'.-0',num2str(abs(lonin)),'.',resplot,'.h5'];
             else
                 fileopen = [dataloc,'\AST_L3_',resfolder,'\asterged.v',vers,'.',num2str(latin),'.0',num2str(lonin),'.',resplot,'.h5'];
             end
-            
+
         elseif abs(lonin)<10
-            
+
             if lonin<0
                 fileopen = [dataloc,'\AST_L3_',resfolder,'\asterged.v',vers,'.',num2str(latin),'.-00',num2str(abs(lonin)),'.',resplot,'.h5'];
             else
                 fileopen = [dataloc,'\AST_L3_',resfolder,'\asterged.v',vers,'.',num2str(latin),'.00',num2str(lonin),'.',resplot,'.h5'];
             end
-            
+
         else
             fileopen = [dataloc,'\AST_L3_',resfolder,'\asterged.v',vers,'.',num2str(latin),'.',num2str(lonin),'.',resplot,'.h5'];
         end
-        
+
         % ASTER Emissivities
         try
             hinfo = hdf5info(fileopen);
-            
+
             % Read in Latitude
             %Lat{c}  = double(hdf5read(hinfo.GroupHierarchy.Groups(2).Datasets(1)))';
             %Lon{c}  = double(hdf5read(hinfo.GroupHierarchy.Groups(2).Datasets(2)))';
-            
+
             % Read in emissivity info
             Emis_mean = double(hdf5read(hinfo.GroupHierarchy.Groups(2).Datasets(1)));
-            
-            
+
+
             % band 13
             e13_mean = Emis_mean(:,:,4)./1000;
             e13_mean = e13_mean';
-            
+
             % Set ASTER fill values (-9999 and 0) to nan
             ast_fill = (e13_mean<=0);
             e13_mean(ast_fill) = nan;
-            
+
             % band 14
             e14_mean = Emis_mean(:,:,5)./1000;
             e14_mean = e14_mean';
-            
+
             % Set ASTER fill values (-9999 and 0) to nan
             ast_fill = (e14_mean<=0);
             e14_mean(ast_fill) = nan;
-            
+
             % Estimate Landsat band6 emissivity using regression analysis
             e6{c} = 0.44.*e13_mean + 0.4.*e14_mean + 0.156;
-            
+
             NDVI = double(hdf5read(hinfo.GroupHierarchy.Groups(5).Datasets(1)));
             NDVI = NDVI'./100;
             nv{c} = NDVI;
-            
-            
+
+
         catch ME  % Most likely ocean
-            
-            
+
+
             e13_mean = repmat(0.99,[1000 1000]);
             e14_mean = repmat(0.99,[1000 1000]);
-            
+
             e6{c} = 0.44.*e13_mean + 0.4.*e14_mean + 0.156;
-            
+
             NDVI = zeros(1000,1000);
             nv{c} = NDVI;
-            
+
         end
-        
+
     end
-    
+
    e6t{r} = cat(2,e6{1:length(e6)});
     nvt{r} = cat(2,nv{1:length(nv)});
-    
+
 end
 
 eL7_v3 = cat(1,e6t{1:length(e6t)});
@@ -163,7 +163,7 @@ x = reshape(Late_sub,1,szn);
 y = reshape(Lone_sub,1,szn);
 z1 = reshape(e_sub,1,szn);
 z2 = reshape(n_sub,1,szn);
- 
+
 % Interpolate ASTER GED grid onto Landsat pixels
 F1 = TriScatteredInterp(x',y',z1');
 F2 = TriScatteredInterp(x',y',z2');
