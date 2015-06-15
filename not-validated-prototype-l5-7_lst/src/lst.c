@@ -61,7 +61,6 @@ main (int argc, char *argv[])
 
     int modtran_run;
 
-    double alb = 0.1;
     double **modtran_results = NULL;
 
     char *tmp_env = NULL;
@@ -239,7 +238,7 @@ main (int argc, char *argv[])
     }
 
     /* Generate parameters for each height and NARR point */
-    if (calculate_point_atmospheric_parameters (input, &points, alb,
+    if (calculate_point_atmospheric_parameters (input, &points,
                                                 modtran_results, verbose)
         != SUCCESS)
     {
