@@ -36,7 +36,6 @@ usage ()
     printf ("usage: scene_based_lst"
             " --xml=input_xml_filename"
             " --dem=input_dem_filename"
-            " --emis=input_emissivity_filename"
             " [--use-tape6]"
             " [--verbose]"
             " [--debug]\n");
@@ -45,7 +44,6 @@ usage ()
     printf ("where the following parameters are required:\n");
     printf ("    --xml: name of the input XML file\n");
     printf ("    --dem: name of the input DEM file\n");
-    printf ("    --emis: name of the input emissivity file\n");
     printf ("\n");
     printf ("where the following parameters are optional:\n");
     printf ("    --use-tape6: use the values from the MODTRAN generated"
@@ -59,8 +57,8 @@ usage ()
     printf ("\n");
     printf ("Example: scene_based_lst"
             " --xml=LE70390032010263EDC00.xml"
-            " --dem=17_30_DEM.tif"
-            " --emis=AG100B.v003.-20.122.0001.bin" " --verbose\n");
+            " --dem=LE70390032010263EDC00_dem.img"
+            " --verbose\n");
     printf ("Note: The scene_based_lst must run from the directory"
             " where the input data are located.\n\n");
 }
@@ -100,7 +98,6 @@ int get_args
     char *argv[],            /* I: string of cmd-line args */
     char *xml_infile,        /* I: address of input XML metadata filename  */
     char *dem_infile,        /* I: address of input DEM filename */
-    char *emissivity_infile, /* I: address of input emissivity filename */
     bool *use_tape6,         /* O: use the tape6 output */
     bool *verbose,           /* O: verbose flag */
     bool *debug              /* O: debug flag */
@@ -119,7 +116,6 @@ int get_args
         {"use-tape6", no_argument, &use_tape6_flag, 1},
         {"xml", required_argument, 0, 'i'},
         {"dem", required_argument, 0, 'd'},
-        {"emis", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {0, 0, 0, 0}
     };
@@ -156,10 +152,6 @@ int get_args
                 snprintf(dem_infile, PATH_MAX, optarg);
                 break;
 
-            case 'e':              /* xml infile */
-                snprintf(emissivity_infile, PATH_MAX, optarg);
-                break;
-
             case '?':
             default:
                 sprintf (errmsg, "Unknown option %s", argv[optind - 1]);
@@ -182,12 +174,6 @@ int get_args
         RETURN_ERROR ("DEM input file is a required argument", FUNC_NAME,
                       FAILURE);
     }
-    if (strlen(emissivity_infile) <= 0)
-    {
-        usage ();
-        RETURN_ERROR ("Emissivity input file is a required argument",
-                      FUNC_NAME, FAILURE);
-    }
 
     /* Set the use_tape6 flag */
     if (use_tape6_flag)
@@ -205,7 +191,6 @@ int get_args
     {
         printf ("XML_input_file = %s\n", xml_infile);
         printf ("DEM_input_file = %s\n", dem_infile);
-        printf ("Emissivity_input_file = %s\n", emissivity_infile);
     }
 
     /* Set the debug flag */

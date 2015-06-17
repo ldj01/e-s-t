@@ -451,7 +451,6 @@ int calculate_pixel_atmospheric_parameters
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     char *xml_filename,        /* I: XML filename */
     char *dem_filename,        /* I: input DEM filename */
-    char *emi_filename,        /* I: input Emissivity filename */
     double **modtran_results,  /* I: results from MODTRAN runs */
     bool verbose               /* I: value to indicate if intermediate
                                      messages be printed */

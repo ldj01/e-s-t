@@ -12,7 +12,6 @@ int get_args
     char *argv[],            /* I: string of cmd-line args */
     char *xml_infile,        /* I: address of input XML metadata filename  */
     char *dem_infile,        /* I: address of input DEM filename */
-    char *emissivity_infile, /* I: address of input emissivity filename */
     bool *tape_6,            /* O: use the tape6 output */
     bool *verbose,           /* O: verbose flag */
     bool *debug              /* O: debug flag */

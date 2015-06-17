@@ -49,7 +49,6 @@ main (int argc, char *argv[])
     char msg_str[MAX_STR_LEN];
     char xml_filename[PATH_MAX];        /* input XML filename */
     char dem_filename[PATH_MAX];        /* input DEM filename */
-    char emissivity_filename[PATH_MAX]; /* input Emissivity filename */
     char command[PATH_MAX];
 
     Input_t *input = NULL;          /* input data and meta data */
@@ -77,7 +76,7 @@ main (int argc, char *argv[])
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
-    if (get_args (argc, argv, xml_filename, dem_filename, emissivity_filename,
+    if (get_args (argc, argv, xml_filename, dem_filename,
                   &use_tape6, &verbose, &debug) != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
@@ -250,7 +249,6 @@ main (int argc, char *argv[])
     if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 xml_filename,
                                                 dem_filename,
-                                                emissivity_filename,
                                                 modtran_results, verbose)
         != SUCCESS)
     {

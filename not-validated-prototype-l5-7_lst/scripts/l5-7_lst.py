@@ -256,7 +256,6 @@ def process_lst(args, base_aux_dir):
     mtl_filename = '{0}_MTL.txt'.format(product_id)
     # ESPA creates the DEM for us
     dem_filename = '{0}_dem.img'.format(product_id)
-    emi_filename = '{0}_emis.img'.format(product_id)
 
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
@@ -264,7 +263,6 @@ def process_lst(args, base_aux_dir):
     cmd = ['l5-7_intermedtiate_data',
            '--xml', args.xml_filename,
            '--dem', dem_filename,
-           '--emi', emi_filename,
            '--verbose']
     if args.debug:
         cmd.append('--debug')
@@ -303,6 +301,35 @@ def process_lst(args, base_aux_dir):
     # TODO TODO TODO - Generate the LST product here
     # TODO TODO TODO - Generate the LST product here
     # TODO TODO TODO - Generate the LST product here
+#                %% LST calculation
+#
+#                % Compute Surface radiance
+#                surfrad = (L - pathr)./t1r;
+#
+#                %     if surfrad==0
+#                %         disp('Zero Radiance value')
+#                %         continue
+#                %     end
+#
+#
+#                R = surfrad - (1-easter_mod).*skyr;
+#
+#                Rz = R<=0;
+#                R(Rz) = nan;
+#
+#                % Account for emissivity to get Planck emitted radiance
+#                Re = R./easter_mod;
+#                szR = size(R);
+#
+#                clear surfrad R Rz
+#
+#                % Use Brightness temperature LUT to get skin temperature
+#                RadBT = BT(:,2);
+#                TBT = BT(:,1);
+#
+#                Rint = reshape(Re,1,szR(1).*szR(2));
+#                LST = interp1(RadBT,TBT,Rint);
+#                LST = reshape(LST,szR);
 
     # ------------------------------------------------------------------------
     # Cleanup
