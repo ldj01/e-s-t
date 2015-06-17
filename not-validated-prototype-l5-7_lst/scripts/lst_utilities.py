@@ -41,6 +41,12 @@ class Version:
                .format(Version.version))
         return msg
 
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def app_version():
+        version_text = 'l5-7_lst_{0}'.format(Version.version)
+        return version_text
+
 
 # ============================================================================
 class System:
