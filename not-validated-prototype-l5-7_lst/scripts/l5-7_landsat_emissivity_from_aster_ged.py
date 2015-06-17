@@ -52,10 +52,6 @@ import metadata_api
 import lst_utilities as util
 
 
-# Version of the software to be used for reporting and in the XML metadata
-VERSION = '0.0.1'
-
-
 '''
   Example HTTP file request for ASTER GED data.
 
@@ -989,7 +985,7 @@ def process(args):
 
     emis_band.set_production_date(production_date)
 
-    emis_band.set_app_version('_'.join(['l5-7_lst', VERSION]))
+    emis_band.set_app_version(util.Version.app_version())
 
     bands.add_band(emis_band)
 
@@ -1037,7 +1033,7 @@ if __name__ == '__main__':
 
     # Report the version and exit
     if args.version:
-        print "Version: {0}".format(VERSION)
+        print "Version: {0}".format(util.Version.version_text())
         sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
