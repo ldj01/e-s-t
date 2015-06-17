@@ -2,7 +2,8 @@
     FILE: lst_utilities.py
 
     PURPOSE: Provide a library of routines to be used by LST python
-             applications.
+             applications.  Each routine is placed under a class in hopes of
+             separating them into specific collections/groups.
 
     PROJECT: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -20,7 +21,25 @@ import os
 import logging
 import commands
 import requests
+from osgeo import gdal, osr
 from time import sleep
+
+
+# ============================================================================
+class Version:
+    '''
+    Description:
+        Provides methods for retrieving version information.
+    '''
+
+    version = '0.0.1'
+
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def version_text():
+        msg = ('Landsat 5 and 7 - Land Surface Temperature - Version {0}'
+               .format(Version.version))
+        return msg
 
 
 # ============================================================================
@@ -167,3 +186,37 @@ class Web:
                     req.close()
 
         return status_code
+
+
+# ============================================================================
+class Geo:
+    '''
+    Description:
+        Provides methods for interfacing with web resources.
+    '''
+
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def get_proj4_projection_string(img_filename):
+        '''
+        Description:
+            Determine the proj4 projection parameters for the specified image.
+
+        Returns:
+            proj4 - The proj4 projection string for the image.
+        '''
+
+        ds = gdal.Open(img_filename)
+        if ds is None:
+            raise RuntimeError("GDAL failed to open (%s)" % img_filename)
+
+        ds_srs = osr.SpatialReference()
+        ds_srs.ImportFromWkt(ds.GetProjection())
+
+        proj4 = ds_srs.ExportToProj4()
+
+        del (ds_srs)
+        del (ds)
+
+        return proj4
+
