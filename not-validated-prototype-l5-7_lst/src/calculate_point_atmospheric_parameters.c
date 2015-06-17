@@ -803,7 +803,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L5_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L5_Spectral_Response.rsp");
+                  "%s/%s", lst_data_dir, "L5_Spectral_Response.txt");
     }
     else if (input->meta.instrument == INST_ETM
              && input->meta.satellite == SAT_LANDSAT_7)
@@ -811,7 +811,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L7_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L7_Spectral_Response.rsp");
+                  "%s/%s", lst_data_dir, "L7_Spectral_Response.txt");
     }
     else if (input->meta.instrument == INST_OLI_TIRS
              && input->meta.satellite == SAT_LANDSAT_8)
@@ -819,7 +819,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L8_OLITIRS_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L8_B10.rsp");
+                  "%s/%s", lst_data_dir, "L8_Spectral_Response.txt");
     }
     else
     {
