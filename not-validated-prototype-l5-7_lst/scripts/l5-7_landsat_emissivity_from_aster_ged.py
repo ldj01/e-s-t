@@ -69,7 +69,7 @@ VERSION = '0.0.1'
 # Variables to hold the server name and path retrieved from the environment
 SERVER_NAME = ''
 SERVER_PATH = ''
-# Setup some formats to generate the URL to retrieve an ASTER GED tile
+# Setup some formats to apply to the URL for retrieving an ASTER GED tile
 FILE_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
 FILE_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
 
@@ -245,31 +245,6 @@ def generate_raster_file(driver, filename, x_dim, y_dim, data,
 
     except Exception:
         raise
-
-
-# ============================================================================
-def get_proj4_projection_string(img_filename):
-    '''
-    Description:
-        Determine the proj4 projection parameters for the specified image.
-
-    Returns:
-        proj4 - The proj4 projection string for the image.
-    '''
-
-    ds = gdal.Open(img_filename)
-    if ds is None:
-        raise RuntimeError("GDAL failed to open (%s)" % img_filename)
-
-    ds_srs = osr.SpatialReference()
-    ds_srs.ImportFromWkt(ds.GetProjection())
-
-    proj4 = ds_srs.ExportToProj4()
-
-    del (ds_srs)
-    del (ds)
-
-    return proj4
 
 
 # ============================================================================
@@ -607,7 +582,12 @@ def build_landsat_emis_data(args, driver, ls_info):
 
 
 # ============================================================================
-def read_info_from_metadata(xml_filename):
+def retrieve_metadata_information(xml_filename):
+    '''
+    Description:
+        Loads and reads required information from the metadata XML file.
+    '''
+
     # Read the XML metadata
     espa_xml = metadata_api.parse(xml_filename, silence=True)
     # Grab the global metadata object
@@ -653,7 +633,8 @@ def read_info_from_metadata(xml_filename):
             toa_bt_name = band.get_file_name()
 
             # Get the output proj4 string
-            ls_info.dest_proj4 = get_proj4_projection_string(toa_bt_name)
+            ls_info.dest_proj4 = \
+                util.Geo.get_proj4_projection_string(toa_bt_name)
 
     # Error if we didn't find the required TOA bands in the data
     if len(toa_green_name) <= 0:
@@ -722,7 +703,7 @@ def process(args):
         (ls_info, toa_bt_name, toa_green_name, toa_red_name, toa_nir_name,
          toa_swir1_name, toa_green_scale_factor, toa_red_scale_factor,
          toa_nir_scale_factor, toa_swir1_scale_factor,
-         satellite) = read_info_from_metadata(args.xml_filename)
+         satellite) = retrieve_metadata_information(args.xml_filename)
     except:
         logger.exception("Failed reading input XML metadata file")
         raise
