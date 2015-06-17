@@ -28,64 +28,11 @@ import logging
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 
-# espa-common objects and methods
-from espa_constants import EXIT_FAILURE
-from espa_constants import EXIT_SUCCESS
+# Import the metadata api found in the espa-product-formatter project
 import metadata_api
 
-
-# ============================================================================
-def execute_cmd(cmd):
-    '''
-    Description:
-      Execute a command line and return the terminal output or raise an
-      exception
-
-    Returns:
-        output - The stdout and/or stderr from the executed command.
-    '''
-
-    output = ''
-
-    (status, output) = commands.getstatusoutput(cmd)
-
-    if status < 0:
-        message = "Application terminated by signal [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if status != 0:
-        message = "Application failed to execute [%s]" % cmd
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    if os.WEXITSTATUS(status) != 0:
-        message = "Application [%s] returned error code [%d]" \
-                  % (cmd, os.WEXITSTATUS(status))
-        if len(output) > 0:
-            message = ' Stdout/Stderr is: '.join([message, output])
-        raise Exception(message)
-
-    return output
-
-
-# ============================================================================
-def create_directory(directory):
-    '''
-    Description:
-        Create the specified directory with some error checking.
-    '''
-
-    # Create/Make sure the directory exists
-    try:
-        os.makedirs(directory, mode=0755)
-    except OSError as ose:
-        if ose.errno == errno.EEXIST and os.path.isdir(directory):
-            pass
-        else:
-            raise
+# Import local modules
+import lst_utilities as util
 
 
 # ============================================================================
@@ -100,7 +47,7 @@ def extract_grib_data(hdr_path, grb_path, output_dir):
 
     logger = logging.getLogger(__name__)
 
-    create_directory(output_dir)
+    util.System.create_directory(output_dir)
 
     with open(hdr_path, 'r') as hdr_fd:
         for line in hdr_fd.readlines():
@@ -121,7 +68,7 @@ def extract_grib_data(hdr_path, grb_path, output_dir):
             # Extract the pressure data and raise any errors
             output = ''
             try:
-                output = execute_cmd(cmd)
+                output = util.System.execute_cmd(cmd)
             except Exception, e:
                 logger.error("Failed to unpack data")
                 raise e
@@ -271,7 +218,7 @@ def process_lst(args, base_aux_dir):
     output = ''
     try:
         logger.info("Calling [{0}]".format(cmd))
-        output = execute_cmd(cmd)
+        output = util.System.execute_cmd(cmd)
     except Exception, e:
         logger.error("Failed processing scene_based_lst")
         raise e
@@ -288,7 +235,7 @@ def process_lst(args, base_aux_dir):
     output = ''
     try:
         logger.info("Calling [{0}]".format(cmd))
-        output = execute_cmd(cmd)
+        output = util.System.execute_cmd(cmd)
     except Exception, e:
         logger.error("Failed processing scene_based_lst")
         raise e
@@ -375,7 +322,8 @@ if __name__ == '__main__':
     # ---- Add parameters ----
     # Required parameters
     parser.add_argument('--xml',
-                        action='store', dest='xml_filename', required=True,
+                        action='store', dest='xml_filename',
+                        required=False, default=None,
                         help="The XML metadata file to use")
 
     # Optional parameters
@@ -389,8 +337,34 @@ if __name__ == '__main__':
                         required=False, default=False,
                         help="Keep any debugging data")
 
+    parser.add_argument('--version',
+                        action='store_true', dest='version',
+                        required=False, default=False,
+                        help="Reports the version of the software")
+
     # Parse the command line parameters
     args = parser.parse_args()
+
+    # Command line arguments are required so print the help if none were
+    # provided
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)  # EXIT FAILURE
+
+    # Report the version and exit
+    if args.version:
+        print util.Version.version_text()
+        sys.exit(0)  # EXIT SUCCESS
+
+    # Verify that the --xml parameter was specified
+    if args.xml_filename is None:
+        raise Exception("--xml must be specified on the command line")
+        sys.exit(1)  # EXIT FAILURE
+
+    # Setup the logging level
+    log_level = logging.INFO
+    if args.debug:
+        log_level = logging.DEBUG
 
     # Setup the default logger format and level.  Log to STDOUT.
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
@@ -398,7 +372,7 @@ if __name__ == '__main__':
                                 ' %(filename)s:%(lineno)d:'
                                 '%(funcName)s -- %(message)s'),
                         datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO,
+                        level=log_level,
                         stream=sys.stdout)
 
     # Get the logger
@@ -408,24 +382,24 @@ if __name__ == '__main__':
     base_aux_dir = os.environ.get('LST_AUX_DIR')
     if base_aux_dir is None:
         logger.info("Missing environment variable LST_AUX_DIR")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     # Not used here, only verified because the lst executable requires it
     base_data_dir = os.environ.get('LST_DATA_DIR')
     if base_data_dir is None:
         logger.info("Missing environment variable LST_DATA_DIR")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     # Verify that the base_aux_dir exists
     if not os.path.isdir(base_aux_dir):
         logger.info("LST_AUX_DIR directory does not exist")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     # Verify that the XML filename provided is not an empty string
     if args.xml_filename == '':
         logger.fatal("No XML metadata filename provided.")
         logger.fatal("Error processing LST.  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     try:
         logger.info("Generating LST products")
@@ -434,7 +408,7 @@ if __name__ == '__main__':
 
     except Exception, e:
         logger.exception("Error processing LST.  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     logger.info("Completion of LST processing")
-    sys.exit(EXIT_SUCCESS)
+    sys.exit(0)  # EXIT SUCCESS
