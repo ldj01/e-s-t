@@ -384,10 +384,16 @@ if __name__ == '__main__':
         logger.info("Missing environment variable LST_AUX_DIR")
         sys.exit(1)  # EXIT FAILURE
 
-    # Not used here, only verified because the lst executable requires it
-    base_data_dir = os.environ.get('LST_DATA_DIR')
-    if base_data_dir is None:
+    # Not used here, only verified because a sub-executable requires it
+    tmp = os.environ.get('LST_DATA_DIR')
+    if tmp is None:
         logger.info("Missing environment variable LST_DATA_DIR")
+        sys.exit(1)  # EXIT FAILURE
+
+    # Not used here, only verified because a sub-executable requires it
+    tmp = os.environ.get('ASTER_GED_SERVER_NAME')
+    if tmp is None:
+        logger.info("Missing environment variable ASTER_GED_SERVER_NAME")
         sys.exit(1)  # EXIT FAILURE
 
     # Verify that the base_aux_dir exists
