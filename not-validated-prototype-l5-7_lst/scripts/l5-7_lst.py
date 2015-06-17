@@ -244,39 +244,21 @@ def process_lst(args, base_aux_dir):
             logger.info(output)
 
     # ------------------------------------------------------------------------
-    # TODO TODO TODO - Generate the LST product here
-    # TODO TODO TODO - Generate the LST product here
-    # TODO TODO TODO - Generate the LST product here
-    # TODO TODO TODO - Generate the LST product here
-#                %% LST calculation
-#
-#                % Compute Surface radiance
-#                surfrad = (L - pathr)./t1r;
-#
-#                %     if surfrad==0
-#                %         disp('Zero Radiance value')
-#                %         continue
-#                %     end
-#
-#
-#                R = surfrad - (1-easter_mod).*skyr;
-#
-#                Rz = R<=0;
-#                R(Rz) = nan;
-#
-#                % Account for emissivity to get Planck emitted radiance
-#                Re = R./easter_mod;
-#                szR = size(R);
-#
-#                clear surfrad R Rz
-#
-#                % Use Brightness temperature LUT to get skin temperature
-#                RadBT = BT(:,2);
-#                TBT = BT(:,1);
-#
-#                Rint = reshape(Re,1,szR(1).*szR(2));
-#                LST = interp1(RadBT,TBT,Rint);
-#                LST = reshape(LST,szR);
+    # Generate Land Surface Temperature band
+    cmd = ['l5-7_build_lst_data.py',
+           '--xml', args.xml_filename]
+
+    cmd = ' '.join(cmd)
+    output = ''
+    try:
+        logger.info("Calling [{0}]".format(cmd))
+        output = util.System.execute_cmd(cmd)
+    except Exception, e:
+        logger.error("Failed processing scene_based_lst")
+        raise e
+    finally:
+        if len(output) > 0:
+            logger.info(output)
 
     # ------------------------------------------------------------------------
     # Cleanup
@@ -301,7 +283,10 @@ def process_lst(args, base_aux_dir):
 
         os.unlink('point_list.txt')
 
-    # TODO TODO TODO
+    # TODO TODO TODO - More cleanup and removal of items from the metadata.xml
+    # TODO TODO TODO - More cleanup and removal of items from the metadata.xml
+    # TODO TODO TODO - More cleanup and removal of items from the metadata.xml
+
     # TODO TODO TODO
     # TODO TODO TODO
     # TODO TODO TODO
