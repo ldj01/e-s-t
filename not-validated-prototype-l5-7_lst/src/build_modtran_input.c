@@ -1383,7 +1383,8 @@ int build_modtran_input
                           " | sed 's/tmp/%s/'"
                           " | sed 's/alb/%4.2f/'"
                           " > %s/tape5",
-                          temp_strs[temperature], alb[temperature], current_alb);
+                          temp_strs[temperature], alb[temperature],
+                          current_alb);
                 if (system (command) != SUCCESS)
                 {
                     RETURN_ERROR ("Failed creating tape5", FUNC_NAME, FAILURE);
