@@ -19,6 +19,7 @@
 
 import os
 import logging
+import errno
 import commands
 import requests
 from osgeo import gdal, osr
