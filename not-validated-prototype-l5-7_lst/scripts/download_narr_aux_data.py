@@ -24,9 +24,7 @@
 import os
 import sys
 import shutil
-import errno
 import re
-import commands
 import logging
 import tempfile
 import requests
