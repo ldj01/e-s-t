@@ -21,9 +21,7 @@ import os
 import sys
 import shutil
 import glob
-import errno
 import re
-import commands
 import logging
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
@@ -188,9 +186,9 @@ def process_lst(args, base_aux_dir):
         logger.info("Extracting LST AUX data")
 
         extract_aux_data(args, base_aux_dir)
-    except Exception, e:
+    except Exception:
         logger.error("Failed processing lst_download_extract_aux_data.py")
-        raise e
+        raise
 
     if args.only_extract_aux_data:
         logger.info("Stopping - User requested to stop after extracting"
