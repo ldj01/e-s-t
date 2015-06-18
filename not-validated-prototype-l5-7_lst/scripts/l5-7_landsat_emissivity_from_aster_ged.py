@@ -536,14 +536,13 @@ def build_landsat_emis_data(args, driver, ls_info):
         logger.exception("Mosaicing ASTER NDVI tiles")
         raise
 
-    # Cleanup the estimated Landsat EMIS tiles
     if not args.keep_intermediate_data:
+        # Cleanup the estimated Landsat EMIS tiles
         for emis_filename in landsat_emis_mean_filenames:
             if os.path.exists(emis_filename):
                 os.unlink(emis_filename)
 
-    # Cleanup the ASTER NDVI tiles
-    if not args.keep_intermediate_data:
+        # Cleanup the ASTER NDVI tiles
         for ndvi_filename in aster_ndvi_mean_filenames:
             if os.path.exists(ndvi_filename):
                 os.unlink(ndvi_filename)
@@ -568,11 +567,12 @@ def build_landsat_emis_data(args, driver, ls_info):
         logger.exception("Warping ASTER NDVI to match Landsat data")
         raise
 
-    # Cleanup the temp files
-    if os.path.exists(landsat_emis_mosaic_name):
-        os.unlink(landsat_emis_mosaic_name)
-    if os.path.exists(aster_ndvi_mosaic_name):
-        os.unlink(aster_ndvi_mosaic_name)
+    if not args.keep_intermediate_data:
+        # Cleanup the temp files
+        if os.path.exists(landsat_emis_mosaic_name):
+            os.unlink(landsat_emis_mosaic_name)
+        if os.path.exists(aster_ndvi_mosaic_name):
+            os.unlink(aster_ndvi_mosaic_name)
 
     return (landsat_emis_warped_name, aster_ndvi_warped_name)
 
@@ -841,6 +841,13 @@ def process(args):
     del (ds)
     del (landsat_emis_data)
     del (aster_ndvi_data)
+
+    if not args.keep_intermediate_data:
+        # Cleanup the temp files since we have them in memory
+        if os.path.exists(landsat_emis_warped_name):
+            os.unlink(landsat_emis_warped_name)
+        if os.path.exists(aster_ndvi_warped_name):
+            os.unlink(aster_ndvi_warped_name)
 
     logger.info("Normalizing Landsat and ASTER NDVI")
     # Normalize Landsat NDVI by max value
