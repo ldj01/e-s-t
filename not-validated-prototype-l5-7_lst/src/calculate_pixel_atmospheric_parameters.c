@@ -19,7 +19,6 @@
    Set them to 0 to turn them off.
    They need to be set to 0 for production/standard processing. */
 #define OUTPUT_CELL_DESIGNATION_BAND 0
-#define OUTPUT_INTERMEDIATE_BANDS 1
 
 
 /* Defines the index for the intermediate bands which are generated for the
@@ -483,7 +482,6 @@ int calculate_pixel_atmospheric_parameters
     char *tmp_char = NULL;
     char scene_name[PATH_MAX];
 
-#if OUTPUT_INTERMEDIATE_BANDS
     char thermal_filename[PATH_MAX];
     char upwelled_filename[PATH_MAX];
     char downwelled_filename[PATH_MAX];
@@ -492,7 +490,6 @@ int calculate_pixel_atmospheric_parameters
     FILE *transmittance_fd = NULL;
     FILE *upwelled_fd = NULL;
     FILE *downwelled_fd = NULL;
-#endif
 
     FILE *dem_fd = NULL;
     int16_t *dem = NULL;        /* input DEM data in meters */
@@ -556,16 +553,14 @@ int calculate_pixel_atmospheric_parameters
               "%s_%s.img", scene_name, "cells");
 #endif
 
-#if OUTPUT_INTERMEDIATE_BANDS
     snprintf (thermal_filename, sizeof (thermal_filename),
-              "%s_%s.img", scene_name, LST_THERMAL_RADIANCE_PRODUCT_NAME);
+              "%s_%s.img", scene_name, LST_THERMAL_RADIANCE_BAND_NAME);
     snprintf (upwelled_filename, sizeof (upwelled_filename),
-              "%s_%s.img", scene_name, LST_UPWELLED_RADIANCE_PRODUCT_NAME);
+              "%s_%s.img", scene_name, LST_UPWELLED_RADIANCE_BAND_NAME);
     snprintf (downwelled_filename, sizeof (downwelled_filename),
-              "%s_%s.img", scene_name, LST_DOWNWELLED_RADIANCE_PRODUCT_NAME);
+              "%s_%s.img", scene_name, LST_DOWNWELLED_RADIANCE_BAND_NAME);
     snprintf (transmittance_filename, sizeof (transmittance_filename),
-              "%s_%s.img", scene_name, LST_ATMOS_TRANS_PRODUCT_NAME);
-#endif
+              "%s_%s.img", scene_name, LST_ATMOS_TRANS_BAND_NAME);
 
     /* Open the intermediate binary files for writing */
 #if OUTPUT_CELL_DESIGNATION_BAND
@@ -577,35 +572,33 @@ int calculate_pixel_atmospheric_parameters
     }
 #endif
 
-#if OUTPUT_INTERMEDIATE_BANDS
     thermal_fd = fopen (thermal_filename, "wb");
     if (thermal_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", thermal_filename);
+        sprintf (msg, "Opening intermediate file: %s", thermal_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
     transmittance_fd = fopen (transmittance_filename, "wb");
     if (transmittance_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", transmittance_filename);
+        sprintf (msg, "Opening intermediate file: %s", transmittance_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
     upwelled_fd = fopen (upwelled_filename, "wb");
     if (upwelled_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", upwelled_filename);
+        sprintf (msg, "Opening intermediate file: %s", upwelled_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
 
     downwelled_fd = fopen (downwelled_filename, "wb");
     if (downwelled_fd == NULL)
     {
-        sprintf (msg, "Opening report file: %s", downwelled_filename);
+        sprintf (msg, "Opening intermediate file: %s", downwelled_filename);
         RETURN_ERROR (msg, FUNC_NAME, FAILURE);
     }
-#endif
 
     /* Allocate memory for intermediate_bands */
     intermediate_bands =
@@ -840,7 +833,7 @@ int calculate_pixel_atmospheric_parameters
         }
 #endif
 
-#if OUTPUT_INTERMEDIATE_BANDS
+        /* Write out the temporary intermediate output files */
         status = fwrite (&intermediate_bands[BAND_TRANSMISSION][0],
                          sizeof (float), input->thermal.size.s,
                          transmittance_fd);
@@ -873,7 +866,6 @@ int calculate_pixel_atmospheric_parameters
             sprintf (msg, "Writing to %s", thermal_filename);
             ERROR_MESSAGE (msg, FUNC_NAME);
         }
-#endif
     } /* END - for line */
 
     /* Free allocated memory */
@@ -905,7 +897,6 @@ int calculate_pixel_atmospheric_parameters
     }
 #endif
 
-#if OUTPUT_INTERMEDIATE_BANDS
     status = fclose (thermal_fd);
     if (status)
     {
@@ -933,10 +924,10 @@ int calculate_pixel_atmospheric_parameters
         sprintf (msg, "Closing file %s", downwelled_filename);
         ERROR_MESSAGE (msg, FUNC_NAME);
     }
-#endif
 
     if (add_lst_band_product(xml_filename,
                              input->thermal.band_name,
+                             thermal_filename,
                              LST_THERMAL_RADIANCE_PRODUCT_NAME,
                              LST_THERMAL_RADIANCE_BAND_NAME,
                              LST_THERMAL_RADIANCE_SHORT_NAME,
@@ -949,6 +940,7 @@ int calculate_pixel_atmospheric_parameters
 
     if (add_lst_band_product(xml_filename,
                              input->thermal.band_name,
+                             transmittance_filename,
                              LST_ATMOS_TRANS_PRODUCT_NAME,
                              LST_ATMOS_TRANS_BAND_NAME,
                              LST_ATMOS_TRANS_SHORT_NAME,
@@ -961,6 +953,7 @@ int calculate_pixel_atmospheric_parameters
 
     if (add_lst_band_product(xml_filename,
                              input->thermal.band_name,
+                             upwelled_filename,
                              LST_UPWELLED_RADIANCE_PRODUCT_NAME,
                              LST_UPWELLED_RADIANCE_BAND_NAME,
                              LST_UPWELLED_RADIANCE_SHORT_NAME,
@@ -973,6 +966,7 @@ int calculate_pixel_atmospheric_parameters
 
     if (add_lst_band_product(xml_filename,
                              input->thermal.band_name,
+                             downwelled_filename,
                              LST_DOWNWELLED_RADIANCE_PRODUCT_NAME,
                              LST_DOWNWELLED_RADIANCE_BAND_NAME,
                              LST_DOWNWELLED_RADIANCE_SHORT_NAME,
