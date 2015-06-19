@@ -27,7 +27,7 @@ from time import sleep
 
 
 # ============================================================================
-class Version:
+class Version(object):
     '''
     Description:
         Provides methods for retrieving version information.
@@ -50,7 +50,7 @@ class Version:
 
 
 # ============================================================================
-class System:
+class System(object):
     '''
     Description:
         Provides methods for interfacing with the host server.
@@ -112,7 +112,7 @@ class System:
 
 
 # ============================================================================
-class Web:
+class Web(object):
     '''
     Description:
         Provides methods for interfacing with web resources.
@@ -196,7 +196,7 @@ class Web:
 
 
 # ============================================================================
-class Geo:
+class Geo(object):
     '''
     Description:
         Provides methods for interfacing with web resources.
