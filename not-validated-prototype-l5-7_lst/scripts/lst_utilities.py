@@ -22,6 +22,7 @@ import logging
 import errno
 import commands
 import requests
+from cStringIO import StringIO
 from osgeo import gdal, osr
 from time import sleep
 
@@ -68,8 +69,11 @@ class System(object):
             output - The stdout and/or stderr from the executed command.
         '''
 
+        logger = logging.getLogger(__name__)
+
         output = ''
 
+        logger.info("Executing [{0}]".format(cmd))
         (status, output) = commands.getstatusoutput(cmd)
 
         if status < 0:
@@ -196,6 +200,111 @@ class Web(object):
 
 
 # ============================================================================
+class Warp(object):
+    '''
+    Description:
+        Provides warping capabilities through GDAL's gdalwarp command line
+        tool.
+    '''
+
+    supported_output_formats = ['ENVI', 'GTiff']
+    x_pixel_min = 0.5
+    x_pixel_max = 1000.0
+    y_pixel_min = 0.5
+    y_pixel_max = 1000.0
+
+    # ------------------------------------------------------------------------
+    def __init__(self):
+        self.base_cmd = ['gdalwarp', '-wm', '2048', '-multi']
+
+        self.x_pixel_size = None
+        self.y_pixel_size = None
+
+        self.source_proj4 = None
+        self.target_proj4 = None
+
+        self.overwrite_target = False
+
+        self.target_image_extents = None
+
+        self.output_format = None
+
+        self.source_no_data_value = None
+        self.target_no_data_value = None
+
+        self.source_files = None
+        self.target_file = None
+
+    # ------------------------------------------------------------------------
+    def set_output_pixel_size(x_pixel_size, y_pixel_size):
+        if x_pixel_size < 0.5 or x_pixel_size > 1000.0:
+            raise Exception('X pixel_size out of range [{0} - {1}]'
+                            .format(self.x_pixel_min, self.x_pixel_max))
+
+        if y_pixel_size < 0.5 or y_pixel_size > 1000.0:
+            raise Exception('Y pixel_size out of range [{0} - {1}]'
+                            .format(self.y_pixel_min, self.y_pixel_max))
+
+        self.x_pixel_size = x_pixel_size
+        self.y_pixel_size = y_pixel_size
+
+    # ------------------------------------------------------------------------
+    def set_source_proj4(source_proj4):
+        self.source_proj4 = source_proj4
+
+    # ------------------------------------------------------------------------
+    def set_target_proj4(target_proj4):
+        self.target_proj4 = target_proj4
+
+    # ------------------------------------------------------------------------
+    def set_source_no_data_value(no_data_value):
+        self.source_no_data_value = float(no_data_value)
+
+    # ------------------------------------------------------------------------
+    def set_target_no_data_value(no_data_value):
+        self.target_no_data_value = float(no_data_value)
+
+    # ------------------------------------------------------------------------
+    def overwrite_target(true_false):
+        self.overwrite_target = true_false
+
+    # ------------------------------------------------------------------------
+    def set_output_format(format):
+
+        if format not in self.supported_output_formats:
+            raise NotImplementedError('Format [{0}] not supported'.
+                                      format(format))
+
+        self.output_format = format
+
+    # ------------------------------------------------------------------------
+    def set_source_files(source_files):
+        self.source_files = source_files
+
+    # ------------------------------------------------------------------------
+    def set_target_file(target_file):
+        self.target_file = target_file
+
+    # ------------------------------------------------------------------------
+    def execute(self):
+        if self.source_files is None:
+            raise Exception('Source file(s) not specified')
+
+        if self.target_file is None:
+            raise Exception('Target file not specified')
+
+        # Add the base command
+        cmd = [x for x in self.base_cmd]
+
+        # Adde the pixel size command
+        if self.x_pixel_size is not None and self.y_pixel_size is not None:
+        cmd.extend(['-tr', str(self.x_pixel_size), str(self.y_pixel_size)]
+
+        # TODO TODO TODO - Lots to get done here
+        print cmd
+
+
+# ============================================================================
 class Geo(object):
     '''
     Description:
@@ -227,3 +336,103 @@ class Geo(object):
 
         return proj4
 
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def update_envi_header(hdr_file_path, no_data_value):
+        '''
+        Description:
+            Updates the specified ENVI header.  Especially the no data value,
+            since it is not supported by the GDAL ENVI driver.
+        '''
+
+        sb = StringIO()
+        with open(hdr_file_path, 'r') as tmp_fd:
+            while True:
+                line = tmp_fd.readline()
+                if not line:
+                    break
+                if (line.startswith('data ignore value') or
+                        line.startswith('description')):
+                    pass
+                else:
+                    sb.write(line)
+
+                if line.startswith('description'):
+                    # This may be on multiple lines so read lines until
+                    # we find the closing brace
+                    if not line.strip().endswith('}'):
+                        while 1:
+                            next_line = tmp_fd.readline()
+                            if (not next_line or
+                                    next_line.strip().endswith('}')):
+                                break
+                    sb.write('description = {USGS-EROS-ESPA generated}\n')
+                elif (line.startswith('data type') and
+                      (no_data_value is not None)):
+                    sb.write('data ignore value = %s\n' % no_data_value)
+
+        # Do the actual replace here
+        with open(hdr_file_path, 'w') as tmp_fd:
+            tmp_fd.write(sb.getvalue())
+
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def generate_raster_file(driver, filename, data, x_dim, y_dim,
+                             geo_transform, proj_wkt,
+                             no_data_value, data_type):
+        '''
+        Description:
+            Creates a raster file on disk for the specified data, using the
+            specified driver.
+
+        Note: It is assumed that the driver supports setting of the no data
+              value.
+              It is the callers responsibility to fix it if it does not.
+
+        Note: It is assumed that the caller specified the correct file
+              extension in the filename parameter for the specfied driver.
+        '''
+
+        try:
+            raster = driver.Create(filename, x_dim, y_dim, 1, data_type)
+
+            raster.SetGeoTransform(geo_transform)
+            raster.SetProjection(proj_wkt)
+            raster.GetRasterBand(1).WriteArray(data)
+            raster.GetRasterBand(1).SetNoDataValue(no_data_value)
+            raster.FlushCache()
+
+            # Cleanup memory
+            del (raster)
+
+        except Exception:
+            raise
+
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def mosaic_tiles_into_one_raster(src_names, dest_name, no_data_value):
+        '''
+        Description:
+            Executes gdalwarp on the supplied source names to generate a
+            mosaic'ed destination named file.
+        '''
+
+        logger = logging.getLogger(__name__)
+
+        cmd = ['gdalwarp', '-wm', '2048', '-multi',
+               '-srcnodata', str(no_data_value),
+               '-dstnodata', str(no_data_value)]
+        cmd.extend(src_names)
+        cmd.append(dest_name)
+
+        cmd = ' '.join(cmd)
+
+        output = ''
+        try:
+            output = System.execute_cmd(cmd)
+        except Exception:
+            logger.error("Failed to mosaic tiles")
+            raise
+        finally:
+            if len(output) > 0:
+                logger.info(output)
