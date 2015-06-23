@@ -11,7 +11,7 @@ find_library ( Math_Library m ) # We need the standard math library
 
 include_directories ( ${LibESPA_INCLUDES} ${LIBXML2_INCLUDE_DIR} )
 
-add_executable ( l5-7_intermedtiate_data
+add_executable ( l5_7_intermedtiate_data
                      lst.c
                      input.c
                      output.c
@@ -24,13 +24,13 @@ add_executable ( l5-7_intermedtiate_data
                      calculate_point_atmospheric_parameters.c
                      calculate_pixel_atmospheric_parameters.c )
 
-target_link_libraries ( l5-7_intermedtiate_data
+target_link_libraries ( l5_7_intermedtiate_data
                             ${LibESPA_LIBRARIES}
                             ${LIBXML2_LIBRARIES}
                             ${ZLIB_LIBRARIES}
                             ${LIBLZMA_LIBRARIES}
                             ${Math_Library} )
 
-install ( TARGETS l5-7_intermedtiate_data
+install ( TARGETS l5_7_intermedtiate_data
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
 
