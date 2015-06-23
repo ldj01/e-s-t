@@ -226,7 +226,7 @@ def process_lst(args, base_aux_dir):
 
     # ------------------------------------------------------------------------
     # Generate extimated Landsat emissivity band
-    cmd = ['l5-7_landsat_emissivity_from_aster_ged.py',
+    cmd = ['l5-7_estimate_landsat_emissivity.py',
            '--xml', args.xml_filename]
 
     cmd = ' '.join(cmd)
