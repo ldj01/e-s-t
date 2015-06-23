@@ -80,12 +80,13 @@ class EstimateLandsatEmissivity(object):
             self.max_y_extent = None
             self.dest_proj4 = None
 
-    def __init__(self, args, server_name, server_path):
+    def __init__(self, xml_filename, server_name, server_path,
+                 keep_intermediate_data=False):
         super(EstimateLandsatEmissivity, self).__init__()
 
         # Keep local copies of these command line arguments
-        self.xml_filename = args.xml_filename
-        self.keep_intermediate_data = args.keep_intermediate_data
+        self.xml_filename = xml_filename
+        self.keep_intermediate_data = keep_intermediate_data
 
         # Create the info object
         self.ls_info = self.LandsatSourceInfo()
@@ -1012,7 +1013,9 @@ if __name__ == '__main__':
                                      '/ASTT/AG100.003/2000.01.01/')
 
         # Create the processor object
-        processor = EstimateLandsatEmissivity(args, server_name, server_path)
+        processor = EstimateLandsatEmissivity(args.xml_filename,
+                                              server_name, server_path,
+                                              args.keep_intermediate_data)
 
         # Call the main processing routine
         processor.generate_product()
