@@ -115,6 +115,9 @@ class EstimateLandsatEmissivity(object):
         self.toa_nir_scale_factor = 1.0
         self.toa_swir1_scale_factor = 1.0
 
+        # Setup the logger to use
+        self.logger = logging.getLogger(__name__)
+
     # ------------------------------------------------------------------------
     def extract_aster_data(self, emis_ds_name, ndvi_ds_name,
                            lat_ds_name, lon_ds_name):
@@ -208,8 +211,6 @@ class EstimateLandsatEmissivity(object):
             data.
         '''
 
-        logger = logging.getLogger(__name__)
-
         cmd = ['gdalwarp', '-wm', '2048', '-multi',
                '-tr', str(self.ls_info.x_pixel_size),
                str(self.ls_info.y_pixel_size),
@@ -228,14 +229,14 @@ class EstimateLandsatEmissivity(object):
 
         output = ''
         try:
-            logger.info("Executing [{0}]".format(cmd))
+            self.logger.info("Executing [{0}]".format(cmd))
             output = util.System.execute_cmd(cmd)
         except Exception:
-            logger.error("Failed during warping to match Landsat")
+            self.logger.error("Failed during warping to match Landsat")
             raise
         finally:
             if len(output) > 0:
-                logger.info(output)
+                self.logger.info(output)
 
     # ------------------------------------------------------------------------
     def build_ls_emis_data(self, driver):
@@ -316,10 +317,10 @@ class EstimateLandsatEmissivity(object):
                 lon_ds_name = ''.join(['HDF5:"', h5_file_path,
                                        '"://Geolocation/Longitude'])
 
-                logger.debug(emis_ds_name)
-                logger.debug(ndvi_ds_name)
-                logger.debug(lat_ds_name)
-                logger.debug(lon_ds_name)
+                self.logger.debug(emis_ds_name)
+                self.logger.debug(ndvi_ds_name)
+                self.logger.debug(lat_ds_name)
+                self.logger.debug(lon_ds_name)
 
                 # ------------------------------------------------------------
                 try:
@@ -328,7 +329,7 @@ class EstimateLandsatEmissivity(object):
                         self.extract_aster_data(emis_ds_name, ndvi_ds_name,
                                                 lat_ds_name, lon_ds_name)
                 except Exception:
-                    logger.exception("Extracting ASTER data from tile")
+                    self.logger.exception("Extracting ASTER data from tile")
                     raise
 
                 # Remove the HDF5 tile since we have extracted all the info we
@@ -404,7 +405,7 @@ class EstimateLandsatEmissivity(object):
                 # ------------------------------------------------------------
                 # Create the estimated Landsat EMIS raster output tile
                 try:
-                    logger.info("Creating an estimated Landsat EMIS tile")
+                    self.logger.info("Creating an estimated Landsat EMIS tile")
                     util.Geo.generate_raster_file(driver, ls_emis_tile_name,
                                                   ls_emis_numpy, x_dim, y_dim,
                                                   geo_transform,
@@ -412,13 +413,13 @@ class EstimateLandsatEmissivity(object):
                                                   self.no_data_value,
                                                   gdal.GDT_Float32)
                 except Exception:
-                    logger.exception("Creating Landsat EMIS tile")
+                    self.logger.exception("Creating Landsat EMIS tile")
                     raise
 
                 # ------------------------------------------------------------
                 # Create the ASTER NDVI raster output tile
                 try:
-                    logger.info("Creating an ASTER NDVI tile")
+                    self.logger.info("Creating an ASTER NDVI tile")
                     util.Geo.generate_raster_file(driver,
                                                   aster_ndvi_tile_name,
                                                   aster_ndvi_numpy,
@@ -428,7 +429,7 @@ class EstimateLandsatEmissivity(object):
                                                   self.no_data_value,
                                                   gdal.GDT_Float32)
                 except Exception:
-                    logger.exception("Creating ASTER NDVI tile")
+                    self.logger.exception("Creating ASTER NDVI tile")
                     raise
 
                 # Memory cleanup
@@ -451,22 +452,22 @@ class EstimateLandsatEmissivity(object):
 
         # Mosaic the estimated Landsat EMIS tiles into the temp EMIS
         try:
-            logger.info("Building mosaic for estimated Landsat EMIS")
+            self.logger.info("Building mosaic for estimated Landsat EMIS")
             util.Geo.mosaic_tiles_into_one_raster(ls_emis_mean_filenames,
                                                   ls_emis_mosaic_name,
                                                   self.no_data_value)
         except Exception:
-            logger.exception("Mosaicing EMIS tiles")
+            self.logger.exception("Mosaicing EMIS tiles")
             raise
 
         # Mosaic the ASTER NDVI tiles into the temp NDVI
         try:
-            logger.info("Building mosaic for ASTER NDVI")
+            self.logger.info("Building mosaic for ASTER NDVI")
             util.Geo.mosaic_tiles_into_one_raster(aster_ndvi_mean_filenames,
                                                   aster_ndvi_mosaic_name,
                                                   self.no_data_value)
         except Exception:
-            logger.exception("Mosaicing ASTER NDVI tiles")
+            self.logger.exception("Mosaicing ASTER NDVI tiles")
             raise
 
         if not self.keep_intermediate_data:
@@ -482,20 +483,21 @@ class EstimateLandsatEmissivity(object):
 
         # Warp estimated Landsat EMIS to match the Landsat data
         try:
-            logger.info("Warping estimated Landsat EMIS to match Landsat data")
+            self.logger.info("Warping estimated Landsat EMIS to"
+                             " match Landsat data")
             self.warp_raster_to_match_ls_data(ls_emis_mosaic_name,
                                               ls_emis_warped_name)
         except Exception:
-            logger.exception("Warping EMIS to match Landsat data")
+            self.logger.exception("Warping EMIS to match Landsat data")
             raise
 
         # Warp ASTER NDVI to match the Landsat data
         try:
-            logger.info("Warping ASTER NDVI to match Landsat data")
+            self.logger.info("Warping ASTER NDVI to match Landsat data")
             self.warp_raster_to_match_ls_data(aster_ndvi_mosaic_name,
                                               aster_ndvi_warped_name)
         except Exception:
-            logger.exception("Warping ASTER NDVI to match Landsat data")
+            self.logger.exception("Warping ASTER NDVI to match Landsat data")
             raise
 
         if not self.keep_intermediate_data:
@@ -619,14 +621,14 @@ class EstimateLandsatEmissivity(object):
             emissivity product.
         '''
 
-        logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
 
-        logger.info("Start - Estimate Landsat Emissivity")
+        self.logger.info("Start - Estimate Landsat Emissivity")
 
         try:
             self.retrieve_metadata_information()
         except:
-            logger.exception("Failed reading input XML metadata file")
+            self.logger.exception("Failed reading input XML metadata file")
             raise
 
         # Register all the gdal drivers and choose the GeoTiff for our temp
@@ -636,7 +638,7 @@ class EstimateLandsatEmissivity(object):
         envi_driver = gdal.GetDriverByName('ENVI')
 
         # Read the Landsat bands into memory
-        logger.info("Loading Landsat TOA input bands")
+        self.logger.info("Loading Landsat TOA input bands")
         # GREEN
         ds = gdal.Open(self.toa_green_name)
         x_dim = ds.RasterXSize  # They are all the same size
@@ -702,12 +704,12 @@ class EstimateLandsatEmissivity(object):
         ls_swir1_masked = np.ma.masked_where(mask, ls_swir1_masked)
 
         # Build the Landsat TOA NDVI data
-        logger.info("Building TOA based NDVI for Landsat data")
+        self.logger.info("Building TOA based NDVI for Landsat data")
         ls_ndvi_masked = ((ls_nir_masked - ls_red_masked) /
                           (ls_nir_masked + ls_red_masked))
 
         # Build the Landsat TOA NDSI data
-        logger.info("Building TOA based NDSI for Landsat data")
+        self.logger.info("Building TOA based NDSI for Landsat data")
         ls_ndsi_masked = ((ls_green_masked - ls_swir1_masked) /
                           (ls_green_masked + ls_swir1_masked))
 
@@ -724,7 +726,7 @@ class EstimateLandsatEmissivity(object):
         ls_ndvi_masked[ls_ndvi_masked < 0] = 0
 
         # Save the locations for the specfied snow pixels
-        logger.info("Determine snow pixel locations")
+        self.logger.info("Determine snow pixel locations")
         selected_snow_locations = np.where(ls_ndsi_masked > 0.4)
 
         # Memory cleanup
@@ -734,7 +736,8 @@ class EstimateLandsatEmissivity(object):
         # warp it to the Landsat scenes projection and image extents
         # For convenience the ASTER NDVI is also extracted and warped to the
         # Landsat scenes projection and image extents
-        logger.info("Build thermal emissivity band and retrieve ASTER NDVI")
+        self.logger.info("Build thermal emissivity band and"
+                         " retrieve ASTER NDVI")
         (ls_emis_warped_name,
          aster_ndvi_warped_name) = self.build_ls_emis_data(geotiff_driver)
 
@@ -774,7 +777,7 @@ class EstimateLandsatEmissivity(object):
             if os.path.exists(aster_ndvi_warped_name):
                 os.unlink(aster_ndvi_warped_name)
 
-        logger.info("Normalizing Landsat and ASTER NDVI")
+        self.logger.info("Normalizing Landsat and ASTER NDVI")
         # Normalize Landsat NDVI by max value
         min_ls_ndvi = ls_ndvi_masked.min()
         max_ls_ndvi = ls_ndvi_masked.max()
@@ -786,7 +789,7 @@ class EstimateLandsatEmissivity(object):
         aster_ndvi_masked = aster_ndvi_masked / float(max_aster_ndvi)
 
         # Calculate fractional veg-cover for both Landsat and ASTER NDVI
-        logger.info("Calculating fractional vegetation cover")
+        self.logger.info("Calculating fractional vegetation cover")
         fv_Landsat = 1.0 - ((max_ls_ndvi - ls_ndvi_masked) /
                             (max_ls_ndvi - min_ls_ndvi))
         fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_masked) /
@@ -802,8 +805,8 @@ class EstimateLandsatEmissivity(object):
         # Adjust estimated Landsat EMIS for vegetation and snow, to generate
         # the final Landsat EMIS data
         if self.satellite == 'LANDSAT_7':
-            logger.info("Adjusting estimated Landsat 7 EMIS"
-                        " for vegetation and snow")
+            self.logger.info("Adjusting estimated Landsat 7 EMIS"
+                             " for vegetation and snow")
             ls_soil = ((ls_emis_masked - 0.975 * fv_Aster) / (1.0 - fv_Aster))
             ls_mod = (0.9848 * fv_Landsat + ls_soil * (1.0 - fv_Landsat))
 
@@ -813,8 +816,8 @@ class EstimateLandsatEmissivity(object):
             ls_emis_final[selected_snow_locations] = 0.9869
 
         elif self.satellite == 'LANDSAT_5':
-            logger.info("Adjusting estimated Landsat 5 EMIS"
-                        " for vegetation and snow")
+            self.logger.info("Adjusting estimated Landsat 5 EMIS"
+                             " for vegetation and snow")
             ls_soil = ((ls_emis_masked - 0.975 * fv_Aster) / (1.0 - fv_Aster))
             ls_mod = (0.9851 * fv_Landsat + ls_soil * (1.0 - fv_Landsat))
 
@@ -832,8 +835,8 @@ class EstimateLandsatEmissivity(object):
 
         # Add the fill and scan gaps and ASTER gaps back into the results,
         # since they may have been lost
-        logger.info("Adding fill and data gaps back into the estimated"
-                    " Landsat emissivity results")
+        self.logger.info("Adding fill and data gaps back into the estimated"
+                         " Landsat emissivity results")
         ls_emis_final[ls_emis_no_data_locations] = self.no_data_value
         ls_emis_final[ls_emis_gap_locations] = self.no_data_value
         ls_emis_final[aster_ndvi_no_data_locations] = self.no_data_value
@@ -858,14 +861,14 @@ class EstimateLandsatEmissivity(object):
         ls_emis_hdr_filename = ''.join([product_id, '_emis', '.hdr'])
         ls_emis_aux_filename = ''.join([ls_emis_img_filename, '.aux', '.xml'])
 
-        logger.info("Creating {0}".format(ls_emis_img_filename))
+        self.logger.info("Creating {0}".format(ls_emis_img_filename))
         util.Geo.generate_raster_file(envi_driver, ls_emis_img_filename,
                                       ls_emis_final, x_dim, y_dim,
                                       ds_tmp_transform,
                                       ds_tmp_srs.ExportToWkt(),
                                       self.no_data_value, gdal.GDT_Float32)
 
-        logger.info("Updating {0}".format(ls_emis_hdr_filename))
+        self.logger.info("Updating {0}".format(ls_emis_hdr_filename))
         util.Geo.update_envi_header(ls_emis_hdr_filename, self.no_data_value)
 
         # Remove the *.aux.xml file generated by GDAL
@@ -930,7 +933,7 @@ class EstimateLandsatEmissivity(object):
         # Memory cleanup
         del (ls_emis_final)
 
-        logger.info("Completed - Estimate Landsat Emissivity")
+        self.logger.info("Completed - Estimate Landsat Emissivity")
 
 
 # ============================================================================
@@ -942,8 +945,7 @@ if __name__ == '__main__':
     '''
 
     # Build the command line argument parser
-    description = ("Retrieves ASTER GED data and derives an estimated Landsat"
-                   "emissivity product for the specified Landsat scene")
+    description = ("Estimates Landsat Emissivity from ASTER GED data")
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
