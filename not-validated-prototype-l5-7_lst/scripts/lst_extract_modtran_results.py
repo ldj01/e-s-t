@@ -25,11 +25,6 @@ from argparse import ArgumentParser
 from cStringIO import StringIO
 
 
-# espa-common objects and methods
-from espa_constants import EXIT_FAILURE
-from espa_constants import EXIT_SUCCESS
-
-
 # ============================================================================
 def extract_tpst(tape6_fd):
     '''
@@ -233,15 +228,15 @@ if __name__ == '__main__':
         logger.fatal("No data source specified.")
         logger.fatal("Error processing LST MODTRAN results."
                      "  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     if not os.path.isdir(args.input_path):
         logger.fatal("--input-path directory not found")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     if not os.path.isdir(args.output_path):
         logger.fatal("--output-path directory not found")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     try:
         if args.tape6:
@@ -254,7 +249,7 @@ if __name__ == '__main__':
     except Exception, e:
         logger.exception("Error processing LST MODTRAN results."
                          "  Processing will terminate.")
-        sys.exit(EXIT_FAILURE)
+        sys.exit(1)  # EXIT FAILURE
 
     logger.info("LST MODTRAN results processing complete")
-    sys.exit(EXIT_SUCCESS)
+    sys.exit(0)  # EXIT SUCCESS
