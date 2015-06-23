@@ -54,7 +54,7 @@ import lst_utilities as util
 class EstimateLandsatEmissivity(object):
     '''
     Description:
-        Defines the processor for generating the estimated Landsat emissivity
+        Defines the processor for generating the estimated Landsat Emissivity
         product.
     '''
 
@@ -80,11 +80,22 @@ class EstimateLandsatEmissivity(object):
             self.max_y_extent = None
             self.dest_proj4 = None
 
-    def __init__(self, xml_filename, server_name, server_path,
-                 keep_intermediate_data=False):
+    def __init__(self, xml_filename, keep_intermediate_data=False):
         super(EstimateLandsatEmissivity, self).__init__()
 
-        # Keep local copies of these command line arguments
+        server_name = ''
+        # Grab the server name from the environment
+        if 'ASTER_GED_SERVER_NAME' not in os.environ:
+            raise Exception("Environment variable ASTER_GED_SERVER_NAME is"
+                            " not defined")
+        else:
+            server_name = os.environ.get('ASTER_GED_SERVER_NAME')
+
+        # Grab the server path from the environment or default it
+        server_path = os.environ.get('ASTER_GED_SERVER_PATH',
+                                     '/ASTT/AG100.003/2000.01.01/')
+
+        # Keep local copies of these
         self.xml_filename = xml_filename
         self.keep_intermediate_data = keep_intermediate_data
 
@@ -876,6 +887,8 @@ class EstimateLandsatEmissivity(object):
         if os.path.exists(ls_emis_aux_filename):
             os.unlink(ls_emis_aux_filename)
 
+        self.logger.info("Adding {0} to {1}".format(ls_emis_img_filename,
+                                                    self.xml_filename))
         # Add the estimated Landsat emissivity to the metadata XML
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
         bands = espa_xml.get_bands()
@@ -1000,21 +1013,8 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     try:
-        server_name = ''
-        # Grab the server name from the environment
-        if 'ASTER_GED_SERVER_NAME' not in os.environ:
-            raise Exception("Environment variable ASTER_GED_SERVER_NAME is"
-                            " not defined")
-        else:
-            server_name = os.environ.get('ASTER_GED_SERVER_NAME')
-
-        # Grab the server path from the environment or default it
-        server_path = os.environ.get('ASTER_GED_SERVER_PATH',
-                                     '/ASTT/AG100.003/2000.01.01/')
-
         # Create the processor object
         processor = EstimateLandsatEmissivity(args.xml_filename,
-                                              server_name, server_path,
                                               args.keep_intermediate_data)
 
         # Call the main processing routine
