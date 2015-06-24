@@ -124,7 +124,7 @@ class Web(object):
 
     # ------------------------------------------------------------------------
     @staticmethod
-    def http_transfer_file(download_url, destination_file):
+    def http_transfer_file(download_url, destination_file, headers=None):
         '''
         Description:
             Using http transfer a file from a source location to a destination
@@ -157,7 +157,8 @@ class Web(object):
             status_code = requests.codes['ok']
             req = None
             try:
-                req = session.get(url=download_url, timeout=300.0)
+                req = session.get(url=download_url, timeout=300.0,
+                                  headers=headers)
 
                 if not req.ok:
                     logger.error("HTTP - Transfer of [{0}] - FAILED"
@@ -174,7 +175,7 @@ class Web(object):
                 done = True
                 logger.info("HTTP - Transfer Complete")
 
-            except:
+            except Exception:
                 logger.exception("HTTP - Transfer Issue")
 
                 if req is not None:
