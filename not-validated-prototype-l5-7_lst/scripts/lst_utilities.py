@@ -200,6 +200,8 @@ class Web(object):
 
 
 # ============================================================================
+# TODO TODO TODO - This Warp class is not usable yet, it is only a very very
+#                  early stage prototype.
 class Warp(object):
     '''
     Description:
@@ -298,10 +300,12 @@ class Warp(object):
 
         # Adde the pixel size command
         if self.x_pixel_size is not None and self.y_pixel_size is not None:
-        cmd.extend(['-tr', str(self.x_pixel_size), str(self.y_pixel_size)]
+            cmd.extend(['-tr',
+                        str(self.x_pixel_size),
+                        str(self.y_pixel_size)])
 
         # TODO TODO TODO - Lots to get done here
-        print cmd
+        print ' '.join(cmd)
 
 
 # ============================================================================
