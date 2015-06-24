@@ -9,7 +9,7 @@ all:
 
 install:
 	install -d $(PREFIX)/bin
-	install -m 755 l5-7_lst.py $(PREFIX)/bin
+	install -m 755 l5_7_lst.py $(PREFIX)/bin
 	install -m 755 l5_7_build_lst_data.py $(PREFIX)/bin
 	install -m 755 l5_7_estimate_landsat_emissivity.py $(PREFIX)/bin
 	install -m 755 download_narr_aux_data.py $(PREFIX)/bin
