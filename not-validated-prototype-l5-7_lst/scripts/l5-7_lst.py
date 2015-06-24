@@ -32,6 +32,9 @@ import metadata_api
 # Import local modules
 import lst_utilities as util
 
+import l5_7_estimate_landsat_emissivity as estimate_landsat_emissivity
+import l5_7_build_lst_data as build_lst_data
+
 
 # ============================================================================
 def extract_grib_data(hdr_path, grb_path, output_dir):
@@ -76,7 +79,7 @@ def extract_grib_data(hdr_path, grb_path, output_dir):
 
 
 # ============================================================================
-def extract_aux_data(args, base_aux_dir):
+def extract_aux_data(xml_filename, base_aux_dir):
     '''
     Description:
         Builds the strings required to locate the auxillary data in the
@@ -85,7 +88,7 @@ def extract_aux_data(args, base_aux_dir):
 
     logger = logging.getLogger(__name__)
 
-    xml = metadata_api.parse(args.xml_filename, silence=True)
+    xml = metadata_api.parse(xml_filename, silence=True)
     global_metadata = xml.get_global_metadata()
     acq_date = str(global_metadata.get_acquisition_date())
     scene_center_time = str(global_metadata.get_scene_center_time())
@@ -171,7 +174,9 @@ def extract_aux_data(args, base_aux_dir):
 
 
 # ============================================================================
-def process_lst(args, base_aux_dir):
+def process_lst(xml_filename, base_aux_dir,
+                only_extract_aux_data=False, debug=False,
+                keep_intermediate_data=False):
     '''
     Description:
         Provides the glue code for generating LST products.
@@ -185,19 +190,19 @@ def process_lst(args, base_aux_dir):
     try:
         logger.info("Extracting LST AUX data")
 
-        extract_aux_data(args, base_aux_dir)
+        extract_aux_data(xml_filename, base_aux_dir)
     except Exception:
         logger.error("Failed processing lst_download_extract_aux_data.py")
         raise
 
-    if args.only_extract_aux_data:
+    if only_extract_aux_data:
         logger.info("Stopping - User requested to stop after extracting"
                     " LST AUX data")
         return
 
     # Extract the product id from the xml filename and build some other
     # filenames
-    product_id = os.path.splitext(args.xml_filename)[0]
+    product_id = os.path.splitext(xml_filename)[0]
     mtl_filename = '{0}_MTL.txt'.format(product_id)
     # ESPA creates the DEM for us
     dem_filename = '{0}_dem.img'.format(product_id)
@@ -205,11 +210,11 @@ def process_lst(args, base_aux_dir):
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
     # the atmospheric transmittance band
-    cmd = ['l5-7_intermedtiate_data',
-           '--xml', args.xml_filename,
+    cmd = ['l5_7_intermedtiate_data',
+           '--xml', xml_filename,
            '--dem', dem_filename,
            '--verbose']
-    if args.debug:
+    if debug:
         cmd.append('--debug')
 
     cmd = ' '.join(cmd)
@@ -217,50 +222,36 @@ def process_lst(args, base_aux_dir):
     try:
         logger.info("Calling [{0}]".format(cmd))
         output = util.System.execute_cmd(cmd)
-    except Exception, e:
-        logger.error("Failed processing scene_based_lst")
-        raise e
+    except Exception:
+        logger.error("Failed creating intermediate data")
+        raise
     finally:
         if len(output) > 0:
             logger.info(output)
 
     # ------------------------------------------------------------------------
-    # Generate extimated Landsat emissivity band
-    cmd = ['l5-7_estimate_landsat_emissivity.py',
-           '--xml', args.xml_filename]
-
-    cmd = ' '.join(cmd)
-    output = ''
+    # Generate Estimated Landsat Emissivity data
     try:
-        logger.info("Calling [{0}]".format(cmd))
-        output = util.System.execute_cmd(cmd)
-    except Exception, e:
-        logger.error("Failed processing scene_based_lst")
-        raise e
-    finally:
-        if len(output) > 0:
-            logger.info(output)
+        processor = estimate_landsat_emissivity \
+            .EstimateLandsatEmissivity(xml_filename,
+                                       keep_intermediate_data)
+        processor.generate_product()
+    except Exception:
+        logger.error("Failed creating Estimated Landsat Emissivity data")
+        raise
 
     # ------------------------------------------------------------------------
     # Generate Land Surface Temperature band
-    cmd = ['l5-7_build_lst_data.py',
-           '--xml', args.xml_filename]
-
-    cmd = ' '.join(cmd)
-    output = ''
     try:
-        logger.info("Calling [{0}]".format(cmd))
-        output = util.System.execute_cmd(cmd)
-    except Exception, e:
-        logger.error("Failed processing scene_based_lst")
-        raise e
-    finally:
-        if len(output) > 0:
-            logger.info(output)
+        processor = build_lst_data.BuildLSTData(xml_filename)
+        processor.generate_data()
+    except Exception:
+        logger.error("Failed processing Land Surface Temperature")
+        raise
 
     # ------------------------------------------------------------------------
     # Cleanup
-    if not args.debug:
+    if not debug:
 
         # Remove the grib extraction directories
         shutil.rmtree('HGT_1', ignore_errors=True)
@@ -393,7 +384,8 @@ if __name__ == '__main__':
     try:
         logger.info("Generating LST products")
 
-        process_lst(args, base_aux_dir)
+        process_lst(args.xml_filename, base_aux_dir,
+                    args.only_extract_aux_data, args.debug)
 
     except Exception, e:
         logger.exception("Error processing LST.  Processing will terminate.")
