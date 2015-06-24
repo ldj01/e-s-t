@@ -166,7 +166,7 @@ class BuildLSTData(object):
 
         try:
             self.retrieve_metadata_information()
-        except:
+        except Exception:
             self.logger.exception("Failed reading input XML metadata file")
             raise
 

@@ -227,7 +227,7 @@ def build_points(gm, base_data_dir):
 
     try:
         grid_data = read_narr_coordinates(base_data_dir)
-    except:
+    except Exception:
         logger.error("Failed reading auxillary NARR dataset")
         raise
 

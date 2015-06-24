@@ -246,7 +246,7 @@ if __name__ == '__main__':
             logger.info("Using pltout.asc results")
             process_pltout_results(args)
 
-    except Exception, e:
+    except Exception:
         logger.exception("Error processing LST MODTRAN results."
                          "  Processing will terminate.")
         sys.exit(1)  # EXIT FAILURE
