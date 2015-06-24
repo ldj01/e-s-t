@@ -115,7 +115,7 @@ class AUX_Processor(object):
                 '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0])
             logger.info("Dir Name = {0}".format(dir_name))
 
-            util.create_directory(dir_name)
+            util.System.create_directory(dir_name)
 
             index = 1
             for pressure in mb_numbers:
@@ -131,10 +131,10 @@ class AUX_Processor(object):
                 output = ''
                 try:
                     logger.debug("Executing: [{0}]".format(cmd))
-                    output = util.execute_cmd(cmd)
-                except Exception, e:
+                    output = util.System.execute_cmd(cmd)
+                except Exception:
                     logger.error("Failed to unpack data")
-                    raise e
+                    raise
                 finally:
                     if len(output) > 0:
                         logger.info(output)
@@ -236,7 +236,7 @@ class AUX_Processor(object):
             return None
 
         # Download the inv file
-        util.http_transfer_file(inv_src, inv_name)
+        util.Web.http_transfer_file(inv_src, inv_name)
 
         grb_info = dict()
         for parm in self._parms_to_extract:
@@ -253,7 +253,7 @@ class AUX_Processor(object):
 
             # Download the specific sections for the current parameter
             logger.info("Destination Filename = {0}".format(grb_file))
-            util.http_transfer_file(grb_src, grb_file, headers=headers)
+            util.Web.http_transfer_file(grb_src, grb_file, headers=headers)
 
             grb_info[parm] = grb_file
 
@@ -299,7 +299,7 @@ class AUX_Processor(object):
             output = ''
             try:
                 logger.debug("Executing: [{0}]".format(cmd))
-                output = util.execute_cmd(cmd)
+                output = util.System.execute_cmd(cmd)
             except Exception:
                 logger.error("Failed reading {0} file".format(grb_file))
                 raise
@@ -327,7 +327,7 @@ class AUX_Processor(object):
 
         logger.info("Archiving into [{0}]".format(dest_path))
 
-        util.create_directory(dest_path)
+        util.System.create_directory(dest_path)
 
         for parm in self._parms_to_extract:
 
