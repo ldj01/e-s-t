@@ -105,15 +105,15 @@ class AUX_Processor(object):
         logger = logging.getLogger(__name__)
 
         for parm in self._parms_to_extract:
-            logger.info("Processing = {0} parameter values".format(parm))
+            logger.info('Processing = {0} parameter values'.format(parm))
 
             mb_numbers = grb_info[parm]['mb_numbers']
             grb_file = grb_info[parm]['filename']
-            logger.debug("Grb Filename = {0}".format(grb_file))
+            logger.debug('Grb Filename = {0}'.format(grb_file))
 
             dir_name = \
                 '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0])
-            logger.info("Dir Name = {0}".format(dir_name))
+            logger.info('Dir Name = {0}'.format(dir_name))
 
             util.System.create_directory(dir_name)
 
@@ -130,10 +130,10 @@ class AUX_Processor(object):
                 # Extract the pressure data and raise any errors
                 output = ''
                 try:
-                    logger.debug("Executing: [{0}]".format(cmd))
+                    logger.debug('Executing: [{0}]'.format(cmd))
                     output = util.System.execute_cmd(cmd)
                 except Exception:
-                    logger.error("Failed to unpack data")
+                    logger.error('Failed to unpack data')
                     raise
                 finally:
                     if len(output) > 0:
@@ -208,7 +208,7 @@ class AUX_Processor(object):
                        }
 
         Note:
-            We use the "Range" option in the http headers to retrieve only the
+            We use the 'Range' option in the http headers to retrieve only the
             portions of the auxillary data files that we need.
         '''
 
@@ -225,8 +225,8 @@ class AUX_Processor(object):
         data_path = self._aux_path_template.format(yyyymm, yyyymmdd)
         inv_src = '{0}{1}{2}'.format(self._aux_hostname, data_path, inv_name)
         grb_src = '{0}{1}{2}'.format(self._aux_hostname, data_path, grb_name)
-        logger.debug("INV = {0}".format(inv_src))
-        logger.debug("GRB = {0}".format(grb_src))
+        logger.debug('INV = {0}'.format(inv_src))
+        logger.debug('GRB = {0}'.format(grb_src))
 
         # Determine is the grib data exists on the server before continuing
         req = requests.head(inv_src)
@@ -240,7 +240,7 @@ class AUX_Processor(object):
 
         grb_info = dict()
         for parm in self._parms_to_extract:
-            logger.info("Retrieving = {0} parameter values".format(parm))
+            logger.info('Retrieving = {0} parameter values'.format(parm))
 
             # Determine the specific sections of the grib file to download
             byte_range = self.determine_grib_bytes(inv_name, parm)
@@ -252,7 +252,7 @@ class AUX_Processor(object):
             grb_file = grb_name.replace('.grb', '_{0}.grb'.format(parm))
 
             # Download the specific sections for the current parameter
-            logger.info("Destination Filename = {0}".format(grb_file))
+            logger.info('Destination Filename = {0}'.format(grb_file))
             util.Web.http_transfer_file(grb_src, grb_file, headers=headers)
 
             grb_info[parm] = grb_file
@@ -290,7 +290,7 @@ class AUX_Processor(object):
             grb_file = grb_info[parm]
             hdr_file = grb_file.replace('.grb', '.hdr')
 
-            logger.info("Building {0} header file".format(hdr_file))
+            logger.info('Building {0} header file'.format(hdr_file))
 
             cmd = ['wgrib', grb_file, '-h', '>', hdr_file]
             cmd = ' '.join(cmd)
@@ -298,10 +298,10 @@ class AUX_Processor(object):
             # Extract the pressure data and raise any errors
             output = ''
             try:
-                logger.debug("Executing: [{0}]".format(cmd))
+                logger.debug('Executing: [{0}]'.format(cmd))
                 output = util.System.execute_cmd(cmd)
             except Exception:
-                logger.error("Failed reading {0} file".format(grb_file))
+                logger.error('Failed reading {0} file'.format(grb_file))
                 raise
             finally:
                 if len(output) > 0:
@@ -320,12 +320,12 @@ class AUX_Processor(object):
         logger = logging.getLogger(__name__)
 
         if not os.path.isdir(self._base_aux_dir):
-            raise Exception("Base auxillary directory does not exist")
+            raise Exception('Base auxillary directory does not exist')
 
         dest_path = '{0}/{1:0>4}/{2:0>2}/{3:0>2}'.format(self._base_aux_dir,
                                                          year, month, day)
 
-        logger.info("Archiving into [{0}]".format(dest_path))
+        logger.info('Archiving into [{0}]'.format(dest_path))
 
         util.System.create_directory(dest_path)
 
@@ -373,8 +373,8 @@ class AUX_Processor(object):
 
                     if grb_info is None:
                         date = start_date.replace(hour=hour)
-                        logger.warning("NARR data unavailable for"
-                                       " {0}".format(str(date)))
+                        logger.warning('NARR data unavailable for {0}'
+                                       .format(str(date)))
                         continue
 
                     hdr_info = self.build_header_files(grb_info)
@@ -406,8 +406,8 @@ if __name__ == '__main__':
     '''
 
     # Create a command line arugment parser
-    description = ("Downloads LST auxillary inputs, then archives them for"
-                   "future use.")
+    description = ('Downloads LST auxillary inputs, then archives them for'
+                   ' future use.')
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -415,14 +415,14 @@ if __name__ == '__main__':
                         action='store',
                         dest='start_date',
                         required=False,
-                        help=("(Optional) The starting date 'YYYYDDD'."
-                              "  Required if --end-date supplied."))
+                        help=('(Optional) The starting date YYYYDDD.'
+                              '  Required if --end-date supplied.'))
 
     parser.add_argument('--end-date',
                         action='store',
                         dest='end_date',
                         required=False,
-                        help="(Optional) The ending date 'YYYYDDD'")
+                        help='(Optional) The ending date YYYYDDD')
 
     # Parse the command line parameters
     args = parser.parse_args()
@@ -443,17 +443,17 @@ if __name__ == '__main__':
     # specified
     base_aux_dir = os.environ.get('LST_AUX_DIR')
     if base_aux_dir is None:
-        logger.info("Missing environment variable LST_AUX_DIR")
+        logger.info('Missing environment variable LST_AUX_DIR')
         sys.exit(1)
 
     if not os.path.isdir(base_aux_dir):
-        logger.info("LST_AUX_DIR directory does not exist")
+        logger.info('LST_AUX_DIR directory does not exist')
         sys.exit(1)
 
     # Validate the start date is present if the end date was supplied
     if ((args.end_date is not None) and (args.start_date is None)):
-        logger.error("--start-date must be specified"
-                     " if --end-date is specified")
+        logger.error('--start-date must be specified'
+                     ' if --end-date is specified')
         sys.exit(1)
 
     # If the start date was not specified, default to the current UTC time
@@ -473,7 +473,7 @@ if __name__ == '__main__':
     if type(start_date) == str:
         length = len(start_date)
         if length < 7 or length > 10:
-            logger.error("Invalid --start-date")
+            logger.error('Invalid --start-date')
             sys.exit(1)
 
         if length == 7:
@@ -482,13 +482,13 @@ if __name__ == '__main__':
         try:
             start_date = datetime.strptime(start_date, '%Y%j%Z')
         except Exception:
-            logger.exception("Invalid --start-date")
+            logger.exception('Invalid --start-date')
             sys.exit(1)
 
     if type(end_date) == str:
         length = len(end_date)
         if length < 7 or length > 10:
-            logger.error("Invalid --end-date")
+            logger.error('Invalid --end-date')
             sys.exit(1)
 
         if length == 7:
@@ -497,24 +497,24 @@ if __name__ == '__main__':
         try:
             end_date = datetime.strptime(end_date, '%Y%j%Z')
         except Exception:
-            logger.exception("Invalid --end-date")
+            logger.exception('Invalid --end-date')
             sys.exit(1)
 
     if end_date < start_date:
-        logger.error("--end-date must be after --start-date")
+        logger.error('--end-date must be after --start-date')
         sys.exit(1)
 
     try:
-        logger.info("Downloading and extracting LST AUX data")
+        logger.info('Downloading and extracting LST AUX data')
 
         aux_processor = AUX_Processor(base_aux_dir, start_date, end_date)
 
         aux_processor.download_and_archive_aux_data()
 
     except Exception:
-        logger.exception("Error processing LST AUX data."
-                         "  Processing will terminate.")
+        logger.exception('Error processing LST AUX data.'
+                         '  Processing will terminate.')
         sys.exit(1)
 
-    logger.info("LST AUX data downloaded and extracted")
+    logger.info('LST AUX data downloaded and extracted')
     sys.exit(0)

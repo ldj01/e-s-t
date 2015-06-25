@@ -27,6 +27,9 @@ from osgeo import gdal, osr
 from time import sleep
 
 
+import metadata_api
+
+
 # ============================================================================
 class Version(object):
     '''
@@ -73,24 +76,24 @@ class System(object):
 
         output = ''
 
-        logger.info("Executing [{0}]".format(cmd))
+        logger.info('Executing [{0}]'.format(cmd))
         (status, output) = commands.getstatusoutput(cmd)
 
         if status < 0:
-            message = "Application terminated by signal [%s]" % cmd
+            message = 'Application terminated by signal [{0}]'.format(cmd)
             if len(output) > 0:
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
 
         if status != 0:
-            message = "Application failed to execute [%s]" % cmd
+            message = 'Application failed to execute [{0}]'.format(cmd)
             if len(output) > 0:
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
 
         if os.WEXITSTATUS(status) != 0:
-            message = "Application [%s] returned error code [%d]" \
-                      % (cmd, os.WEXITSTATUS(status))
+            message = ('Application [{0}] returned error code [{1}]'
+                       .format(cmd, os.WEXITSTATUS(status)))
             if len(output) > 0:
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
@@ -113,6 +116,59 @@ class System(object):
                 pass
             else:
                 raise
+
+
+# ============================================================================
+class Metadata(object):
+    '''
+    Description:
+        Provides methods for interfacing with our metadata XML file.
+    '''
+
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def remove_products(xml_filename, product_list):
+
+        if not product_list:
+            # We don't error, just nothing to do.
+            return
+
+        espa_xml = metadata_api.parse(xml_filename, silence=True)
+        bands = espa_xml.get_bands()
+
+        # Gather all the filenames to be removed
+        filenames = list()
+        for band in bands.band:
+            if band.product in product_list:
+                # Add the .img file
+                filenames.append(band.file_name)
+                # Add the .hdr file
+                hdr_filename = band.file_name.replace('.img', '.hdr')
+                filenames.append(hdr_filename)
+
+        # If we found some then remove them
+        if len(filenames) > 0:
+            # First remove from disk
+            for filename in filenames:
+                if os.path.exists(filename):
+                    os.unlink(filename)
+
+            # Second remove from metadata XML
+            # Remove them from the XML by creating a new list of all the
+            # others
+            bands.band[:] = [band for band in bands.band
+                             if band.product not in product_list]
+
+            try:
+                # Export to the file with validation
+                with open(xml_filename, 'w') as xml_fd:
+                    metadata_api.export(xml_fd, espa_xml)
+
+            except Exception:
+                raise
+
+        del (bands)
+        del (espa_xml)
 
 
 # ============================================================================
@@ -161,7 +217,7 @@ class Web(object):
                                   headers=headers)
 
                 if not req.ok:
-                    logger.error("HTTP - Transfer of [{0}] - FAILED"
+                    logger.error('HTTP - Transfer of [{0}] - FAILED'
                                  .format(download_url))
                     # The raise_for_status gets caught by this try's except
                     # block
@@ -173,18 +229,18 @@ class Web(object):
 
                 # Break the looping
                 done = True
-                logger.info("HTTP - Transfer Complete")
+                logger.info('HTTP - Transfer Complete')
 
             except Exception:
-                logger.exception("HTTP - Transfer Issue")
+                logger.exception('HTTP - Transfer Issue')
 
                 if req is not None:
                     status_code = req.status_code
 
                 if status_code != requests.codes['not_found']:
                     if retry_attempt > 3:
-                        logger.info("HTTP - Transfer Failed"
-                                    " - exceeded retry limit")
+                        logger.info('HTTP - Transfer Failed'
+                                    ' - exceeded retry limit')
                         done = True
                     else:
                         retry_attempt += 1
@@ -329,7 +385,8 @@ class Geo(object):
 
         ds = gdal.Open(img_filename)
         if ds is None:
-            raise RuntimeError("GDAL failed to open (%s)" % img_filename)
+            raise RuntimeError('GDAL failed to open ({0})'
+                               .format(img_filename))
 
         ds_srs = osr.SpatialReference()
         ds_srs.ImportFromWkt(ds.GetProjection())
@@ -374,7 +431,8 @@ class Geo(object):
                     sb.write('description = {USGS-EROS-ESPA generated}\n')
                 elif (line.startswith('data type') and
                       (no_data_value is not None)):
-                    sb.write('data ignore value = %s\n' % no_data_value)
+                    sb.write('data ignore value = {0}\n'
+                             .format(no_data_value))
 
         # Do the actual replace here
         with open(hdr_file_path, 'w') as tmp_fd:
@@ -436,7 +494,7 @@ class Geo(object):
         try:
             output = System.execute_cmd(cmd)
         except Exception:
-            logger.error("Failed to mosaic tiles")
+            logger.error('Failed to mosaic tiles')
             raise
         finally:
             if len(output) > 0:

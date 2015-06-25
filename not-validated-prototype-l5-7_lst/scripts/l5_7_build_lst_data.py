@@ -82,8 +82,8 @@ class BuildLSTData(object):
         self.lst_data_dir = ''
         # Grab the data directory from the environment
         if 'LST_DATA_DIR' not in os.environ:
-            raise Exception("Environment variable LST_DATA_DIR is"
-                            " not defined")
+            raise Exception('Environment variable LST_DATA_DIR is'
+                            ' not defined')
         else:
             self.lst_data_dir = os.environ.get('LST_DATA_DIR')
 
@@ -134,20 +134,20 @@ class BuildLSTData(object):
 
         # Error if we didn't find the required TOA bands in the data
         if len(self.thermal_name) <= 0:
-            raise Exception("Failed to find the lst_thermal_radiance band"
-                            " in the input data")
+            raise Exception('Failed to find the lst_thermal_radiance band'
+                            ' in the input data')
         if len(self.transmittance_name) <= 0:
-            raise Exception("Failed to find the lst_atmospheric_transmittance"
-                            " in the input data")
+            raise Exception('Failed to find the lst_atmospheric_transmittance'
+                            ' in the input data')
         if len(self.upwelled_name) <= 0:
-            raise Exception("Failed to find the lst_upwelled_radiance"
-                            " in the input data")
+            raise Exception('Failed to find the lst_upwelled_radiance'
+                            ' in the input data')
         if len(self.downwelled_name) <= 0:
-            raise Exception("Failed to find the lst_downwelled_radiance"
-                            " in the input data")
+            raise Exception('Failed to find the lst_downwelled_radiance'
+                            ' in the input data')
         if len(self.emissivity_name) <= 0:
-            raise Exception("Failed to find the landsat_emis"
-                            " in the input data")
+            raise Exception('Failed to find the landsat_emis'
+                            ' in the input data')
 
         # Save for later
         self.satellite = gm.satellite
@@ -167,7 +167,7 @@ class BuildLSTData(object):
         try:
             self.retrieve_metadata_information()
         except Exception:
-            self.logger.exception("Failed reading input XML metadata file")
+            self.logger.exception('Failed reading input XML metadata file')
             raise
 
         # Register all the gdal drivers and choose the ENVI for our output
@@ -175,7 +175,7 @@ class BuildLSTData(object):
         envi_driver = gdal.GetDriverByName('ENVI')
 
         # Read the bands into memory
-        self.logger.info("Loading intermediate data")
+        self.logger.info('Loading intermediate data')
         # Landsat Radiance at sensor for thermal band
         ds = gdal.Open(self.thermal_name)
         x_dim = ds.RasterXSize  # They are all the same size
@@ -226,7 +226,7 @@ class BuildLSTData(object):
         del (ds)
 
         # Build the LST data from the intermediate inputs
-        self.logger.info("Calculating surface radiance")
+        self.logger.info('Calculating surface radiance')
         # Surface radiance
         surface_radiance = (thermal_masked - upwelled_masked) / trans_masked
 
@@ -236,7 +236,7 @@ class BuildLSTData(object):
                     (1.0 - emissivity_masked) * downwelled_masked)
 
         # Account for surface emissivity to get Plank emitted radiance
-        self.logger.info("Calculating Plank emitted radiance")
+        self.logger.info('Calculating Plank emitted radiance')
         radiance_emitted = radiance / emissivity_masked
 
         # Memory cleanup
@@ -251,19 +251,19 @@ class BuildLSTData(object):
         # Use Brightness Temperature LUT to get skin temperature
         # Read the correct one for what we are processing
         if self.satellite == 'LANDSAT_7':
-            self.logger.info("Using Landsat 7 Brightness Temperature LUT")
-            bt_name = "L7_Brightness_Temperature_LUT.txt"
+            self.logger.info('Using Landsat 7 Brightness Temperature LUT')
+            bt_name = 'L7_Brightness_Temperature_LUT.txt'
 
         elif self.satellite == 'LANDSAT_5':
-            self.logger.info("Using Landsat 5 Brightness Temperature LUT")
-            bt_name = "L5_Brightness_Temperature_LUT.txt"
+            self.logger.info('Using Landsat 5 Brightness Temperature LUT')
+            bt_name = 'L5_Brightness_Temperature_LUT.txt'
 
         bt_data = np.loadtxt(os.path.join(self.lst_data_dir, bt_name),
                              dtype=float, delimiter=' ')
         bt_radiance_LUT = bt_data[:, 1]
         bt_temp_LUT = bt_data[:, 0]
 
-        self.logger.info("Generating LST results")
+        self.logger.info('Generating LST results')
         lst_data = np.interp(radiance_emitted, bt_radiance_LUT, bt_temp_LUT)
 
         # Memory cleanup
@@ -275,8 +275,8 @@ class BuildLSTData(object):
 
         # Add the fill and scan gaps back into the results, since they may
         # have been lost
-        self.logger.info("Adding fill and data gaps back into the Land"
-                         " Surface Temperature results")
+        self.logger.info('Adding fill and data gaps back into the Land'
+                         ' Surface Temperature results')
         lst_data[thermal_no_data_locations] = NO_DATA_VALUE
         lst_data[trans_no_data_locations] = NO_DATA_VALUE
         lst_data[upwelled_no_data_locations] = NO_DATA_VALUE
@@ -295,20 +295,20 @@ class BuildLSTData(object):
         lst_hdr_filename = ''.join([product_id, '_lst', '.hdr'])
         lst_aux_filename = ''.join([lst_img_filename, '.aux', '.xml'])
 
-        self.logger.info("Creating {0}".format(lst_img_filename))
+        self.logger.info('Creating {0}'.format(lst_img_filename))
         util.Geo.generate_raster_file(envi_driver, lst_img_filename,
                                       lst_data, x_dim, y_dim, ds_transform,
                                       ds_srs.ExportToWkt(), NO_DATA_VALUE,
                                       gdal.GDT_Int16)
 
-        self.logger.info("Updating {0}".format(lst_hdr_filename))
+        self.logger.info('Updating {0}'.format(lst_hdr_filename))
         util.Geo.update_envi_header(lst_hdr_filename, NO_DATA_VALUE)
 
         # Remove the *.aux.xml file generated by GDAL
         if os.path.exists(lst_aux_filename):
             os.unlink(lst_aux_filename)
 
-        self.logger.info("Adding {0} to {1}".format(lst_img_filename,
+        self.logger.info('Adding {0} to {1}'.format(lst_img_filename,
                                                     self.xml_filename))
         # Add the estimated Land Surface Temperature product to the metadata XML
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
@@ -322,14 +322,14 @@ class BuildLSTData(object):
                 base_band = band
 
         if base_band is None:
-            raise Exception("Failed to find the TOA BLUE band"
-                            " in the input data")
+            raise Exception('Failed to find the TOA BLUE band'
+                            ' in the input data')
 
-        lst_band = metadata_api.band(product="lst",
+        lst_band = metadata_api.band(product='lst',
                                      source='toa_refl',
-                                     name="land_surface_temperature",
-                                     category="image",
-                                     data_type="INT16",
+                                     name='land_surface_temperature',
+                                     category='image',
+                                     data_type='INT16',
                                      scale_factor=SCALE_FACTOR,
                                      add_offset=0,
                                      nlines=base_band.get_nlines(),
@@ -337,9 +337,9 @@ class BuildLSTData(object):
                                      fill_value=str(NO_DATA_VALUE))
 
         lst_band.set_short_name('{0}LST'.format(sensor_code))
-        lst_band.set_long_name("Land Surface Temperature")
+        lst_band.set_long_name('Land Surface Temperature')
         lst_band.set_file_name(lst_img_filename)
-        lst_band.set_data_units("temperature (kelvin)")
+        lst_band.set_data_units('temperature (kelvin)')
 
         pixel_size = metadata_api.pixel_size(base_band.pixel_size.x,
                                              base_band.pixel_size.x,
@@ -378,8 +378,8 @@ if __name__ == '__main__':
     '''
 
     # Build the command line argument parser
-    description = ("Reads intermediate data generated previously and combines"
-                   " them into the Land Surface Temperature product")
+    description = ('Reads intermediate data generated previously and combines'
+                   ' them into the Land Surface Temperature product')
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -387,13 +387,13 @@ if __name__ == '__main__':
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
-                        help="The XML metadata file to use")
+                        help='The XML metadata file to use')
 
     # Optional parameters
     parser.add_argument('--version',
                         action='store_true', dest='version',
                         required=False, default=False,
-                        help="Reports the version of the software")
+                        help='Reports the version of the software')
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -411,7 +411,7 @@ if __name__ == '__main__':
 
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
-        raise Exception("--xml must be specified on the command line")
+        raise Exception('--xml must be specified on the command line')
         sys.exit(1)  # EXIT FAILURE
 
     # Configure logging
@@ -429,10 +429,8 @@ if __name__ == '__main__':
 
         # Call the main processing routine
         build_lst_data.generate_data()
-    except Exception, e:
-        if hasattr(e, 'output'):
-            logger.error("Output [%s]" % e.output)
-        logger.exception("Processing failed")
+    except Exception:
+        logger.exception('Processing failed')
         sys.exit(1)  # EXIT FAILURE
 
     sys.exit(0)  # EXIT SUCCESS

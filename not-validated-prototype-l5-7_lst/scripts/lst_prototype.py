@@ -57,7 +57,7 @@ def read_narr_coordinates(base_data_dir):
     narr_path = os.path.join(base_data_dir, 'narr_coordinates.txt')
 
     grid_data = list()
-    with open(narr_path, "r") as narr_fd:
+    with open(narr_path, 'r') as narr_fd:
         for line in narr_fd:
             line = line.strip()
             (grid_col, grid_row, grid_lat, grid_lon) = line.split()
@@ -205,7 +205,7 @@ def build_points(gm, base_data_dir):
 
     points = Points_Info()
 
-    """
+    '''
     expand range to include NARR points outside image for edge pixels */
     TODO - 0.2deg at higher latitudes will not be sufficient for the
            longitudinal test, since at lat(72deg) 1deg lon = 34504.22meters
@@ -214,30 +214,30 @@ def build_points(gm, base_data_dir):
            This is probably only a CONUS quick and dirty solution.
 
     NOTE - MERRA is even farther apart so this will not work for that. */
-    """
+    '''
     buffered_north_lat = float(gm.bounding_coordinates.north) + 0.2
     buffered_south_lat = float(gm.bounding_coordinates.south) - 0.2
     buffered_east_lat = float(gm.bounding_coordinates.east) + 0.2
     buffered_west_lat = float(gm.bounding_coordinates.west) - 0.2
-    logger.info("Buffered Latitude and Longitude for point determination")
-    logger.info("  buffered north latitude = {0}".format(buffered_north_lat))
-    logger.info("  buffered south latitude = {0}".format(buffered_south_lat))
-    logger.info("  buffered east longitude = {0}".format(buffered_east_lat))
-    logger.info("  buffered west longitude = {0}".format(buffered_west_lat))
+    logger.info('Buffered Latitude and Longitude for point determination')
+    logger.info('  buffered north latitude = {0}'.format(buffered_north_lat))
+    logger.info('  buffered south latitude = {0}'.format(buffered_south_lat))
+    logger.info('  buffered east longitude = {0}'.format(buffered_east_lat))
+    logger.info('  buffered west longitude = {0}'.format(buffered_west_lat))
 
     try:
         grid_data = read_narr_coordinates(base_data_dir)
     except Exception:
-        logger.error("Failed reading auxillary NARR dataset")
+        logger.error('Failed reading auxillary NARR dataset')
         raise
 
-    """
+    '''
     Determine the points in the NARR dataset that fall within our buffered
     Landsat area using logical operators lessThanLat and greaterThanLat are
     values where the NARR values are less than or greater than the edges of
     the Landsat corners values respectively pixels that are true in both fall
     within the Landsat scene the same thing is done with longitude values
-    """
+    '''
     min_row = 1000
     max_row = -1000
     min_col = 1000
@@ -260,13 +260,13 @@ def build_points(gm, base_data_dir):
     points.max_col = max_col - 1
     points.num_rows = max_row - min_row + 1
     points.num_cols = max_col - min_col + 1
-    logger.info("NARR Points (Min/Max) Range")
-    logger.info("  min_row = {0}".format(points.min_row))
-    logger.info("  max_row = {0}".format(points.max_row))
-    logger.info("  min_col = {0}".format(points.min_col))
-    logger.info("  max_col = {0}".format(points.max_col))
-    logger.info("  num_rows = {0}".format(points.num_rows))
-    logger.info("  num_cols = {0}".format(points.num_cols))
+    logger.info('NARR Points (Min/Max) Range')
+    logger.info('  min_row = {0}'.format(points.min_row))
+    logger.info('  max_row = {0}'.format(points.max_row))
+    logger.info('  min_col = {0}'.format(points.min_col))
+    logger.info('  max_col = {0}'.format(points.max_col))
+    logger.info('  num_rows = {0}'.format(points.num_rows))
+    logger.info('  num_cols = {0}'.format(points.num_cols))
 
     points.grid_points = list()
     # Retain only the points within the rectangle
@@ -321,14 +321,14 @@ if __name__ == '__main__':
     '''
 
     # Build the command line argument parser
-    description = ("Retrieve ASTER data application")
+    description = ('Retrieve ASTER data application')
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
     # Required parameters
     parser.add_argument('--xml',
                         action='store', dest='xml_filename', required=True,
-                        help="The XML metadata file to use")
+                        help='The XML metadata file to use')
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -345,21 +345,19 @@ if __name__ == '__main__':
 
     base_data_dir = os.environ.get('LST_DATA_DIR')
     if base_data_dir is None:
-        logger.info("Missing environment variable LST_DATA_DIR")
+        logger.info('Missing environment variable LST_DATA_DIR')
         sys.exit(1)  # EXIT FAILURE
 
     if not os.path.isdir(base_data_dir):
-        logger.info("LST_DATA_DIR directory does not exist")
+        logger.info('LST_DATA_DIR directory does not exist')
         sys.exit(1)  # EXIT FAILURE
 
     try:
         # Call the main processing routine
         process(args.xml_filename, base_data_dir)
 
-    except Exception, e:
-        if hasattr(e, 'output'):
-            logger.error("Output [%s]" % e.output)
-        logger.exception("Processing failed")
+    except Exception:
+        logger.exception('Processing failed')
         sys.exit(1)  # EXIT FAILURE
 
     sys.exit(0)  # EXIT SUCCESS
