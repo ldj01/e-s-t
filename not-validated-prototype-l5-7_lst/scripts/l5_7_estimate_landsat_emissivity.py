@@ -337,9 +337,9 @@ class EstimateLandsatEmissivity(object):
                 # ------------------------------------------------------------
                 try:
                     (aster_b13_data, aster_b14_data, aster_ndvi_data,
-                     aster_lat_data, aster_lon_data, x_dim, y_dim) = \
+                     aster_lat_data, aster_lon_data, x_dim, y_dim) = (
                         self.extract_aster_data(emis_ds_name, ndvi_ds_name,
-                                                lat_ds_name, lon_ds_name)
+                                                lat_ds_name, lon_ds_name))
                 except Exception:
                     self.logger.exception('Extracting ASTER data from tile')
                     raise
@@ -563,8 +563,8 @@ class EstimateLandsatEmissivity(object):
                 toa_bt_name = band.get_file_name()
 
                 # Get the output proj4 string
-                self.ls_info.dest_proj4 = \
-                    util.Geo.get_proj4_projection_string(toa_bt_name)
+                self.ls_info.dest_proj4 = (
+                    util.Geo.get_proj4_projection_string(toa_bt_name))
 
         # Error if we didn't find the required TOA bands in the data
         if len(self.toa_green_name) <= 0:
@@ -680,14 +680,14 @@ class EstimateLandsatEmissivity(object):
         ls_swir1_masked = ls_swir1_masked * self.toa_swir1_scale_factor
 
         # Save the locations of the fill and scan gaps
-        ls_green_no_data_locations = \
-            np.where(ls_green_data == self.no_data_value)
-        ls_red_no_data_locations = \
-            np.where(ls_red_data == self.no_data_value)
-        ls_nir_no_data_locations = \
-            np.where(ls_nir_data == self.no_data_value)
-        ls_swir1_no_data_locations = \
-            np.where(ls_swir1_data == self.no_data_value)
+        ls_green_no_data_locations = (
+            np.where(ls_green_data == self.no_data_value))
+        ls_red_no_data_locations = (
+            np.where(ls_red_data == self.no_data_value))
+        ls_nir_no_data_locations = (
+            np.where(ls_nir_data == self.no_data_value))
+        ls_swir1_no_data_locations = (
+            np.where(ls_swir1_data == self.no_data_value))
 
         # Save for the output products
         ds_tmp_srs = osr.SpatialReference()
@@ -771,8 +771,8 @@ class EstimateLandsatEmissivity(object):
         # Save the locations of the gaps in the estimated Landsat EMIS
         # and Aster NDVI data
         ls_emis_gap_locations = np.where(ls_emis_data == 0)
-        ls_emis_no_data_locations = \
-            np.where(ls_emis_data == self.no_data_value)
+        ls_emis_no_data_locations = (
+            np.where(ls_emis_data == self.no_data_value))
         aster_ndvi_gap_locations = np.where(aster_ndvi_data == 0)
         aster_ndvi_no_data_locations = np.where(aster_ndvi_data ==
                                                 self.no_data_value)
@@ -929,10 +929,10 @@ class EstimateLandsatEmissivity(object):
         emis_band.set_valid_range(valid_range)
 
         # Set the date, but first clean the microseconds off of it
-        production_date = \
+        production_date = (
             datetime.datetime.strptime(datetime.datetime.now().
                                        strftime('%Y-%m-%dT%H:%M:%S'),
-                                       '%Y-%m-%dT%H:%M:%S')
+                                       '%Y-%m-%dT%H:%M:%S'))
 
         emis_band.set_production_date(production_date)
 

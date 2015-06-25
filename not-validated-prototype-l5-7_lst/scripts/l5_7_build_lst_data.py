@@ -207,10 +207,10 @@ class BuildLSTData(object):
         thermal_no_data_locations = np.where(thermal_data == NO_DATA_VALUE)
         trans_no_data_locations = np.where(trans_data == NO_DATA_VALUE)
         upwelled_no_data_locations = np.where(upwelled_data == NO_DATA_VALUE)
-        downwelled_no_data_locations = \
-            np.where(downwelled_data == NO_DATA_VALUE)
-        emissivity_no_data_locations = \
-            np.where(emissivity_data == NO_DATA_VALUE)
+        downwelled_no_data_locations = (
+            np.where(downwelled_data == NO_DATA_VALUE))
+        emissivity_no_data_locations = (
+            np.where(emissivity_data == NO_DATA_VALUE))
 
         # Save for the output product
         ds_srs = osr.SpatialReference()
@@ -350,10 +350,10 @@ class BuildLSTData(object):
         lst_band.set_valid_range(valid_range)
 
         # Set the date, but first clean the microseconds off of it
-        production_date = \
+        production_date = (
             datetime.datetime.strptime(datetime.datetime.now().
                                        strftime('%Y-%m-%dT%H:%M:%S'),
-                                       '%Y-%m-%dT%H:%M:%S')
+                                       '%Y-%m-%dT%H:%M:%S'))
 
         lst_band.set_production_date(production_date)
 

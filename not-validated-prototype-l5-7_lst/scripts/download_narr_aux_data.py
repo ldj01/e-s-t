@@ -111,8 +111,8 @@ class AUX_Processor(object):
             grb_file = grb_info[parm]['filename']
             logger.debug('Grb Filename = {0}'.format(grb_file))
 
-            dir_name = \
-                '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0])
+            dir_name = (
+                '{0}'.format(os.path.splitext(os.path.basename(grb_file))[0]))
             logger.info('Dir Name = {0}'.format(dir_name))
 
             util.System.create_directory(dir_name)
