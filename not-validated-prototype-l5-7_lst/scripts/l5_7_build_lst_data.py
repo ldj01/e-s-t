@@ -310,7 +310,7 @@ class BuildLSTData(object):
 
         self.logger.info('Adding {0} to {1}'.format(lst_img_filename,
                                                     self.xml_filename))
-        # Add the estimated Land Surface Temperature product to the metadata XML
+        # Add the estimated Land Surface Temperature product to the metadata
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
         bands = espa_xml.get_bands()
         sensor_code = product_id[0:3]

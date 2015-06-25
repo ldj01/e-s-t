@@ -214,8 +214,8 @@ def generate_lst(xml_filename, base_aux_dir,
     # Retrieval and initial processing of the required AUX data
     try:
         logger.info('Extracting LST AUX data')
-        aux_processor = AuxNARRGribProcessor(xml_filename, base_aux_dir)
-        aux_processor.extract_aux_data()
+        current_processor = AuxNARRGribProcessor(xml_filename, base_aux_dir)
+        current_processor.extract_aux_data()
     except Exception:
         logger.error('Failed processing auxillary NARR data')
         raise
@@ -225,12 +225,12 @@ def generate_lst(xml_filename, base_aux_dir,
                     ' LST AUX data')
         return
 
-    # Extract the product id from the xml filename and build some other
+    # Extract the input ID from the xml filename and build some other
     # filenames
-    product_id = os.path.splitext(xml_filename)[0]
-    mtl_filename = '{0}_MTL.txt'.format(product_id)
+    input_id = os.path.splitext(xml_filename)[0]
+    mtl_filename = '{0}_MTL.txt'.format(input_id)
     # ESPA creates the DEM for us
-    dem_filename = '{0}_dem.img'.format(product_id)
+    dem_filename = '{0}_dem.img'.format(input_id)
 
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
@@ -257,10 +257,10 @@ def generate_lst(xml_filename, base_aux_dir,
     # ------------------------------------------------------------------------
     # Generate Estimated Landsat Emissivity band
     try:
-        processor = estimate_landsat_emissivity \
-            .EstimateLandsatEmissivity(xml_filename,
-                                       keep_intermediate_data)
-        processor.generate_product()
+        current_processor = (
+            estimate_landsat_emissivity.EstimateLandsatEmissivity(
+                xml_filename, keep_intermediate_data))
+        current_processor.generate_product()
     except Exception:
         logger.error('Failed creating Estimated Landsat Emissivity data')
         raise
@@ -268,8 +268,8 @@ def generate_lst(xml_filename, base_aux_dir,
     # ------------------------------------------------------------------------
     # Generate Land Surface Temperature band
     try:
-        processor = build_lst_data.BuildLSTData(xml_filename)
-        processor.generate_data()
+        current_processor = build_lst_data.BuildLSTData(xml_filename)
+        current_processor.generate_data()
     except Exception:
         logger.error('Failed processing Land Surface Temperature')
         raise

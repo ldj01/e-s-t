@@ -243,10 +243,10 @@ def build_points(gm, base_data_dir):
     min_col = 1000
     max_col = -1000
     for point in grid_data:
-        if (buffered_north_lat > point.latitude
-                and buffered_south_lat < point.latitude
-                and buffered_west_lat < point.longitude
-                and buffered_east_lat > point.longitude):
+        if (buffered_north_lat > point.latitude and
+                buffered_south_lat < point.latitude and
+                buffered_west_lat < point.longitude and
+                buffered_east_lat > point.longitude):
             min_row = min(min_row, point.row)
             max_row = max(max_row, point.row)
             min_col = min(min_col, point.col)
@@ -280,7 +280,7 @@ def build_points(gm, base_data_dir):
 
     # TODO TODO TODO
     # /* Convert lat/lon to UTM northing/easting */
-    convert_latitude_longitude_to_utm_northing_easting(gm, 
+    # convert_latitude_longitude_to_utm_northing_easting(gm,
     # TODO TODO TODO
 
     return points
