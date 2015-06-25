@@ -5,20 +5,31 @@
 # land-surface-temperature.
 #------------------------------------------------------------------------------
 
-SUBDIRS	= scripts src static_data
+# Specify the directories to compile statically or not
+NON_STATIC_COMPILE = scripts static_data
+STATIC_COMPILE     = src
 
 all:
-	@for dir in $(SUBDIRS); do \
+	@for dir in $(NON_STATIC_COMPILE); do \
+        echo "make all in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile); done
+	@for dir in $(STATIC_COMPILE); do \
         echo "make all in $$dir..."; \
         (cd $$dir; $(MAKE) -f Makefile.static); done
 
 install: all
-	@for dir in $(SUBDIRS); do \
+	@for dir in $(NON_STATIC_COMPILE); do \
+        echo "make install in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile install); done
+	@for dir in $(STATIC_COMPILE); do \
         echo "make install in $$dir..."; \
         (cd $$dir; $(MAKE) -f Makefile.static install); done
 
 clean:
-	@for dir in $(SUBDIRS); do \
+	@for dir in $(NON_STATIC_COMPILE); do \
+        echo "make clean in $$dir..."; \
+        (cd $$dir; $(MAKE) -f Makefile clean); done
+	@for dir in $(STATIC_COMPILE); do \
         echo "make clean in $$dir..."; \
         (cd $$dir; $(MAKE) -f Makefile.static clean); done
 
