@@ -1,4 +1,8 @@
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -15,13 +19,6 @@
 #include "build_modtran_input.h"
 #include "calculate_point_atmospheric_parameters.h"
 #include "calculate_pixel_atmospheric_parameters.h"
-
-
-/* These are for compile time debugging logic.
-   Set them to 0 to turn them off.
-   They need to be set to 1 for production/standard processing. */
-#define RUN_MODTRAN 1
-#define EXTRACT_TAPE6_RESULTS 1
 
 
 /******************************************************************************
@@ -163,27 +160,43 @@ main (int argc, char *argv[])
 
     /* Call build_modtran_input to generate the tape5 file input and
        the MODTRAN commands for each point and height */
-    if (build_modtran_input (input, &points, verbose, debug)
-        != SUCCESS)
+    if (build_modtran_input (input, &points, verbose, debug) != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Perform MODTRAN runs by calling each command */
+    bool abort_modtran = false;
+#ifdef _OPENMP
+    #pragma omp parallel for schedule(static, 1) shared(abort_modtran)
+#endif
     for (modtran_run = 0; modtran_run < points.num_modtran_runs; modtran_run++)
     {
-        snprintf (msg_str, sizeof(msg_str),
-                  "Executing MODTRAN [%s]",
-                   points.modtran_runs[modtran_run].command);
-        LOG_MESSAGE (msg_str, FUNC_NAME);
-
-#if RUN_MODTRAN
-        if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
-        {
-            RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
-                          EXIT_FAILURE);
-        }
+#ifdef _OPENMP
+        #pragma omp flush (abort_modtran)
 #endif
+        if (!abort_modtran)
+        {
+            snprintf (msg_str, sizeof(msg_str),
+                      "Executing MODTRAN [%s]",
+                       points.modtran_runs[modtran_run].command);
+            LOG_MESSAGE (msg_str, FUNC_NAME);
+
+            if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
+            {
+                abort_modtran = true;
+#ifdef _OPENMP
+                #pragma omp flush (abort_modtran)
+#endif
+            }
+        }
+    }
+
+    /* If we aborted one of the modtran runs for some reason, then error and
+       exit the application */
+    if (abort_modtran)
+    {
+        RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* PARSING MODTRAN RESULTS:
@@ -217,13 +230,11 @@ main (int argc, char *argv[])
         snprintf (msg_str, sizeof(msg_str), "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if EXTRACT_TAPE6_RESULTS
         if (system (command) != SUCCESS)
         {
             RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
                           FUNC_NAME, EXIT_FAILURE);
         }
-#endif
     }
 
     /* Allocate memory for MODTRAN results */
