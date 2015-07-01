@@ -288,14 +288,16 @@ def generate_lst(xml_filename, base_aux_dir,
 
         # Remove the point directories generated during the core processing
         remove_dirs = set()
-        with open('point_list.txt', 'r') as point_list_fd:
+        point_filename = 'point_list.txt'
+        with open(point_filename, 'r') as point_list_fd:
             remove_dirs = set(list([line.strip()
                                     for line in point_list_fd.readlines()]))
 
         for dirname in remove_dirs:
             shutil.rmtree(dirname, ignore_errors=False)
 
-        os.unlink('point_list.txt')
+        # Finally remove the file
+        os.unlink(point_filename)
 
     if not keep_lst_temp_data:
         util.Metadata.remove_products(xml_filename, ['lst_temp'])
