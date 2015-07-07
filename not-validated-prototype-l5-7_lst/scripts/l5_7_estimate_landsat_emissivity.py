@@ -31,11 +31,9 @@
 
 import os
 import sys
-import glob
 import logging
 import math
 import requests
-import commands
 import datetime
 import numpy as np
 from argparse import ArgumentParser
@@ -127,6 +125,9 @@ class EstimateLandsatEmissivity(object):
         self.toa_nir_scale_factor = 1.0
         self.toa_swir1_scale_factor = 1.0
 
+        self.src_proj4 = None
+        self.satellite = None
+
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
@@ -150,62 +151,58 @@ class EstimateLandsatEmissivity(object):
 
         try:
             # Open the Emissivity sub-dataset
-            emis_sds = gdal.Open(emis_ds_name)
-            if emis_sds is None:
+            data_set = gdal.Open(emis_ds_name)
+            if data_set is None:
                 raise RuntimeError('GDAL failed to open {0}'
                                    .format(emis_ds_name))
 
-            # Open the NDVI sub-dataset
-            ndvi_sds = gdal.Open(ndvi_ds_name)
-            if ndvi_sds is None:
-                raise RuntimeError('GDAL failed to open {0}'
-                                   .format(ndvi_sds_name))
-
-            # Open the Latitude sub-dataset
-            lat_sds = gdal.Open(lat_ds_name)
-            if lat_sds is None:
-                raise RuntimeError('GDAL failed to open {0}'
-                                   .format(lat_ds_name))
-
-            # Open the Longitude sub-dataset
-            lon_sds = gdal.Open(lon_ds_name)
-            if lon_sds is None:
-                raise RuntimeError('GDAL failed to open {0}'
-                                   .format(lon_ds_name))
-
             # The dimensions are the same for all the bands so just use
             # the values from the Emissivity dataset
-            x_dim = emis_sds.RasterXSize
-            y_dim = emis_sds.RasterYSize
+            x_dim = data_set.RasterXSize
+            y_dim = data_set.RasterYSize
 
             # Retrieve the band 13 data from the HDF5 input
-            aster_b13_data = emis_sds.GetRasterBand(4).ReadAsArray(0, 0,
+            aster_b13_data = data_set.GetRasterBand(4).ReadAsArray(0, 0,
                                                                    x_dim,
                                                                    y_dim)
 
             # Retrieve the band 14 data from the HDF5 input
-            aster_b14_data = emis_sds.GetRasterBand(5).ReadAsArray(0, 0,
+            aster_b14_data = data_set.GetRasterBand(5).ReadAsArray(0, 0,
                                                                    x_dim,
                                                                    y_dim)
-            del (emis_sds)
+            # Open the NDVI sub-dataset
+            data_set = gdal.Open(ndvi_ds_name)
+            if data_set is None:
+                raise RuntimeError('GDAL failed to open {0}'
+                                   .format(ndvi_ds_name))
 
             # Retrieve the NDVI band data from the HDF5 input
-            aster_ndvi_data = ndvi_sds.GetRasterBand(1).ReadAsArray(0, 0,
+            aster_ndvi_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
                                                                     x_dim,
                                                                     y_dim)
-            del (ndvi_sds)
+            # Open the Latitude sub-dataset
+            data_set = gdal.Open(lat_ds_name)
+            if data_set is None:
+                raise RuntimeError('GDAL failed to open {0}'
+                                   .format(lat_ds_name))
 
             # Retrieve the Latitude data from the HDF5 input
-            aster_lat_data = lat_sds.GetRasterBand(1).ReadAsArray(0, 0,
-                                                                  x_dim,
-                                                                  y_dim)
-            del (lat_sds)
+            aster_lat_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                                   x_dim,
+                                                                   y_dim)
+
+            # Open the Longitude sub-dataset
+            data_set = gdal.Open(lon_ds_name)
+            if data_set is None:
+                raise RuntimeError('GDAL failed to open {0}'
+                                   .format(lon_ds_name))
 
             # Retrieve the Longitude data from the HDF5 input
-            aster_lon_data = lon_sds.GetRasterBand(1).ReadAsArray(0, 0,
-                                                                  x_dim,
-                                                                  y_dim)
-            del (lon_sds)
+            aster_lon_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                                   x_dim,
+                                                                   y_dim)
+
+            del data_set
 
         except Exception:
             raise
@@ -365,61 +362,60 @@ class EstimateLandsatEmissivity(object):
                 geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
 
                 # ------------------------------------------------------------
-                # Create a mask of the band 13 data and then scale it
-                # Original matlab code is <= 0
-                aster_b13_masked = np.ma.masked_less_equal(aster_b13_data, 0)
-                aster_b13_scaled = aster_b13_masked * 0.001
+                # Save the no data and gap locations.
+                aster_b13_gap_locations = np.where(aster_b13_data == 0)
+                aster_b13_no_data_locations = (
+                    np.where(aster_b13_data == self.no_data_value))
 
-                # Create a mask of the band 14 data and then scale it
-                # Original matlab code is <= 0
-                aster_b14_masked = np.ma.masked_less_equal(aster_b14_data, 0)
-                aster_b14_scaled = aster_b14_masked * 0.001
+                # Scale the data
+                aster_b13_data = aster_b13_data * 0.001
 
-                # Re-make the masks for B13 and B14 as a combined mask so the
-                # estimated Landsat EMIS has the correct mask
-                mask = np.ma.mask_or(np.ma.getmask(aster_b13_scaled),
-                                     np.ma.getmask(aster_b14_scaled))
-                aster_b13_scaled = np.ma.masked_where(mask, aster_b13_scaled)
-                aster_b14_scaled = np.ma.masked_where(mask, aster_b14_scaled)
+                # ------------------------------------------------------------
+                # Save the no data and gap locations.
+                aster_b14_gap_locations = np.where(aster_b14_data == 0)
+                aster_b14_no_data_locations = (
+                    np.where(aster_b14_data == self.no_data_value))
 
-                # Memory cleanup
-                del (mask)
-                del (aster_b13_data)
-                del (aster_b14_data)
-                del (aster_b13_masked)
-                del (aster_b14_masked)
+                # Scale the data
+                aster_b14_data = aster_b14_data * 0.001
 
+                # ------------------------------------------------------------
                 # Create the estimated Landsat EMIS data
-                ls_emis_data = (0.44 * aster_b13_scaled +
-                                0.4 * aster_b14_scaled + 0.156)
+                ls_emis_data = (0.44 * aster_b13_data +
+                                0.4 * aster_b14_data + 0.156)
+
+                # Re-apply the no data and gap locations.
+                ls_emis_data[aster_b13_gap_locations] = 0
+                ls_emis_data[aster_b13_no_data_locations] = self.no_data_value
+                ls_emis_data[aster_b14_gap_locations] = 0
+                ls_emis_data[aster_b14_no_data_locations] = self.no_data_value
 
                 # Memory cleanup
-                del (aster_b13_scaled)
-                del (aster_b14_scaled)
+                del aster_b13_data
+                del aster_b14_data
+                del aster_b13_gap_locations
+                del aster_b14_gap_locations
+                del aster_b13_no_data_locations
+                del aster_b14_no_data_locations
 
-                # Create a mask of the NDVI band data and then scale it
-                aster_ndvi_masked = np.ma.masked_equal(aster_ndvi_data,
-                                                       self.no_data_value)
-                aster_ndvi_scaled = aster_ndvi_masked * 0.01
+                # ------------------------------------------------------------
+                # Save the no data locations.
+                aster_ndvi_no_data_locations = (
+                    np.where(aster_ndvi_data == self.no_data_value))
 
-                # Memory cleanup
-                del (aster_ndvi_data)
-                del (aster_ndvi_masked)
+                # Scale the data
+                aster_ndvi_data = aster_ndvi_data * 0.01
 
-                # numpy array them so they are no longer masked
-                ls_emis_numpy = np.array(ls_emis_data)
-                aster_ndvi_numpy = np.array(aster_ndvi_scaled)
-
-                # Memory cleanup
-                del (ls_emis_data)
-                del (aster_ndvi_scaled)
+                # Re-apply the no data locations.
+                aster_ndvi_data[aster_ndvi_no_data_locations] = (
+                    self.no_data_value)
 
                 # ------------------------------------------------------------
                 # Create the estimated Landsat EMIS raster output tile
                 try:
                     self.logger.info('Creating an estimated Landsat EMIS tile')
                     util.Geo.generate_raster_file(driver, ls_emis_tile_name,
-                                                  ls_emis_numpy, x_dim, y_dim,
+                                                  ls_emis_data, x_dim, y_dim,
                                                   geo_transform,
                                                   ds_srs.ExportToWkt(),
                                                   self.no_data_value,
@@ -434,7 +430,7 @@ class EstimateLandsatEmissivity(object):
                     self.logger.info('Creating an ASTER NDVI tile')
                     util.Geo.generate_raster_file(driver,
                                                   aster_ndvi_tile_name,
-                                                  aster_ndvi_numpy,
+                                                  aster_ndvi_data,
                                                   x_dim, y_dim,
                                                   geo_transform,
                                                   ds_srs.ExportToWkt(),
@@ -445,8 +441,8 @@ class EstimateLandsatEmissivity(object):
                     raise
 
                 # Memory cleanup
-                del (ls_emis_numpy)
-                del (aster_ndvi_numpy)
+                del ls_emis_data
+                del aster_ndvi_data
 
         # Check to see that we downloaded at least one ASTER tile for
         # processing.
@@ -614,9 +610,9 @@ class EstimateLandsatEmissivity(object):
         # Save for later
         self.satellite = gm.satellite
 
-        del (bands)
-        del (gm)
-        del (espa_xml)
+        del bands
+        del gm
+        del espa_xml
 
     # ------------------------------------------------------------------------
     # TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER TILE
@@ -649,100 +645,99 @@ class EstimateLandsatEmissivity(object):
         geotiff_driver = gdal.GetDriverByName('GTiff')
         envi_driver = gdal.GetDriverByName('ENVI')
 
-        # Read the Landsat bands into memory
-        self.logger.info('Loading Landsat TOA input bands')
-        # GREEN
-        ds = gdal.Open(self.toa_green_name)
-        x_dim = ds.RasterXSize  # They are all the same size
-        y_dim = ds.RasterYSize
-        ls_green_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        ls_green_masked = np.ma.masked_equal(ls_green_data,
-                                             self.no_data_value)
-        ls_green_masked = ls_green_masked * self.toa_green_scale_factor
+        # ====================================================================
+        # Build NDVI in memory
+        self.logger.info('Building TOA based NDVI band for Landsat data')
 
-        # RED
-        ds = gdal.Open(self.toa_red_name)
-        ls_red_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        ls_red_masked = np.ma.masked_equal(ls_red_data, self.no_data_value)
-        ls_red_masked = ls_red_masked * self.toa_red_scale_factor
+        # NIR ----------------------------------------------------------------
+        data_set = gdal.Open(self.toa_nir_name)
+        x_dim = data_set.RasterXSize  # They are all the same size
+        y_dim = data_set.RasterYSize
+        ls_nir_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                            x_dim, y_dim)
+        nir_no_data_locations = np.where(ls_nir_data == self.no_data_value)
+        ls_nir_data = ls_nir_data * self.toa_nir_scale_factor
 
-        # NIR
-        ds = gdal.Open(self.toa_nir_name)
-        ls_nir_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        ls_nir_masked = np.ma.masked_equal(ls_nir_data, self.no_data_value)
-        ls_nir_masked = ls_nir_masked * self.toa_nir_scale_factor
+        # RED ----------------------------------------------------------------
+        data_set = gdal.Open(self.toa_red_name)
+        ls_red_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                            x_dim, y_dim)
+        red_no_data_locations = np.where(ls_red_data == self.no_data_value)
+        ls_red_data = ls_red_data * self.toa_red_scale_factor
 
-        # SWIR1
-        ds = gdal.Open(self.toa_swir1_name)
-        ls_swir1_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        ls_swir1_masked = np.ma.masked_equal(ls_swir1_data,
-                                             self.no_data_value)
-        ls_swir1_masked = ls_swir1_masked * self.toa_swir1_scale_factor
+        # NDVI ---------------------------------------------------------------
+        # Also scale from (-1.0, 1.0) to (0.0, 1.0) the ASTER range
+        ls_ndvi_data = (((ls_nir_data - ls_red_data) /
+                         (ls_nir_data + ls_red_data)) + 1.0) / 2.0
 
-        # Save the locations of the fill and scan gaps
-        ls_green_no_data_locations = (
-            np.where(ls_green_data == self.no_data_value))
-        ls_red_no_data_locations = (
-            np.where(ls_red_data == self.no_data_value))
-        ls_nir_no_data_locations = (
-            np.where(ls_nir_data == self.no_data_value))
-        ls_swir1_no_data_locations = (
-            np.where(ls_swir1_data == self.no_data_value))
-
-        # Save for the output products
-        ds_tmp_srs = osr.SpatialReference()
-        ds_tmp_srs.ImportFromWkt(ds.GetProjection())
-        ds_tmp_transform = ds.GetGeoTransform()
+        # Cleanup no data locations
+        ls_ndvi_data[nir_no_data_locations] = self.no_data_value
+        ls_ndvi_data[red_no_data_locations] = self.no_data_value
 
         # Memory cleanup
-        del (ls_green_data)
-        del (ls_red_data)
-        del (ls_nir_data)
-        del (ls_swir1_data)
-        del (ds)
+        del ls_red_data
+        del ls_nir_data
+        del nir_no_data_locations
+        del red_no_data_locations
 
-        # Re-make the masks for NIR and RED as a combined mask so NDVI has the
-        # correct mask
-        mask = np.ma.mask_or(np.ma.getmask(ls_nir_masked),
-                             np.ma.getmask(ls_red_masked))
-        ls_nir_masked = np.ma.masked_where(mask, ls_nir_masked)
-        ls_red_masked = np.ma.masked_where(mask, ls_red_masked)
+        # ====================================================================
+        # Build NDSI in memory
+        self.logger.info('Building TOA based NDSI band for Landsat data')
 
-        # Re-make the masks for GREEN and SWIR1 as a combined mask so NDSI has
-        # the correct mask
-        mask = np.ma.mask_or(np.ma.getmask(ls_green_masked),
-                             np.ma.getmask(ls_swir1_masked))
-        ls_green_masked = np.ma.masked_where(mask, ls_green_masked)
-        ls_swir1_masked = np.ma.masked_where(mask, ls_swir1_masked)
+        # GREEN --------------------------------------------------------------
+        data_set = gdal.Open(self.toa_green_name)
+        ls_green_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                              x_dim, y_dim)
+        green_no_data_locations = (
+            np.where(ls_green_data == self.no_data_value))
+        ls_green_data = ls_green_data * self.toa_green_scale_factor
 
-        # Build the Landsat TOA NDVI data
-        self.logger.info('Building TOA based NDVI for Landsat data')
-        ls_ndvi_masked = ((ls_nir_masked - ls_red_masked) /
-                          (ls_nir_masked + ls_red_masked))
+        # SWIR1 --------------------------------------------------------------
+        data_set = gdal.Open(self.toa_swir1_name)
+        ls_swir1_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                              x_dim, y_dim)
+        swir1_no_data_locations = (
+            np.where(ls_swir1_data == self.no_data_value))
+        ls_swir1_data = ls_swir1_data * self.toa_swir1_scale_factor
 
         # Build the Landsat TOA NDSI data
         self.logger.info('Building TOA based NDSI for Landsat data')
-        ls_ndsi_masked = ((ls_green_masked - ls_swir1_masked) /
-                          (ls_green_masked + ls_swir1_masked))
+        ls_ndsi_data = ((ls_green_data - ls_swir1_data) /
+                        (ls_green_data + ls_swir1_data))
+
+        # Cleanup no data locations
+        ls_ndsi_data[green_no_data_locations] = self.no_data_value
+        # Cleanup no data locations
+        ls_ndsi_data[swir1_no_data_locations] = self.no_data_value
 
         # Memory cleanup
-        del (mask)
-        del (ls_red_masked)
-        del (ls_nir_masked)
-        del (ls_green_masked)
-        del (ls_swir1_masked)
+        del ls_green_data
+        del ls_swir1_data
+        del green_no_data_locations
+        del swir1_no_data_locations
 
-        # Harden the mask so it does not change in the following statement
-        ls_ndvi_masked = ls_ndvi_masked.harden_mask()
-        # Turn all negative values to zero
-        ls_ndvi_masked[ls_ndvi_masked < 0] = 0
+        # Save for the output products
+        ds_tmp_srs = osr.SpatialReference()
+        ds_tmp_srs.ImportFromWkt(data_set.GetProjection())
+        ds_tmp_transform = data_set.GetGeoTransform()
+
+        # Memory cleanup
+        del data_set
 
         # Save the locations for the specfied snow pixels
         self.logger.info('Determine snow pixel locations')
-        selected_snow_locations = np.where(ls_ndsi_masked > 0.4)
+        selected_snow_locations = np.where(ls_ndsi_data > 0.4)
+
+        # Save ndvi and ndsi no data locations
+        ndvi_no_data_locations = np.where(ls_ndvi_data == self.no_data_value)
+        ndsi_no_data_locations = np.where(ls_ndsi_data == self.no_data_value)
 
         # Memory cleanup
-        del (ls_ndsi_masked)
+        del ls_ndsi_data
+
+        # Turn all negative values to zero
+        # Use a realy small value so that we don't have negative zero (-0.0)
+        ls_ndvi_data[ls_ndvi_data < 0.0000001] = 0
 
         # Build the estimated Landsat EMIS data from the ASTER GED data and
         # warp it to the Landsat scenes projection and image extents
@@ -754,33 +749,27 @@ class EstimateLandsatEmissivity(object):
          aster_ndvi_warped_name) = self.build_ls_emis_data(geotiff_driver)
 
         # Load the warped estimated Landsat EMIS into memory
-        ds = gdal.Open(ls_emis_warped_name)
-        ls_emis_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        ls_emis_masked = np.ma.masked_equal(ls_emis_data, self.no_data_value)
-        # Harden the mask so it does not change
-        ls_emis_masked = ls_emis_masked.harden_mask()
-
-        # Load the warped ASTER NDVI into memory
-        ds = gdal.Open(aster_ndvi_warped_name)
-        aster_ndvi_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        aster_ndvi_masked = np.ma.masked_equal(aster_ndvi_data,
-                                               self.no_data_value)
-        # Harden the mask so it does not change
-        aster_ndvi_masked = aster_ndvi_masked.harden_mask()
-
-        # Save the locations of the gaps in the estimated Landsat EMIS
-        # and Aster NDVI data
+        data_set = gdal.Open(ls_emis_warped_name)
+        ls_emis_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                             x_dim, y_dim)
         ls_emis_gap_locations = np.where(ls_emis_data == 0)
         ls_emis_no_data_locations = (
             np.where(ls_emis_data == self.no_data_value))
+
+        # Load the warped ASTER NDVI into memory
+        data_set = gdal.Open(aster_ndvi_warped_name)
+        aster_ndvi_data = data_set.GetRasterBand(1).ReadAsArray(0, 0,
+                                                                x_dim, y_dim)
         aster_ndvi_gap_locations = np.where(aster_ndvi_data == 0)
-        aster_ndvi_no_data_locations = np.where(aster_ndvi_data ==
-                                                self.no_data_value)
+        aster_ndvi_no_data_locations = (
+            np.where(aster_ndvi_data == self.no_data_value))
+
+        # Turn all negative values to zero
+        # Use a realy small value so that we don't have negative zero (-0.0)
+        aster_ndvi_data[aster_ndvi_data < 0.0000001] = 0
 
         # Memory cleanup
-        del (ds)
-        del (ls_emis_data)
-        del (aster_ndvi_data)
+        del data_set
 
         if not self.keep_intermediate_data:
             # Cleanup the temp files since we have them in memory
@@ -791,59 +780,69 @@ class EstimateLandsatEmissivity(object):
 
         self.logger.info('Normalizing Landsat and ASTER NDVI')
         # Normalize Landsat NDVI by max value
-        min_ls_ndvi = ls_ndvi_masked.min()
-        max_ls_ndvi = ls_ndvi_masked.max()
-        ls_ndvi_masked = ls_ndvi_masked / float(max_ls_ndvi)
+        # TODO TODO TODO - Min is always Zero here, but wonder if it should be the lowest above zero.
+        min_ls_ndvi = ls_ndvi_data.min()
+        max_ls_ndvi = ls_ndvi_data.max()
+        self.logger.info('Min LS NDVI {0}'.format(min_ls_ndvi))
+        self.logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
+        ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
 
         # Normalize ASTER NDVI by max value
-        min_aster_ndvi = aster_ndvi_masked.min()
-        max_aster_ndvi = aster_ndvi_masked.max()
-        aster_ndvi_masked = aster_ndvi_masked / float(max_aster_ndvi)
+        # TODO TODO TODO - Min is always Zero here, but wonder if it should be the lowest above zero.
+        min_ls_ndvi = ls_ndvi_data.min()
+        min_aster_ndvi = aster_ndvi_data.min()
+        max_aster_ndvi = aster_ndvi_data.max()
+        self.logger.info('Min ASTER NDVI {0}'.format(min_aster_ndvi))
+        self.logger.info('Max ASTER NDVI {0}'.format(max_aster_ndvi))
+        aster_ndvi_data = aster_ndvi_data / float(max_aster_ndvi)
 
         # Calculate fractional veg-cover for both Landsat and ASTER NDVI
         self.logger.info('Calculating fractional vegetation cover')
-        fv_Landsat = 1.0 - ((max_ls_ndvi - ls_ndvi_masked) /
+        fv_Landsat = 1.0 - ((max_ls_ndvi - ls_ndvi_data) /
                             (max_ls_ndvi - min_ls_ndvi))
-        fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_masked) /
+        fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_data) /
                           (max_aster_ndvi - min_aster_ndvi))
 
         # Memory cleanup
-        del (ls_ndvi_masked)
-        del (aster_ndvi_masked)
+        del ls_ndvi_data
+        del aster_ndvi_data
 
-        ls_soil = None
-        ls_mod = None
-        ls_emis_final = None
+        # Soil - From prototype code variable name
+        ls_emis_final = ((ls_emis_data - 0.975 * fv_Aster) /
+                         (1.0 - fv_Aster))
+
+        # Memory cleanup
+        del ls_emis_data
+        del fv_Aster
+
+        snow_emis_value = None
+
         # Adjust estimated Landsat EMIS for vegetation and snow, to generate
         # the final Landsat EMIS data
         if self.satellite == 'LANDSAT_7':
             self.logger.info('Adjusting estimated Landsat 7 EMIS'
                              ' for vegetation and snow')
-            ls_soil = ((ls_emis_masked - 0.975 * fv_Aster) / (1.0 - fv_Aster))
-            ls_mod = (0.9848 * fv_Landsat + ls_soil * (1.0 - fv_Landsat))
+            # Mod - From prototype code variable name
+            ls_emis_final = (0.9848 * fv_Landsat +
+                             ls_emis_final * (1.0 - fv_Landsat))
 
-            # Create a copy as a non-masked array
-            ls_emis_final = np.array(ls_mod)
-            # Medium snow
-            ls_emis_final[selected_snow_locations] = 0.9869
+            snow_emis_value = 0.9869
 
         elif self.satellite == 'LANDSAT_5':
             self.logger.info('Adjusting estimated Landsat 5 EMIS'
                              ' for vegetation and snow')
-            ls_soil = ((ls_emis_masked - 0.975 * fv_Aster) / (1.0 - fv_Aster))
-            ls_mod = (0.9851 * fv_Landsat + ls_soil * (1.0 - fv_Landsat))
+            # Mod - From prototype code variable name
+            ls_emis_final = (0.9851 * fv_Landsat +
+                             ls_emis_final * (1.0 - fv_Landsat))
 
-            # Create a copy as a non-masked array
-            ls_emis_final = np.array(ls_mod)
-            # Medium snow
-            ls_emis_final[selected_snow_locations] = 0.9851
+            snow_emis_value = 0.9851
+
+        # Medium snow
+        ls_emis_final[selected_snow_locations] = snow_emis_value
 
         # Memory cleanup
-        del (fv_Landsat)
-        del (fv_Aster)
-        del (ls_soil)
-        del (ls_mod)
-        del (selected_snow_locations)
+        del fv_Landsat
+        del selected_snow_locations
 
         # Add the fill and scan gaps and ASTER gaps back into the results,
         # since they may have been lost
@@ -853,20 +852,14 @@ class EstimateLandsatEmissivity(object):
         ls_emis_final[ls_emis_gap_locations] = self.no_data_value
         ls_emis_final[aster_ndvi_no_data_locations] = self.no_data_value
         ls_emis_final[aster_ndvi_gap_locations] = self.no_data_value
-        ls_emis_final[ls_green_no_data_locations] = self.no_data_value
-        ls_emis_final[ls_red_no_data_locations] = self.no_data_value
-        ls_emis_final[ls_nir_no_data_locations] = self.no_data_value
-        ls_emis_final[ls_swir1_no_data_locations] = self.no_data_value
+        ls_emis_final[ndvi_no_data_locations] = self.no_data_value
+        ls_emis_final[ndsi_no_data_locations] = self.no_data_value
 
         # Memory cleanup
-        del (ls_emis_no_data_locations)
-        del (ls_emis_gap_locations)
-        del (aster_ndvi_no_data_locations)
-        del (aster_ndvi_gap_locations)
-        del (ls_green_no_data_locations)
-        del (ls_red_no_data_locations)
-        del (ls_nir_no_data_locations)
-        del (ls_swir1_no_data_locations)
+        del ls_emis_no_data_locations
+        del ls_emis_gap_locations
+        del aster_ndvi_no_data_locations
+        del aster_ndvi_gap_locations
 
         product_id = self.xml_filename.split('.xml')[0]
         ls_emis_img_filename = ''.join([product_id, '_emis', '.img'])
@@ -945,7 +938,7 @@ class EstimateLandsatEmissivity(object):
             metadata_api.export(fd, espa_xml)
 
         # Memory cleanup
-        del (ls_emis_final)
+        del ls_emis_final
 
         self.logger.info('Completed - Estimate Landsat Emissivity')
 
@@ -996,7 +989,6 @@ if __name__ == '__main__':
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
-        sys.exit(1)  # EXIT FAILURE
 
     debug_level = logging.INFO
     if args.version:
