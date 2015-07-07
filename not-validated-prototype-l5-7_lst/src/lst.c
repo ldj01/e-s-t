@@ -153,10 +153,9 @@ main (int argc, char *argv[])
         RETURN_ERROR ("Building POINTS input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    if (verbose)
-    {
-        printf ("Number of Points: %d\n", points.num_points);
-    }
+    snprintf (msg_str, sizeof(msg_str),
+              "Number of Points: %d\n", points.num_points);
+    LOG_MESSAGE (msg_str, FUNC_NAME);
 
     /* Call build_modtran_input to generate the tape5 file input and
        the MODTRAN commands for each point and height */
@@ -177,10 +176,13 @@ main (int argc, char *argv[])
 #endif
         if (!abort_modtran)
         {
-            snprintf (msg_str, sizeof(msg_str),
-                      "Executing MODTRAN [%s]",
-                       points.modtran_runs[modtran_run].command);
-            LOG_MESSAGE (msg_str, FUNC_NAME);
+            if (verbose)
+            {
+                snprintf (msg_str, sizeof(msg_str),
+                          "Executing MODTRAN [%s]",
+                           points.modtran_runs[modtran_run].command);
+                LOG_MESSAGE (msg_str, FUNC_NAME);
+            }
 
             if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
             {
