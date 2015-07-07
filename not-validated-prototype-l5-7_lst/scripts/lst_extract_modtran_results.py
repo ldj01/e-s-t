@@ -13,9 +13,9 @@
 
     HISTORY:
 
-    Date              Programmer               Reason
-    ----------------  ------------------------ -------------------------------
-    Jan/2015          Ron Dilley               Initial implementation
+    Date              Reason
+    ----------------  --------------------------------------------------------
+    Jan/2015          Initial implementation
 '''
 
 import os
@@ -25,153 +25,166 @@ from argparse import ArgumentParser
 from cStringIO import StringIO
 
 
-# ============================================================================
-def extract_tpst(tape6_fd):
+class ExtractModtranResults(object):
     '''
     Description:
-        Extract the target pixel surface temperature value from the tape6_fd
-        file and return it as a float value.
+        Extracts modtran results
     '''
 
-    target_pixel_surface_temp = None
+    def __init__(self, input_path, output_path):
+        super(ExtractModtranResults, self).__init__()
 
-    # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
-    for line in tape6_fd:
-        # Remove all whitespace and newlines
-        line = ' '.join(line.strip().split())
+        # Keep local copies of these
+        self.input_path = input_path
+        self.output_path = output_path
 
-        if line.startswith('TARGET-PIXEL (H2) SURFACE TEMPERATURE [K]'):
-            target_pixel_surface_temp = float(list(reversed(line.split()))[0])
-            break
-
-    return target_pixel_surface_temp
+        # Setup the logger to use
+        self.logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-def create_output(args, target_pixel_surface_temp, record_count, records):
-    '''
-    Description:
-        Creates the output file.
-    '''
+    # ------------------------------------------------------------------------
+    def _extract_tpst(self, tape6_fd):
+        '''
+        Description:
+            Extract the target pixel surface temperature value from the
+            tape6 file and return it as a float value.
+        '''
 
-    radiance_dat_filename = '{0}/lst_modtran.dat'.format(args.output_path)
-    radiance_info_filename = '{0}/lst_modtran.info'.format(args.output_path)
+        target_pixel_surface_temp = None
 
-    with open(radiance_dat_filename, 'w') as radiance_dat_fd:
-        radiance_dat_fd.write(records.getvalue())
-
-    with open(radiance_info_filename, 'w') as radiance_info_fd:
-        radiance_info_fd.write('TARGET_PIXEL_SURFACE_TEMPERATURE {0}\n'
-                               .format(target_pixel_surface_temp))
-        radiance_info_fd.write('RADIANCE_RECORD_COUNT {0}\n'
-                               .format(record_count))
-
-
-# ============================================================================
-def process_tape6_results(args):
-    '''
-    Description:
-        Parses the tape6 and extracts the WAVELENGTH and TOTAL_RADIANCE
-        values.  Writes the values to the requested output file.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    tape6_filename = '{0}/tape6'.format(args.input_path)
-
-    if not os.path.isfile(tape6_filename):
-        raise Exception('Missing tape6 file in input directory')
-
-    target_pixel_surface_temp = None
-    record_count = 0
-    records = StringIO()
-
-    # Retrieve the auxillary data and extract it
-    with open(tape6_filename, 'r') as tape6_fd:
-        # Skip the beginning of the data that is not needed
-        for line in tape6_fd:
-            line = line.strip()
-            if line.startswith('RADIANCE(WATTS/CM2-STER-XXX)'):
-                break
-
-        # This is where our data resides
+        # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
         for line in tape6_fd:
             # Remove all whitespace and newlines
             line = ' '.join(line.strip().split())
 
-            # Skip warnings, but output them to the log
-            if 'WARNING' in line:
-                logger.warning('MODTRAN: {0}'.format(line))
-                continue
-
-            # Skip empty and header lines
-            if (not line or
-                    line.startswith('RADIANCE') or
-                    line.startswith('FREQ') or
-                    line.startswith('EMISSION') or
-                    line.startswith('(CM-1)')):
-                continue
-
-            # Skip the remainding of the file
-            if line.startswith('MULTIPLE SCATTERING CALCULATION RESULTS:'):
+            if line.startswith('TARGET-PIXEL (H2) SURFACE TEMPERATURE [K]'):
+                target_pixel_surface_temp = (
+                    float(list(reversed(line.split()))[0]))
                 break
 
-            parts = line.split(' ')
-            if record_count > 0:
-                records.write('\n')
-            records.write(' '.join([parts[1], parts[12]]))
-            record_count += 1
+        return target_pixel_surface_temp
 
-        # Retreive the value from the tape6 file
-        target_pixel_surface_temp = extract_tpst(tape6_fd)
+    # ------------------------------------------------------------------------
+    def _create_output(self, target_pixel_surface_temp, record_count, records):
+        '''
+        Description:
+            Creates the output file.
+        '''
 
-    create_output(args, target_pixel_surface_temp, record_count, records)
+        radiance_dat_filename = ('{0}/lst_modtran.dat'
+                                 .format(self.output_path))
+        radiance_info_filename = ('{0}/lst_modtran.info'
+                                  .format(self.output_path))
 
-    records.close()
+        with open(radiance_dat_filename, 'w') as radiance_dat_fd:
+            radiance_dat_fd.write(records.getvalue())
 
+        with open(radiance_info_filename, 'w') as radiance_info_fd:
+            radiance_info_fd.write('TARGET_PIXEL_SURFACE_TEMPERATURE {0}\n'
+                                   .format(target_pixel_surface_temp))
+            radiance_info_fd.write('RADIANCE_RECORD_COUNT {0}\n'
+                                   .format(record_count))
 
-# ============================================================================
-def process_pltout_results(args):
-    '''
-    Description:
-        Parse and clean up the pltout.asc results.
-    '''
+    # ------------------------------------------------------------------------
+    def process_tape6_results(self):
+        '''
+        Description:
+            Parses the tape6 and extracts the WAVELENGTH and TOTAL_RADIANCE
+            values.  Writes the values to the requested output file.
+        '''
 
-    logger = logging.getLogger(__name__)
+        tape6_filename = '{0}/tape6'.format(self.input_path)
 
-    tape6_filename = '{0}/tape6'.format(args.input_path)
-    pltout_filename = '{0}/pltout.asc'.format(args.input_path)
+        if not os.path.isfile(tape6_filename):
+            raise Exception('Missing tape6 file in input directory')
 
-    if not os.path.isfile(tape6_filename):
-        raise Exception('Missing tape6 file in input directory')
+        target_pixel_surface_temp = None
+        record_count = 0
+        records = StringIO()
 
-    if not os.path.isfile(pltout_filename):
-        raise Exception('Missing pltout.asc file in input directory')
+        # Retrieve the auxillary data and extract it
+        with open(tape6_filename, 'r') as tape6_fd:
+            # Skip the beginning of the data that is not needed
+            for line in tape6_fd:
+                line = line.strip()
+                if line.startswith('RADIANCE(WATTS/CM2-STER-XXX)'):
+                    break
 
-    target_pixel_surface_temp = None
-    record_count = 0
-    records = StringIO()
+            # This is where our data resides
+            for line in tape6_fd:
+                # Remove all whitespace and newlines
+                line = ' '.join(line.strip().split())
 
-    # Retrieve the auxillary data and extract it
-    with open(pltout_filename, 'r') as pltout_fd:
-        for line in pltout_fd:
-            # Remove all whitespace and newlines
-            line = ' '.join(line.strip().split())
+                # Skip warnings, but output them to the log
+                if 'WARNING' in line:
+                    self.logger.warning('MODTRAN: {0}'.format(line))
+                    continue
 
-            if len(line) > 0:
+                # Skip empty and header lines
+                if (not line or
+                        line.startswith('RADIANCE') or
+                        line.startswith('FREQ') or
+                        line.startswith('EMISSION') or
+                        line.startswith('(CM-1)')):
+                    continue
+
+                # Skip the remainding of the file
+                if line.startswith('MULTIPLE SCATTERING CALCULATION RESULTS:'):
+                    break
+
+                parts = line.split(' ')
                 if record_count > 0:
                     records.write('\n')
-                records.write(line)
+                records.write(' '.join([parts[1], parts[12]]))
                 record_count += 1
 
-    # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
-    with open(tape6_filename, 'r') as tape6_fd:
-        # Retreive the value from the tape6 file
-        target_pixel_surface_temp = extract_tpst(tape6_fd)
+            # Retreive the value from the tape6 file
+            target_pixel_surface_temp = self._extract_tpst(tape6_fd)
 
-    create_output(args, target_pixel_surface_temp, record_count, records)
+        self._create_output(target_pixel_surface_temp, record_count, records)
 
-    records.close()
+        records.close()
+
+    # ------------------------------------------------------------------------
+    def process_pltout_results(self):
+        '''
+        Description:
+            Parse and clean up the pltout.asc results.
+        '''
+
+        tape6_filename = '{0}/tape6'.format(self.input_path)
+        pltout_filename = '{0}/pltout.asc'.format(self.input_path)
+
+        if not os.path.isfile(tape6_filename):
+            raise Exception('Missing tape6 file in input directory')
+
+        if not os.path.isfile(pltout_filename):
+            raise Exception('Missing pltout.asc file in input directory')
+
+        target_pixel_surface_temp = None
+        record_count = 0
+        records = StringIO()
+
+        # Retrieve the auxillary data and extract it
+        with open(pltout_filename, 'r') as pltout_fd:
+            for line in pltout_fd:
+                # Remove all whitespace and newlines
+                line = ' '.join(line.strip().split())
+
+                if len(line) > 0:
+                    if record_count > 0:
+                        records.write('\n')
+                    records.write(line)
+                    record_count += 1
+
+        # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
+        with open(tape6_filename, 'r') as tape6_fd:
+            # Retreive the value from the tape6 file
+            target_pixel_surface_temp = self._extract_tpst(tape6_fd)
+
+        self._create_output(target_pixel_surface_temp, record_count, records)
+
+        records.close()
 
 
 # ============================================================================
@@ -239,12 +252,14 @@ if __name__ == '__main__':
         sys.exit(1)  # EXIT FAILURE
 
     try:
+        extractor = ExtractModtranResults(args.input_path, args.output_path)
+
         if args.tape6:
             logger.info('Using TAPE6 results')
-            process_tape6_results(args)
+            extractor.process_tape6_results()
         else:
             logger.info('Using pltout.asc results')
-            process_pltout_results(args)
+            extractor.process_pltout_results()
 
     except Exception:
         logger.exception('Error processing LST MODTRAN results.'
