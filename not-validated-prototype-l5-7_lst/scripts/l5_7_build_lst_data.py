@@ -56,11 +56,6 @@ import metadata_api
 import lst_utilities as util
 
 
-'''
- Specify the no data value we will be using, it also matches the no_data_value
- for the ASTER data we extract and use
-'''
-NO_DATA_VALUE = -9999
 SCALE_FACTOR = 0.1
 MULT_FACTOR = 10.0
 
@@ -86,6 +81,10 @@ class BuildLSTData(object):
                             ' not defined')
         else:
             self.lst_data_dir = os.environ.get('LST_DATA_DIR')
+
+        # Specify the no data value we will be using, it also matches the
+        # no_data_value for the ASTER data we extract and use
+        self.no_data_value = -9999
 
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
@@ -175,42 +174,53 @@ class BuildLSTData(object):
         envi_driver = gdal.GetDriverByName('ENVI')
 
         # Read the bands into memory
-        self.logger.info('Loading intermediate data')
+
         # Landsat Radiance at sensor for thermal band
+        self.logger.info('Loading intermediate thermal band data')
         ds = gdal.Open(self.thermal_name)
         x_dim = ds.RasterXSize  # They are all the same size
         y_dim = ds.RasterYSize
         thermal_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        thermal_masked = np.ma.masked_equal(thermal_data, NO_DATA_VALUE)
 
         # Atmospheric transmittance
+        self.logger.info('Loading intermediate transmittance band data')
         ds = gdal.Open(self.transmittance_name)
         trans_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        trans_masked = np.ma.masked_equal(trans_data, NO_DATA_VALUE)
 
         # Atmospheric path radiance - upwelled radiance
+        self.logger.info('Loading intermediate upwelled band data')
         ds = gdal.Open(self.upwelled_name)
         upwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        upwelled_masked = np.ma.masked_equal(upwelled_data, NO_DATA_VALUE)
+
+        self.logger.info('Calculating surface radiance')
+        # Surface radiance
+        surface_radiance = (thermal_data - upwelled_data) / trans_data
+
+        # Fix the no data locations
+        no_data_locations = np.where(thermal_data == self.no_data_value)
+        surface_radiance[no_data_locations] = self.no_data_value
+
+        no_data_locations = np.where(trans_data == self.no_data_value)
+        surface_radiance[no_data_locations] = self.no_data_value
+
+        no_data_locations = np.where(upwelled_data == self.no_data_value)
+        surface_radiance[no_data_locations] = self.no_data_value
+
+        # Memory cleanup
+        del (thermal_data)
+        del (trans_data)
+        del (upwelled_data)
+        del (no_data_locations)
 
         # Downwelling sky irradiance
+        self.logger.info('Loading intermediate downwelled band data')
         ds = gdal.Open(self.downwelled_name)
         downwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        downwelled_masked = np.ma.masked_equal(downwelled_data, NO_DATA_VALUE)
 
         # Landsat emissivity estimated from ASTER GED data
+        self.logger.info('Loading intermediate emissivity band data')
         ds = gdal.Open(self.emissivity_name)
         emissivity_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
-        emissivity_masked = np.ma.masked_equal(emissivity_data, NO_DATA_VALUE)
-
-        # Save the locations of the fill and scan gaps
-        thermal_no_data_locations = np.where(thermal_data == NO_DATA_VALUE)
-        trans_no_data_locations = np.where(trans_data == NO_DATA_VALUE)
-        upwelled_no_data_locations = np.where(upwelled_data == NO_DATA_VALUE)
-        downwelled_no_data_locations = (
-            np.where(downwelled_data == NO_DATA_VALUE))
-        emissivity_no_data_locations = (
-            np.where(emissivity_data == NO_DATA_VALUE))
 
         # Save for the output product
         ds_srs = osr.SpatialReference()
@@ -218,35 +228,33 @@ class BuildLSTData(object):
         ds_transform = ds.GetGeoTransform()
 
         # Memory cleanup
-        del (thermal_data)
-        del (trans_data)
-        del (upwelled_data)
-        del (downwelled_data)
-        del (emissivity_data)
         del (ds)
-
-        # Build the LST data from the intermediate inputs
-        self.logger.info('Calculating surface radiance')
-        # Surface radiance
-        surface_radiance = (thermal_masked - upwelled_masked) / trans_masked
 
         # Estimate Earth-emitted radiance by subtracting off the reflected
         # downwelling component
         radiance = (surface_radiance -
-                    (1.0 - emissivity_masked) * downwelled_masked)
+                    (1.0 - emissivity_data) * downwelled_data)
 
         # Account for surface emissivity to get Plank emitted radiance
         self.logger.info('Calculating Plank emitted radiance')
-        radiance_emitted = radiance / emissivity_masked
+        radiance_emitted = radiance / emissivity_data
+
+        # Fix the no data locations
+        no_data_locations = np.where(surface_radiance == self.no_data_value)
+        radiance_emitted[no_data_locations] = self.no_data_value
+
+        no_data_locations = np.where(downwelled_data == self.no_data_value)
+        radiance_emitted[no_data_locations] = self.no_data_value
+
+        no_data_locations = np.where(emissivity_data == self.no_data_value)
+        radiance_emitted[no_data_locations] = self.no_data_value
 
         # Memory cleanup
-        del (thermal_masked)
-        del (trans_masked)
-        del (upwelled_masked)
-        del (downwelled_masked)
-        del (emissivity_masked)
+        del (downwelled_data)
+        del (emissivity_data)
         del (surface_radiance)
         del (radiance)
+        del (no_data_locations)
 
         # Use Brightness Temperature LUT to get skin temperature
         # Read the correct one for what we are processing
@@ -266,9 +274,6 @@ class BuildLSTData(object):
         self.logger.info('Generating LST results')
         lst_data = np.interp(radiance_emitted, bt_radiance_LUT, bt_temp_LUT)
 
-        # Memory cleanup
-        del (radiance_emitted)
-
         # Scale the result and convert it to an int16
         lst_data = lst_data * MULT_FACTOR
         lst_fata = lst_data.astype(np.int16)
@@ -277,18 +282,14 @@ class BuildLSTData(object):
         # have been lost
         self.logger.info('Adding fill and data gaps back into the Land'
                          ' Surface Temperature results')
-        lst_data[thermal_no_data_locations] = NO_DATA_VALUE
-        lst_data[trans_no_data_locations] = NO_DATA_VALUE
-        lst_data[upwelled_no_data_locations] = NO_DATA_VALUE
-        lst_data[downwelled_no_data_locations] = NO_DATA_VALUE
-        lst_data[emissivity_no_data_locations] = NO_DATA_VALUE
+
+        # Fix the no data locations
+        no_data_locations = np.where(radiance_emitted == self.no_data_value)
+        lst_data[no_data_locations] = self.no_data_value
 
         # Memory cleanup
-        del (thermal_no_data_locations)
-        del (trans_no_data_locations)
-        del (upwelled_no_data_locations)
-        del (downwelled_no_data_locations)
-        del (emissivity_no_data_locations)
+        del (radiance_emitted)
+        del (no_data_locations)
 
         product_id = self.xml_filename.split('.xml')[0]
         lst_img_filename = ''.join([product_id, '_lst', '.img'])
@@ -298,11 +299,15 @@ class BuildLSTData(object):
         self.logger.info('Creating {0}'.format(lst_img_filename))
         util.Geo.generate_raster_file(envi_driver, lst_img_filename,
                                       lst_data, x_dim, y_dim, ds_transform,
-                                      ds_srs.ExportToWkt(), NO_DATA_VALUE,
+                                      ds_srs.ExportToWkt(), self.no_data_value,
                                       gdal.GDT_Int16)
 
         self.logger.info('Updating {0}'.format(lst_hdr_filename))
-        util.Geo.update_envi_header(lst_hdr_filename, NO_DATA_VALUE)
+        util.Geo.update_envi_header(lst_hdr_filename, self.no_data_value)
+
+        # Memory cleanup
+        del (ds_srs)
+        del (ds_transform)
 
         # Remove the *.aux.xml file generated by GDAL
         if os.path.exists(lst_aux_filename):
@@ -334,7 +339,7 @@ class BuildLSTData(object):
                                      add_offset=0,
                                      nlines=base_band.get_nlines(),
                                      nsamps=base_band.get_nsamps(),
-                                     fill_value=str(NO_DATA_VALUE))
+                                     fill_value=str(self.no_data_value))
 
         lst_band.set_short_name('{0}LST'.format(sensor_code))
         lst_band.set_long_name('Land Surface Temperature')
@@ -366,6 +371,9 @@ class BuildLSTData(object):
             metadata_api.export(fd, espa_xml)
 
         # Memory cleanup
+        del (lst_band)
+        del (bands)
+        del (espa_xml)
         del (lst_data)
 
 
