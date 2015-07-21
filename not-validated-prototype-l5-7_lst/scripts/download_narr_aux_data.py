@@ -16,9 +16,9 @@
 
     HISTORY:
 
-    Date              Programmer               Reason
-    ----------------  ------------------------ -------------------------------
-    Jan/2015          Ron Dilley               Initial implementation
+    Date              Reason
+    ----------------  --------------------------------------------------------
+    Jan/2015          Initial implementation
 '''
 
 import os
