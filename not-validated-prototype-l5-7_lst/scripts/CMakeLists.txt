@@ -10,6 +10,7 @@ install ( PROGRAMS l5_7_lst.py
                    download_narr_aux_data.py
                    lst_extract_modtran_results.py
                    lst_prototype.py
+                   update_narr_aux_data_from_CISL_RDA.py
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
 
 install ( FILES lst_utilities.py
