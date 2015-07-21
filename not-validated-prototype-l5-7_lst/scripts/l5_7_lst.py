@@ -53,7 +53,8 @@ class AuxNARRGribProcessor(object):
 
         self.parms_to_extract = ['HGT', 'SPFH', 'TMP']
         self.aux_path_template = '{0:0>4}/{1:0>2}/{2:0>2}'
-        self.aux_name_template = 'narr-a_221_{0}_{1:0>2}00_000_{2}.{3}'
+        self.aux_name_template = 'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'
+
         self.date_template = '{0:0>4}{1:0>2}{2:0>2}'
         self.dir_template = '{0}/{1}/{2}'
 
@@ -140,21 +141,28 @@ class AuxNARRGribProcessor(object):
         self.logger.debug('Date 1 = {0}'.format(str(date_1)))
         self.logger.debug('Date 2 = {0}'.format(str(date_2)))
 
+        d1_year = date_1.year
+        d1_month = date_1.month
+        d1_day = date_1.day
+        d1_hour = date_1.hour * 100
+
+        d2_year = date_2.year
+        d2_month = date_2.month
+        d2_day = date_2.day
+        d2_hour = date_2.hour * 100
+
         for parm in self.parms_to_extract:
             # Build the source filenames for date 1
-            yyyymmdd = (self.date_template
-                        .format(date_1.year, date_1.month, date_1.day))
-            self.logger.debug('Date 1 yyyymmdd = {0}'.format(yyyymmdd))
-
-            hdr_1_name = (self.aux_name_template
-                          .format(yyyymmdd, date_1.hour, parm, 'hdr'))
-            grb_1_name = (self.aux_name_template
-                          .format(yyyymmdd, date_1.hour, parm, 'grb'))
+            hdr_1_name = (
+                self.aux_name_template.format(parm, d1_year, d1_month, d1_day,
+                                              d1_hour, 'hdr'))
+            grb_1_name = (
+                self.aux_name_template.format(parm, d1_year, d1_month, d1_day,
+                                              d1_hour, 'grb'))
             self.logger.debug('hdr 1 = {0}'.format(hdr_1_name))
             self.logger.debug('grb 1 = {0}'.format(grb_1_name))
 
-            tmp = (self.aux_path_template
-                   .format(date_1.year, date_1.month, date_1.day))
+            tmp = (self.aux_path_template.format(d1_year, d1_month, d1_day))
             hdr_1_path = (self.dir_template
                           .format(base_aux_dir, tmp, hdr_1_name))
             grb_1_path = (self.dir_template
@@ -163,19 +171,16 @@ class AuxNARRGribProcessor(object):
             self.logger.info('Using {0}'.format(grb_1_path))
 
             # Build the source filenames for date 2
-            yyyymmdd = (self.date_template
-                        .format(date_2.year, date_2.month, date_2.day))
-            self.logger.debug('Date 2 yyyymmdd = {0}'.format(yyyymmdd))
-
-            hdr_2_name = (self.aux_name_template
-                          .format(yyyymmdd, date_2.hour, parm, 'hdr'))
-            grb_2_name = (self.aux_name_template
-                          .format(yyyymmdd, date_2.hour, parm, 'grb'))
+            hdr_2_name = (
+                self.aux_name_template.format(parm, d2_year, d2_month, d2_day,
+                                              d2_hour, 'hdr'))
+            grb_2_name = (
+                self.aux_name_template.format(parm, d2_year, d2_month, d2_day,
+                                              d2_hour, 'grb'))
             self.logger.debug('hdr 2 = {0}'.format(hdr_2_name))
             self.logger.debug('grb 2 = {0}'.format(grb_2_name))
 
-            tmp = (self.aux_path_template
-                   .format(date_2.year, date_2.month, date_2.day))
+            tmp = (self.aux_path_template.format(d2_year, d2_month, d2_day))
             hdr_2_path = (self.dir_template
                           .format(base_aux_dir, tmp, hdr_2_name))
             grb_2_path = (self.dir_template
