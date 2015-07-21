@@ -1,6 +1,5 @@
-'''
-    FILE: lst_utilities.py
 
+'''
     PURPOSE: Provide a library of routines to be used by LST python
              applications.  Each routine is placed under a class in hopes of
              separating them into specific collections/groups.
@@ -12,9 +11,9 @@
 
     HISTORY:
 
-    Date              Programmer               Reason
-    ----------------  ------------------------ -------------------------------
-    June/2015         Ron Dilley               Initial implementation
+    Date              Reason
+    ----------------  --------------------------------------------------------
+    July/2015         Initial implementation
 '''
 
 import os
