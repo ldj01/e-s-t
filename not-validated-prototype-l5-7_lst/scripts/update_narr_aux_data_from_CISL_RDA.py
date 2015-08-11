@@ -52,7 +52,7 @@ from datetime import datetime, timedelta
 from contextlib import closing
 
 
-import lst_settings as settings
+from .config import settings
 
 
 # ============================================================================
@@ -78,6 +78,7 @@ class Web(object):
             self.session = requests.Session()
 
             self.timeout = timeout
+            self.max_retries = max_retries
 
             # Determine if we are streaming or not based on block_size
             self.block_size = block_size
@@ -90,19 +91,11 @@ class Web(object):
             self.session.mount('https://', adapter)
 
         # --------------------------------------------------------------------
-        def login(self, login_url=None, login_data=None):
+        def login(self, login_url, login_data):
             '''
             Description:
                 Provides for establishing a logged in session.
             '''
-
-            # Verify that a login url was provided
-            if login_url is None:
-                raise Exception('{login_url} not defined')
-
-            # Verify that login data was provided
-            if login_data is None:
-                raise Exception('{login_data} not defined')
 
             # Login to the site
             self.session.post(url=login_url, data=login_data)
@@ -156,9 +149,9 @@ class Web(object):
                         retrieved_bytes += len(data_chunk)
 
                 if retrieved_bytes != file_size:
-                    raise Exception("Transfer Failed - HTTP -"
-                                    " Retrieved %d out of %d bytes"
-                                    % (retrieved_bytes, file_size))
+                    raise Exception('Transfer Failed - HTTP -'
+                                    ' Retrieved {0} out of {1} bytes'
+                                    .format(retrieved_bytes, file_size))
                 else:
                     return True
 
@@ -183,19 +176,14 @@ class Web(object):
 
             self.logger.info(download_url)
 
-            status_code = requests.codes['ok']
             retry_attempt = 0
             done = False
             while not done:
                 status_code = requests.codes['ok']
-                req = None
                 try:
 
-                    #if self.block_size is not None:
                     done = self._stream_file(download_url,
                                              destination_file)
-                    #else:
-                    #    done = self._get_file(download_url, destination_file)
 
                     if done:
                         self.logger.info("Transfer Complete - HTTP")
@@ -203,11 +191,8 @@ class Web(object):
                 except Exception:
                     self.logger.exception('HTTP - Transfer Issue')
 
-                    if req is not None:
-                        status_code = req.status_code
-
                     if status_code != requests.codes['not_found']:
-                        if retry_attempt > 3:
+                        if retry_attempt > self.max_retries:
                             self.logger.info('HTTP - Transfer Failed'
                                              ' - exceeded retry limit')
                             done = True
@@ -218,10 +203,6 @@ class Web(object):
                         # Not Found - So break the looping because we are done
                         done = True
 
-                finally:
-                    if req is not None:
-                        req.close()
-
             return status_code
 
 
@@ -229,7 +210,7 @@ class Web(object):
 class System(object):
     '''
     Description:
-        Provides methods for interfacing with the host server.
+        Provides methods for interfacing with the local system.
     '''
 
     # ------------------------------------------------------------------------
@@ -291,7 +272,6 @@ class System(object):
 
 
 # ============================================================================
-NAME_FORMAT = 'NARR3D_{0:04}{1:02}_{2:02}{3:02}'
 def get_name_list(s_date, e_date):
     '''
     Description:
@@ -299,8 +279,8 @@ def get_name_list(s_date, e_date):
         provided.
 
     Notes:
-        Special assumptions are coded for the end of the month.
-        Files always contain 3 days except the last file for the month, which
+        Files typically contain 3 days.
+        Special assumptions are coded for the end of the month; which
         may have 1, 2, 3, or 4 days ... depending on the month and year.
     '''
 
@@ -310,13 +290,17 @@ def get_name_list(s_date, e_date):
     while c_date <= e_date:
         if c_date.day == 28:
             (x, days) = calendar.monthrange(c_date.year, c_date.month)
-            yield(NAME_FORMAT.format(c_date.year, c_date.month,
-                                     c_date.day, days))
+            yield(settings.REMOTE_NAME_FORMAT.format(c_date.year,
+                                                     c_date.month,
+                                                     c_date.day,
+                                                     days))
             delta = timedelta(days=(days - 28 + 1))
             c_date += delta
         else:
-            yield(NAME_FORMAT.format(c_date.year, c_date.month,
-                                     c_date.day, c_date.day + 2))
+            yield(settings.REMOTE_NAME_FORMAT.format(c_date.year,
+                                                     c_date.month,
+                                                     c_date.day,
+                                                     c_date.day + 2))
             c_date += days_3
 
 
@@ -332,8 +316,6 @@ def process_grib_for_variable_helper(args):
 
 
 # ============================================================================
-ARCH_FMT = 'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'
-DIR_FMT = '{0}/{1:0>4}/{2:0>2}/{3:0>2}'
 def process_grib_for_variable(variable, grib_file):
     '''
     Description:
@@ -352,52 +334,41 @@ def process_grib_for_variable(variable, grib_file):
     hour = int(parts[1][8:])
 
     # Figure out the filenames to create
-    hdr_name = ARCH_FMT.format(variable, year, month, day, hour*100, 'hdr')
-    grb_name = ARCH_FMT.format(variable, year, month, day, hour*100, 'grb')
+    hdr_name = settings.ARCHIVE_NAME_FORMAT.format(variable, year, month,
+                                                   day, hour*100, 'hdr')
+    grb_name = settings.ARCHIVE_NAME_FORMAT.format(variable, year, month,
+                                                   day, hour*100, 'grb')
 
     # Create inventory/header file to extract the variable data
     cmd = ['wgrib', grib_file, '|', 'grep', variable, '>', hdr_name]
     cmd = ' '.join(cmd)
-    output = ''
-    try:
-        logger.info('Executing [{0}]'.format(cmd))
-        output = System.execute_cmd(cmd)
-    except:
-        raise
-    finally:
-        if len(output) > 0:
-            logger.info(output)
+    logger.info('Executing [{0}]'.format(cmd))
+    output = System.execute_cmd(cmd)
+    if output is not None and len(output) > 0:
+        logger.info(output)
 
     # Create grib files for each variable
     cmd = ['cat', hdr_name, '|',
            'wgrib', grib_file, '-i', '-grib', '-o', grb_name]
     cmd = ' '.join(cmd)
     output = ''
-    try:
-        logger.info('Executing [{0}]'.format(cmd))
-        output = System.execute_cmd(cmd)
-    except:
-        raise
-    finally:
-        if len(output) > 0:
-            logger.info(output)
+    logger.info('Executing [{0}]'.format(cmd))
+    output = System.execute_cmd(cmd)
+    if output is not None and len(output) > 0:
+        logger.info(output)
 
     # Create new inventory/header file for the variable
     cmd = ['wgrib', grb_name, '|', 'grep', variable, '>', hdr_name]
     cmd = ' '.join(cmd)
-    output = ''
-    try:
-        logger.info('Executing [{0}]'.format(cmd))
-        output = System.execute_cmd(cmd)
-    except:
-        raise
-    finally:
-        if len(output) > 0:
-            logger.info(output)
+    logger.info('Executing [{0}]'.format(cmd))
+    output = System.execute_cmd(cmd)
+    if output is not None and len(output) > 0:
+        logger.info(output)
 
     # Determine the directory to place the data and create it if it does not
     # exist
-    dest_path = DIR_FMT.format(base_aux_dir, year, month, day)
+    dest_path = settings.ARCHIVE_DIRECTORY_FORMAT.format(base_aux_dir, year,
+                                                         month, day)
     System.create_directory(dest_path)
 
     # Archive the files
@@ -417,7 +388,6 @@ def process_grib_for_variable(variable, grib_file):
 
 
 # ============================================================================
-URL_FMT = 'http://rda.ucar.edu/data/ds608.0/3HRLY/{0}/{1}'
 if __name__ == '__main__':
 
     # Create a command line arugment parser
@@ -431,30 +401,34 @@ if __name__ == '__main__':
                         dest='start_date',
                         metavar='DATE',
                         required=False,
-                        help='The start date YYYYMMDD if requiring a range.')
+                        help=('The start date YYYYMMDD(inclusive)'
+                              ' if requiring a range.'
+                              '  Defaults to --end-date if not specified.'))
 
     parser.add_argument('--end-date',
                         action='store',
                         dest='end_date',
                         metavar='DATE',
                         required=False,
-                        help='The end date YYYYMMDD if requiring a range.')
+                        help=('The end date YYYYMMDD(inclusive)'
+                              ' if requiring a range.'))
 
     parser.add_argument('--date',
                         action='store',
                         dest='date',
                         metavar='DATE',
                         required=False,
-                        help='The date YYYYMMDD.')
+                        help='The date YYYYMMDD for a specific date.')
 
     parser.add_argument('--block-size',
                         action='store',
                         dest='block_size',
                         metavar='SIZE',
                         required=False,
-                        default=16777216, # 16MB; 33554432 = 32MB
+                        default=16777216,  # 16MB; 33554432 = 32MB
                         help=('The block size used for streaming the download.'
-                              ' (Default => 16MB)'))
+                              ' Specified in bytes.'
+                              '  (Default => 16777216bytes = 16MB)'))
 
     parser.add_argument('--version',
                         action='version',
@@ -529,8 +503,8 @@ if __name__ == '__main__':
     # Establish a logged in session
     session = Web.Session(block_size=args.block_size)
 
-    login_url =  settings.ucar_login_credentials['login_url']
-    login_data =  settings.ucar_login_credentials['login_data']
+    login_url = settings.ucar_login_credentials['login_url']
+    login_data = settings.ucar_login_credentials['login_data']
 
     # Log in
     session.login(login_url, login_data)
@@ -541,29 +515,22 @@ if __name__ == '__main__':
 
         year = name[7:11]
 
-        # http://rda.ucar.edu/data/ds608.0/3HRLY/1979/NARR3D_197901_0103.tar
-        url = URL_FMT.format(year, filename)
+        url = settings.UCAR_URL_FORMAT.format(year, filename)
 
-#        session.http_transfer_file(url, filename)
+        session.http_transfer_file(url, filename)
 
         # Extract the tar'd data
-        # tar -xvf NARR3D_201506_1618.tar -C NARR3D_201506_1618
         cmd = ['tar', '-xvf', filename]
         cmd = ' '.join(cmd)
-        grib_files = ''
-        try:
-            grib_files = System.execute_cmd(cmd)
-        except:
-            raise
-        finally:
-            if len(grib_files) > 0:
-                logger.info(grib_files)
+        grib_files = System.execute_cmd(cmd)
+        if grib_file is not None and len(grib_files) > 0:
+            logger.info(grib_files)
 
         # Process each sub-file and archive the results using a process pool
         pool = mp.Pool(omp_num_threads)
 
         # For each parameter we need
-        for variable in ['HGT', 'TMP', 'SPFH']:
+        for variable in settings.NARR_VARIABLES:
             pool.map(process_grib_for_variable_helper,
                      itertools.izip(itertools.repeat(variable),
                                     grib_files.split()))
@@ -574,5 +541,5 @@ if __name__ == '__main__':
                 os.unlink(grib_file)
 
         # Cleanup - The Tar ball
-#        if os.path.exists(filename):
-#            os.unlink(filename)
+        if os.path.exists(filename):
+            os.unlink(filename)
