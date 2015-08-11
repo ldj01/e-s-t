@@ -14,11 +14,7 @@ install:
 	install -m 755 l5_7_estimate_landsat_emissivity.py $(PREFIX)/bin
 	install -m 755 download_narr_aux_data.py $(PREFIX)/bin
 	install -m 755 lst_extract_modtran_results.py $(PREFIX)/bin
-	install -m 755 update_narr_aux_data_from_CISL_RDA.py $(PREFIX)/bin
 	install -m 644 lst_utilities.py $(PREFIX)/bin
-	install -d $(PREFIX)/bin/config
-	install -m 644 config/__init__.py $(PREFIX)/bin/config
-	install -m 644 config/settings.py $(PREFIX)/bin/config
 
 clean:
 
