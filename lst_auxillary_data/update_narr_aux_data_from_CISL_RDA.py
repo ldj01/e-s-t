@@ -42,11 +42,8 @@ import errno
 import commands
 import requests
 import calendar
-import itertools
 import json
-from cStringIO import StringIO
 from argparse import ArgumentParser
-from osgeo import gdal, osr
 from time import sleep
 from datetime import datetime, timedelta
 from contextlib import closing
@@ -153,8 +150,7 @@ class Web(object):
                     return True
 
         # --------------------------------------------------------------------
-        def http_transfer_file(self, download_url, destination_file,
-                               headers=None):
+        def http_transfer_file(self, download_url, destination_file):
             '''
             Description:
                 Use http to transfer a file from a source location to a
@@ -286,6 +282,16 @@ class NARR_AuxProcessor(object):
         # Define the name of the configuration file that we will use
         self.lst_aux_config_filename = 'lst_auxillary.config'
 
+        # Verify the archive environment variable exists along with the
+        # directory that is specified
+        self.base_aux_dir = os.environ.get('LST_AUX_DIR')
+        if self.base_aux_dir is None:
+            raise Exception('Missing environment variable LST_AUX_DIR')
+
+        if not os.path.isdir(self.base_aux_dir):
+            raise Exception('LST_AUX_DIR directory does not exist')
+
+        self.config = None
         self.load_configuration()
 
         # Keep local copies of these
@@ -300,24 +306,6 @@ class NARR_AuxProcessor(object):
             environment.
        '''
 
-        # Verify environment variable exists along with the directory that is
-        # specified
-        self.base_aux_dir = os.environ.get('LST_AUX_DIR')
-        if self.base_aux_dir is None:
-            self.logger.info('Missing environment variable LST_AUX_DIR')
-            sys.exit(1)
-
-        if not os.path.isdir(self.base_aux_dir):
-            self.logger.info('LST_AUX_DIR directory does not exist')
-            sys.exit(1)
-
-        # Determine the number of threads to use, defaulting to 1
-        self.omp_num_threads = os.environ.get('OMP_NUM_THREADS')
-        if self.omp_num_threads is None:
-            self.omp_num_threads = 1
-        else:
-            self.omp_num_threads = int(self.omp_num_threads)
-
         # The config file is located in the same place as the executable
         cfg_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -330,7 +318,6 @@ class NARR_AuxProcessor(object):
                             '  Please generate one.'.format(cfg_file))
 
         # Load the file
-        self.config = None
         with open(cfg_file, 'r') as fd:
             lines = list()
             for line in fd:
@@ -358,7 +345,7 @@ class NARR_AuxProcessor(object):
             may have 1, 2, 3, or 4 days ... depending on the month and year.
         '''
 
-        format = self.config['remote_name_format']
+        name_format = self.config['remote_name_format']
 
         days_3 = timedelta(days=3)
         c_date = self.s_date
@@ -366,13 +353,13 @@ class NARR_AuxProcessor(object):
         while c_date <= self.e_date:
             if c_date.day == 28:
                 (x, days) = calendar.monthrange(c_date.year, c_date.month)
-                yield(format.format(c_date.year, c_date.month,
-                                    c_date.day, days))
+                yield(name_format.format(c_date.year, c_date.month,
+                                         c_date.day, days))
                 delta = timedelta(days=(days - 28 + 1))
                 c_date += delta
             else:
-                yield(format.format(c_date.year, c_date.month,
-                                    c_date.day, c_date.day + 2))
+                yield(name_format.format(c_date.year, c_date.month,
+                                         c_date.day, c_date.day + 2))
                 c_date += days_3
 
     # ------------------------------------------------------------------------
@@ -446,13 +433,17 @@ class NARR_AuxProcessor(object):
 
     # ------------------------------------------------------------------------
     def archive_aux_data(self):
+        '''
+        Description:
+            Defines the main processing method for the class.
+        '''
 
         # Figure out the names of the files to retrieve
         names = list(self.get_name_list())
 
         # Establish a logged in session
-        session = Web.Session(block_size=
-                              self.config['http_transfer_block_size'])
+        session = Web.Session(
+            block_size=self.config['http_transfer_block_size'])
 
         # Log in
         session.login(self.config['ucar_login_credentials']['login_url'],
