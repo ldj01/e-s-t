@@ -7,7 +7,6 @@ find_package ( PythonLibs 2.7.0 REQUIRED )
 install ( PROGRAMS l5_7_lst.py
                    l5_7_build_lst_data.py
                    l5_7_estimate_landsat_emissivity.py
-                   download_narr_aux_data.py
                    lst_extract_modtran_results.py
                    lst_prototype.py
           DESTINATION ${CMAKE_INSTALL_PREFIX}/bin )
