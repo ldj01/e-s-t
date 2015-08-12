@@ -43,16 +43,13 @@ import commands
 import requests
 import calendar
 import itertools
-import multiprocessing as mp
+import json
 from cStringIO import StringIO
 from argparse import ArgumentParser
 from osgeo import gdal, osr
 from time import sleep
 from datetime import datetime, timedelta
 from contextlib import closing
-
-
-from .config import settings
 
 
 # ============================================================================
@@ -272,123 +269,235 @@ class System(object):
 
 
 # ============================================================================
-def get_name_list(s_date, e_date):
+class NARR_AuxProcessor(object):
     '''
     Description:
-        Determines all of the base filenames to process based on the dates
-        provided.
-
-    Notes:
-        Files typically contain 3 days.
-        Special assumptions are coded for the end of the month; which
-        may have 1, 2, 3, or 4 days ... depending on the month and year.
+        Defines a processor for downloading and extracting the variables
+        required for LST processing from a NARR data source.
     '''
 
-    days_3 = timedelta(days=3)
-    c_date = s_date
+    # ------------------------------------------------------------------------
+    def __init__(self, s_date, e_date):
+        super(NARR_AuxProcessor, self).__init__()
 
-    while c_date <= e_date:
-        if c_date.day == 28:
-            (x, days) = calendar.monthrange(c_date.year, c_date.month)
-            yield(settings.REMOTE_NAME_FORMAT.format(c_date.year,
-                                                     c_date.month,
-                                                     c_date.day,
-                                                     days))
-            delta = timedelta(days=(days - 28 + 1))
-            c_date += delta
+        # Setup the logger to use
+        self.logger = logging.getLogger(__name__)
+
+        # Define the name of the configuration file that we will use
+        self.lst_aux_config_filename = 'lst_auxillary.config'
+
+        self.load_configuration()
+
+        # Keep local copies of these
+        self.s_date = s_date
+        self.e_date = e_date
+
+    # ------------------------------------------------------------------------
+    def load_configuration(self):
+        '''
+        Description:
+            Loads the configuration defined in the config file and by the
+            environment.
+       '''
+
+        # Verify environment variable exists along with the directory that is
+        # specified
+        self.base_aux_dir = os.environ.get('LST_AUX_DIR')
+        if self.base_aux_dir is None:
+            self.logger.info('Missing environment variable LST_AUX_DIR')
+            sys.exit(1)
+
+        if not os.path.isdir(self.base_aux_dir):
+            self.logger.info('LST_AUX_DIR directory does not exist')
+            sys.exit(1)
+
+        # Determine the number of threads to use, defaulting to 1
+        self.omp_num_threads = os.environ.get('OMP_NUM_THREADS')
+        if self.omp_num_threads is None:
+            self.omp_num_threads = 1
         else:
-            yield(settings.REMOTE_NAME_FORMAT.format(c_date.year,
-                                                     c_date.month,
-                                                     c_date.day,
-                                                     c_date.day + 2))
-            c_date += days_3
+            self.omp_num_threads = int(self.omp_num_threads)
+
+        # The config file is located in the same place as the executable
+        cfg_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Add the filename to the path
+        cfg_file = os.path.join(cfg_dir, self.lst_aux_config_filename)
+
+        # Check if it exists
+        if not os.path.exists(cfg_file):
+            raise Exception('Configuration file [{0}] does not exist.'
+                            '  Please generate one.'.format(cfg_file))
+
+        # Load the file
+        self.config = None
+        with open(cfg_file, 'r') as fd:
+            lines = list()
+            for line in fd:
+                # Skip rudimentary comments
+                if line.strip().startswith('#'):
+                    continue
+
+                lines.append(line)
+
+            self.config = json.loads(' '.join(lines))
+
+        if self.config is None:
+            raise Exception('Failed loading configuration')
+
+    # ------------------------------------------------------------------------
+    def get_name_list(self):
+        '''
+        Description:
+            Determines all of the base filenames to process based on the dates
+            provided.
+
+        Notes:
+            Files typically contain 3 days.
+            Special assumptions are coded for the end of the month; which
+            may have 1, 2, 3, or 4 days ... depending on the month and year.
+        '''
+
+        format = self.config['remote_name_format']
+
+        days_3 = timedelta(days=3)
+        c_date = self.s_date
+
+        while c_date <= self.e_date:
+            if c_date.day == 28:
+                (x, days) = calendar.monthrange(c_date.year, c_date.month)
+                yield(format.format(c_date.year, c_date.month,
+                                    c_date.day, days))
+                delta = timedelta(days=(days - 28 + 1))
+                c_date += delta
+            else:
+                yield(format.format(c_date.year, c_date.month,
+                                    c_date.day, c_date.day + 2))
+                c_date += days_3
+
+    # ------------------------------------------------------------------------
+    def process_grib_for_variable(self, variable, grib_file):
+        '''
+        Description:
+            Extract the specified variable from the grib file and archive it.
+        '''
+
+        self.logger.info("Processing [{0}]".format(grib_file))
+
+        # Get the date information from the grib file
+        parts = grib_file.split('.')
+        year = int(parts[1][:4])
+        month = int(parts[1][4:6])
+        day = int(parts[1][6:8])
+        hour = int(parts[1][8:])
+
+        # Figure out the filenames to create
+        hdr_name = (self.config['archive_name_format']
+                    .format(variable, year, month, day, hour*100, 'hdr'))
+        grb_name = (self.config['archive_name_format']
+                    .format(variable, year, month, day, hour*100, 'grb'))
+
+        # Create inventory/header file to extract the variable data
+        cmd = ['wgrib', grib_file, '|', 'grep', variable, '>', hdr_name]
+        cmd = ' '.join(cmd)
+        self.logger.info('Executing [{0}]'.format(cmd))
+        output = System.execute_cmd(cmd)
+        if output is not None and len(output) > 0:
+            self.logger.info(output)
+
+        # Create grib files for each variable
+        cmd = ['cat', hdr_name, '|',
+               'wgrib', grib_file, '-i', '-grib', '-o', grb_name]
+        cmd = ' '.join(cmd)
+        output = ''
+        self.logger.info('Executing [{0}]'.format(cmd))
+        output = System.execute_cmd(cmd)
+        if output is not None and len(output) > 0:
+            self.logger.info(output)
+
+        # Create new inventory/header file for the variable
+        cmd = ['wgrib', grb_name, '|', 'grep', variable, '>', hdr_name]
+        cmd = ' '.join(cmd)
+        self.logger.info('Executing [{0}]'.format(cmd))
+        output = System.execute_cmd(cmd)
+        if output is not None and len(output) > 0:
+            self.logger.info(output)
+
+        # Determine the directory to place the data and create it if it does
+        # not exist
+        dest_path = (self.config['archive_directory_format']
+                     .format(self.base_aux_dir, year, month, day))
+        System.create_directory(dest_path)
+
+        # Archive the files
+        self.logger.info('Archiving into [{0}]'.format(dest_path))
+        # GRIB
+        dest_file = os.path.join(dest_path, grb_name)
+        shutil.copyfile(grb_name, dest_file)
+        # HEADER
+        dest_file = os.path.join(dest_path, hdr_name)
+        shutil.copyfile(hdr_name, dest_file)
+
+        # Cleanup the working directory
+        if os.path.exists(grb_name):
+            os.unlink(grb_name)
+        if os.path.exists(hdr_name):
+            os.unlink(hdr_name)
+
+    # ------------------------------------------------------------------------
+    def archive_aux_data(self):
+
+        # Figure out the names of the files to retrieve
+        names = list(self.get_name_list())
+
+        # Establish a logged in session
+        session = Web.Session(block_size=
+                              self.config['http_transfer_block_size'])
+
+        # Log in
+        session.login(self.config['ucar_login_credentials']['login_url'],
+                      self.config['ucar_login_credentials']['login_data'])
+
+        for name in names:
+            filename = '{0}.tar'.format(name)
+            self.logger.info('Retrieving {0}'.format(filename))
+
+            year = name[7:11]
+
+            url = self.config['ucar_url_format'].format(year, filename)
+
+            session.http_transfer_file(url, filename)
+
+            # Extract the tar'd data
+            cmd = ['tar', '-xvf', filename]
+            cmd = ' '.join(cmd)
+            grib_files = System.execute_cmd(cmd)
+            if grib_files is not None and len(grib_files) > 0:
+                self.logger.info(grib_files)
+
+            # For each parameter we need
+            for variable in self.config['narr_variables']:
+                self.logger.info('Processing Variable [{0}]'.format(variable))
+                for grib_file in grib_files.split():
+                    self.process_grib_for_variable(variable, grib_file)
+
+            # Cleanup - Extracted grib files
+            for grib_file in grib_files.split():
+                if os.path.exists(grib_file):
+                    os.unlink(grib_file)
+
+            # Cleanup - The Tar ball
+            if os.path.exists(filename):
+                os.unlink(filename)
 
 
 # ============================================================================
-def process_grib_for_variable_helper(args):
+def parse_commandline():
     '''
     Description:
-        Turns the list argument into its components for the real process
-        routine, since we need multiple arguments.
+        Provide the command line definition and parsing.  Make sure the date
+        information is good.
     '''
-
-    process_grib_for_variable(*args)
-
-
-# ============================================================================
-def process_grib_for_variable(variable, grib_file):
-    '''
-    Description:
-        Extract the specified variable from the grib file and archive it.
-    '''
-
-    logger = logging.getLogger(__name__)
-
-    logger.info("Processing [{0}]".format(grib_file))
-
-    # Get the date information from the grib file
-    parts = grib_file.split('.')
-    year = int(parts[1][:4])
-    month = int(parts[1][4:6])
-    day = int(parts[1][6:8])
-    hour = int(parts[1][8:])
-
-    # Figure out the filenames to create
-    hdr_name = settings.ARCHIVE_NAME_FORMAT.format(variable, year, month,
-                                                   day, hour*100, 'hdr')
-    grb_name = settings.ARCHIVE_NAME_FORMAT.format(variable, year, month,
-                                                   day, hour*100, 'grb')
-
-    # Create inventory/header file to extract the variable data
-    cmd = ['wgrib', grib_file, '|', 'grep', variable, '>', hdr_name]
-    cmd = ' '.join(cmd)
-    logger.info('Executing [{0}]'.format(cmd))
-    output = System.execute_cmd(cmd)
-    if output is not None and len(output) > 0:
-        logger.info(output)
-
-    # Create grib files for each variable
-    cmd = ['cat', hdr_name, '|',
-           'wgrib', grib_file, '-i', '-grib', '-o', grb_name]
-    cmd = ' '.join(cmd)
-    output = ''
-    logger.info('Executing [{0}]'.format(cmd))
-    output = System.execute_cmd(cmd)
-    if output is not None and len(output) > 0:
-        logger.info(output)
-
-    # Create new inventory/header file for the variable
-    cmd = ['wgrib', grb_name, '|', 'grep', variable, '>', hdr_name]
-    cmd = ' '.join(cmd)
-    logger.info('Executing [{0}]'.format(cmd))
-    output = System.execute_cmd(cmd)
-    if output is not None and len(output) > 0:
-        logger.info(output)
-
-    # Determine the directory to place the data and create it if it does not
-    # exist
-    dest_path = settings.ARCHIVE_DIRECTORY_FORMAT.format(base_aux_dir, year,
-                                                         month, day)
-    System.create_directory(dest_path)
-
-    # Archive the files
-    logger.info('Archiving into [{0}]'.format(dest_path))
-    # GRIB
-    dest_file = os.path.join(dest_path, grb_name)
-    shutil.copyfile(grb_name, dest_file)
-    # HEADER
-    dest_file = os.path.join(dest_path, hdr_name)
-    shutil.copyfile(hdr_name, dest_file)
-
-    # Cleanup the working directory
-    if os.path.exists(grb_name):
-        os.unlink(grb_name)
-    if os.path.exists(hdr_name):
-        os.unlink(hdr_name)
-
-
-# ============================================================================
-if __name__ == '__main__':
 
     # Create a command line arugment parser
     description = ('Downloads LST auxillary inputs, then archives them for'
@@ -420,16 +529,6 @@ if __name__ == '__main__':
                         required=False,
                         help='The date YYYYMMDD for a specific date.')
 
-    parser.add_argument('--block-size',
-                        action='store',
-                        dest='block_size',
-                        metavar='SIZE',
-                        required=False,
-                        default=16777216,  # 16MB; 33554432 = 32MB
-                        help=('The block size used for streaming the download.'
-                              ' Specified in bytes.'
-                              '  (Default => 16777216bytes = 16MB)'))
-
     parser.add_argument('--version',
                         action='version',
                         version='%(prog)s 0.0.1',
@@ -437,42 +536,6 @@ if __name__ == '__main__':
 
     # Parse the command line parameters
     args = parser.parse_args()
-
-    # Setup the default logger format and level. log to STDOUT
-    logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
-                                ' %(levelname)-8s'
-                                ' %(filename)s:%(lineno)d:'
-                                '%(funcName)s -- %(message)s'),
-                        datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO,
-                        stream=sys.stdout)
-
-    # Get the logger
-    logger = logging.getLogger(__name__)
-
-    # Turn down the requests and urllib3 logging
-    requests_logger = logging.getLogger("requests")
-    requests_logger.setLevel(logging.WARNING)
-    urllib3_logger = logging.getLogger("urllib3")
-    urllib3_logger.setLevel(logging.WARNING)
-
-    # Verify environment variable exists along with the directory that is
-    # specified
-    base_aux_dir = os.environ.get('LST_AUX_DIR')
-    if base_aux_dir is None:
-        logger.info('Missing environment variable LST_AUX_DIR')
-        sys.exit(1)
-
-    if not os.path.isdir(base_aux_dir):
-        logger.info('LST_AUX_DIR directory does not exist')
-        sys.exit(1)
-
-    # Determine the number of threads to use, defaulting to 1
-    omp_num_threads = os.environ.get('OMP_NUM_THREADS')
-    if omp_num_threads is None:
-        omp_num_threads = 1
-    else:
-        omp_num_threads = int(omp_num_threads)
 
     s_date = None
     e_date = None
@@ -493,53 +556,50 @@ if __name__ == '__main__':
     else:
         raise Exception('Must supply either --date or --end-date')
 
+    if e_date < s_date:
+        raise Exception('--end-date must be equal-to or after --start-date')
+
     # Start date must start on a day based on a 3day per file pattern
     day = (s_date.day - 1) / 3 * 3 + 1
     delta = timedelta(days=(day - s_date.day))
     s_date += delta
 
-    names = list(get_name_list(s_date, e_date))
+    return (s_date, e_date)
 
-    # Establish a logged in session
-    session = Web.Session(block_size=args.block_size)
 
-    login_url = settings.ucar_login_credentials['login_url']
-    login_data = settings.ucar_login_credentials['login_data']
+# ============================================================================
+if __name__ == '__main__':
 
-    # Log in
-    session.login(login_url, login_data)
+    # Setup the default logger format and level. log to STDOUT
+    logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
+                                ' %(levelname)-8s'
+                                ' %(filename)s:%(lineno)d:'
+                                '%(funcName)s -- %(message)s'),
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        level=logging.INFO,
+                        stream=sys.stdout)
 
-    for name in names:
-        filename = '{0}.tar'.format(name)
-        logger.info('Retrieving {0}'.format(filename))
+    # Get the logger
+    logger = logging.getLogger(__name__)
 
-        year = name[7:11]
+    # Turn down the requests and urllib3 logging otherwise they fill the log
+    # file with mostly useless information
+    requests_logger = logging.getLogger("requests")
+    requests_logger.setLevel(logging.WARNING)
+    urllib3_logger = logging.getLogger("urllib3")
+    urllib3_logger.setLevel(logging.WARNING)
 
-        url = settings.UCAR_URL_FORMAT.format(year, filename)
+    # Process the command line
+    (s_date, e_date) = parse_commandline()
 
-        session.http_transfer_file(url, filename)
+    try:
+        # Create the processor object
+        processor = NARR_AuxProcessor(s_date, e_date)
 
-        # Extract the tar'd data
-        cmd = ['tar', '-xvf', filename]
-        cmd = ' '.join(cmd)
-        grib_files = System.execute_cmd(cmd)
-        if grib_file is not None and len(grib_files) > 0:
-            logger.info(grib_files)
+        # Call the main processing routine
+        processor.archive_aux_data()
+    except Exception:
+        logger.exception('Processing Failed')
+        sys.exit(1)  # EXIT FAILURE
 
-        # Process each sub-file and archive the results using a process pool
-        pool = mp.Pool(omp_num_threads)
-
-        # For each parameter we need
-        for variable in settings.NARR_VARIABLES:
-            pool.map(process_grib_for_variable_helper,
-                     itertools.izip(itertools.repeat(variable),
-                                    grib_files.split()))
-
-        # Cleanup - Extracted grib files
-        for grib_file in grib_files.split():
-            if os.path.exists(grib_file):
-                os.unlink(grib_file)
-
-        # Cleanup - The Tar ball
-        if os.path.exists(filename):
-            os.unlink(filename)
+    sys.exit(0)  # EXIT SUCCESS
