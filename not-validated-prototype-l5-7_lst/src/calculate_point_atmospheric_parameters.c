@@ -350,8 +350,8 @@ int int_tabulated
 /******************************************************************************
 MODULE:  calculate_lt
 
-PURPOSE: Calculate blackbody radiance from temperature using spectral repsonse 
-         function
+PURPOSE: Calculate blackbody radiance from temperature using spectral response
+         function.
 
 RETURN: SUCCESS
         FAILURE
@@ -401,7 +401,7 @@ int calculate_lt
        wavelength for the current temperature */
     planck_eq (spectral_response[0], num_srs, temperature, blackbody_radiance);
 
-    /* multiply the calculated planck radiance by the spectral reponse and
+    /* multiply the calculated planck radiance by the spectral response and
        integrate over wavelength to get one number for current temp */
     for (i = 0; i < num_srs; i++)
     {
@@ -495,7 +495,7 @@ void linear_interpolate_over_modtran
 MODULE:  calculate_lobs
 
 PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
-         reponse function.
+         response function.
 
 RETURN: SUCCESS
         FAILURE
@@ -546,7 +546,7 @@ int calculate_lobs
     linear_interpolate_over_modtran (modtran, index, spectral_response[0],
                                      num_entries, num_srs, temp_rad);
 
-    /* multiply the calculated radiance by the spectral reponse and integrate
+    /* multiply the calculated radiance by the spectral response and integrate
        over wavelength to get one number for current temperature */
     for (i = 0; i < num_srs; i++)
     {
