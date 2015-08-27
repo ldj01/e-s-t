@@ -4,20 +4,21 @@
 # Simple makefile for building and installing land-surface-temperature.
 #------------------------------------------------------------------------------
 
-SUBDIRS	= scripts src static_data
+export ESPA_APPLICATION = l5-7_lst
 
 all:
-	@for dir in $(SUBDIRS); do \
-        echo "make all in $$dir..."; \
-        (cd $$dir; $(MAKE) -f Makefile); done
+	echo "make all in src..."; \
+        (cd src; $(MAKE) -f Makefile)
 
 install: all
-	@for dir in $(SUBDIRS); do \
-        echo "make install in $$dir..."; \
-        (cd $$dir; $(MAKE) -f Makefile install); done
+	echo "make install in scripts..."; \
+        (cd scripts; $(MAKE) -f Makefile install)
+	echo "make install in static_data..."; \
+        (cd static_data; $(MAKE) -f Makefile install)
+	echo "make install in src..."; \
+        (cd src; $(MAKE) -f Makefile install)
 
 clean:
-	@for dir in $(SUBDIRS); do \
-        echo "make clean in $$dir..."; \
-        (cd $$dir; $(MAKE) -f Makefile clean); done
+	echo "make clean in src..."; \
+        (cd clean; $(MAKE) -f Makefile)
 

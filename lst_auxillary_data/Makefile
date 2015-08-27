@@ -3,14 +3,29 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
+.PHONY: check-environment
 
-# Target for the executable
+export ESPA_APPLICATION = lst_auxillary_data
+
+AUX_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
+
 all:
 
-install:
-	install -d $(PREFIX)/bin
-	install -m 755 update_narr_aux_data_from_CISL_RDA.py $(PREFIX)/bin
-	install -m 644 lst_auxillary.config.example $(PREFIX)/bin
+install: check-environment
+	install -d $(AUX_INSTALL_PATH)
+	install -m 755 update_narr_aux_data_from_CISL_RDA.py $(AUX_INSTALL_PATH)
+	install -m 644 example-lst_auxillary.config $(AUX_INSTALL_PATH)
 
 clean:
+
+check-environment:
+ifndef PREFIX
+    $(error PREFIX is undefined)
+endif
+ifndef ESPA_PROJECT
+    $(error ESPA_PROJECT is undefined)
+endif
+ifndef ESPA_APPLICATION
+    $(error ESPA_APPLICATION is undefined)
+endif
 

@@ -5,31 +5,48 @@
 # applications.
 #------------------------------------------------------------------------------
 
-all: l5-7_lst
+export ESPA_PROJECT = espa-land-surface-temperature
+
+DIR_L5-7 = not-validated-prototype-l5-7_lst
+DIR_AUX = lst_auxillary_data
+
+MAKEFILE_NAME = Makefile
+STATIC_MAKEFILE_NAME = Makefile.static
+
+all: all-script all-l5-7
+
+install: install-script install-l5-7
+
+clean: clean-script clean-l5-7
+
+#------------------------------------------------------------------------------
+all-script:
 	echo "make all in scripts"; \
-        (cd scripts; $(MAKE) all -f Makefile);
+        (cd scripts; $(MAKE) all -f $(MAKEFILE_NAME));
 
-install: l5-7_lst-install
+install-script:
 	echo "make install in scripts"; \
-        (cd scripts; $(MAKE) install -f Makefile);
+        (cd scripts; $(MAKE) install -f $(MAKEFILE_NAME));
 
-clean: l5-7_lst-clean
+clean-script:
 	echo "make clean in scripts"; \
-        (cd scripts; $(MAKE) clean -f Makefile);
+        (cd scripts; $(MAKE) clean -f $(MAKEFILE_NAME));
 
-l5-7_lst: l5-7_lst-all
-
-l5-7_lst-all:
+#------------------------------------------------------------------------------
+all-l5-7:
 	echo "make all in not-validated-prototype-l5-7_lst"; \
-        (cd not-validated-prototype-l5-7_lst; \
-        $(MAKE) all -f Makefile);
+        (cd $(DIR_L5-7); $(MAKE) all -f $(MAKEFILE_NAME));
 
-l5-7_lst-install:
+install-l5-7:
 	echo "make install in not-validated-prototype-l5-7_lst"; \
-        (cd not-validated-prototype-l5-7_lst; \
-        $(MAKE) install -f Makefile);
+        (cd $(DIR_L5-7); $(MAKE) install -f $(MAKEFILE_NAME));
 
-l5-7_lst-clean:
+clean-l5-7:
 	echo "make clean in not-validated-prototype-l5-7_lst"; \
-        (cd not-validated-prototype-l5-7_lst; \
-        $(MAKE) clean -f Makefile);
+        (cd $(DIR_L5-7); $(MAKE) clean -f $(MAKEFILE_NAME));
+
+#------------------------------------------------------------------------------
+install-aux:
+	echo "make install in lst_auxillary_data"; \
+        (cd $(DIR_AUX); $(MAKE) install -f $(MAKEFILE_NAME));
+

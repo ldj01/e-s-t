@@ -3,6 +3,9 @@
 #
 # For statically building land-surface-temperature.
 #------------------------------------------------------------------------------
+.PHONY: check-environment
+
+BIN_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
 
 # Set up compile options
 CC = gcc
@@ -20,14 +23,14 @@ NCFLAGS = $(EXTRA) $(INCDIR)
 
 # Define the source code and object files
 SRC = \
-      utilities.c \
-      2d_array.c \
-      date.c \
-      input.c \
-      output.c \
-      get_args.c \
-      build_points.c \
-      build_modtran_input.c \
+      utilities.c                              \
+      2d_array.c                               \
+      date.c                                   \
+      input.c                                  \
+      output.c                                 \
+      get_args.c                               \
+      build_points.c                           \
+      build_modtran_input.c                    \
       calculate_point_atmospheric_parameters.c \
       calculate_pixel_atmospheric_parameters.c \
       lst.c
@@ -50,9 +53,9 @@ all: $(EXE)
 $(EXE): $(OBJ) $(INC)
 	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
 
-install:
-	install -d $(PREFIX)/bin
-	install -m 755 $(EXE) $(PREFIX)/bin
+install: check-environment
+	install -d $(BIN_INSTALL_PATH)
+	install -m 755 $(EXE) $(BIN_INSTALL_PATH)
 
 clean:
 	$(RM) *.o $(EXE)
@@ -61,4 +64,15 @@ $(OBJ): $(INC)
 
 .c.o:
 	$(CC) $(NCFLAGS) -c $<
+
+check-environment:
+ifndef PREFIX
+    $(error PREFIX is undefined)
+endif
+ifndef ESPA_PROJECT
+    $(error ESPA_PROJECT is undefined)
+endif
+ifndef ESPA_APPLICATION
+    $(error ESPA_APPLICATION is undefined)
+endif
 
