@@ -5,8 +5,6 @@
 #------------------------------------------------------------------------------
 .PHONY: all install clean
 
-export ESPA_APPLICATION = l5-7_lst
-
 all:
 	echo "make all in src..."; \
         (cd src; $(MAKE) -f Makefile)

@@ -3,36 +3,35 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
-.PHONY: all install clean check-environment
+.PHONY: all install clean
 
-SCRIPT_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
+# Inherit from upper-level make.config
+TOP = ../..
+include $(TOP)/make.config
 
-SCRIPT_FILES = \
-    l5_7_lst.py \
-    l5_7_build_lst_data.py \
-    l5_7_estimate_landsat_emissivity.py \
-    lst_extract_modtran_results.py \
-    lst_utilities.py \
+script_install_path = $(l57_algorithm_dir)/bin
+
+SCRIPT_EXECUTABLES = \
+    lst_core_processing.py \
+    extract_modtran_results.py
+
+SCRIPT_IMPORTS = \
+    build_lst_data.py \
+    estimate_landsat_emissivity.py \
+    lst_utilities.py
 
 all:
 
-install: check-environment
-	install -d $(SCRIPT_INSTALL_PATH)
-	@for file in $(SCRIPT_FILES); do \
+install:
+	install -d $(script_install_path)
+	@for file in $(SCRIPT_EXECUTABLES); do \
             echo "  installing $$file"; \
-            install -m 755 $$file $(SCRIPT_INSTALL_PATH); \
+            install -m 755 $$file $(script_install_path); \
+        done;
+	@for file in $(SCRIPT_IMPORTS); do \
+            echo "  installing $$file"; \
+            install -m 644 $$file $(script_install_path); \
         done;
 
 clean:
-
-check-environment:
-ifndef PREFIX
-    $(error PREFIX is undefined)
-endif
-ifndef ESPA_PROJECT
-    $(error ESPA_PROJECT is undefined)
-endif
-ifndef ESPA_APPLICATION
-    $(error ESPA_APPLICATION is undefined)
-endif
 

@@ -6,13 +6,13 @@
 #------------------------------------------------------------------------------
 .PHONY: all install clean all-script install-script clean-script all-l5-7 install-l5-7 clean-l5-7 install-aux
 
-export ESPA_PROJECT = espa-land-surface-temperature
-
-DIR_L5-7 = not-validated-prototype-l5-7_lst
-DIR_AUX = lst_auxillary_data
+include make.config
 
 MAKEFILE_NAME = Makefile
 STATIC_MAKEFILE_NAME = Makefile.static
+
+DIR_L5-7 = not-validated-prototype-l5-7_lst
+DIR_AUX = lst_auxillary_data
 
 all: all-script all-l5-7
 
@@ -25,7 +25,7 @@ all-script:
 	echo "make all in scripts"; \
         (cd scripts; $(MAKE) all -f $(MAKEFILE_NAME));
 
-install-script:
+install-script: 
 	echo "make install in scripts"; \
         (cd scripts; $(MAKE) install -f $(MAKEFILE_NAME));
 

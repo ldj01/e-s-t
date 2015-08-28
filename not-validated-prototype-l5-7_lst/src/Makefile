@@ -3,9 +3,13 @@
 #
 # For building land-surface-temperature.
 #------------------------------------------------------------------------------
-.PHONY: all install clean check-environment
+.PHONY: all install clean
 
-BIN_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
+# Inherit from upper-level make.config
+TOP = ../..
+include $(TOP)/make.config
+
+bin_install_path = $(l57_algorithm_dir)/bin
 
 # Set up compile options
 CC = gcc
@@ -53,9 +57,9 @@ all: $(EXE)
 $(EXE): $(OBJ) $(INC)
 	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
 
-install: check-environment
-	install -d $(BIN_INSTALL_PATH)
-	install -m 755 $(EXE) $(BIN_INSTALL_PATH)
+install:
+	install -d $(bin_install_path)
+	install -m 755 $(EXE) $(bin_install_path)
 
 clean:
 	$(RM) *.o $(EXE)
@@ -64,15 +68,4 @@ $(OBJ): $(INC)
 
 .c.o:
 	$(CC) $(NCFLAGS) -c $<
-
-check-environment:
-ifndef PREFIX
-    $(error PREFIX is undefined)
-endif
-ifndef ESPA_PROJECT
-    $(error ESPA_PROJECT is undefined)
-endif
-ifndef ESPA_APPLICATION
-    $(error ESPA_APPLICATION is undefined)
-endif
 

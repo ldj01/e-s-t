@@ -3,9 +3,13 @@
 #
 # Simple makefile for installing the static data.
 #------------------------------------------------------------------------------
-.PHONY: all install clean check-environment
+.PHONY: all install clean
 
-STATIC_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/static_data
+# Inherit from upper-level make.config
+TOP = ../..
+include $(TOP)/make.config
+
+static_install_path = $(l57_algorithm_dir)/static_data
 
 STATIC_DATA_FILES = \
     modtran_head.txt                  \
@@ -20,23 +24,12 @@ STATIC_DATA_FILES = \
 
 all:
 
-install: check-environment
-	install -d $(STATIC_INSTALL_PATH)
+install:
+	install -d $(static_install_path)
 	@for file in $(STATIC_DATA_FILES); do \
             echo "  installing $$file"; \
-            install -m 644 $$file $(STATIC_INSTALL_PATH); \
+            install -m 644 $$file $(static_install_path); \
         done;
 
 clean:
-
-check-environment:
-ifndef PREFIX
-    $(error PREFIX is undefined)
-endif
-ifndef ESPA_PROJECT
-    $(error ESPA_PROJECT is undefined)
-endif
-ifndef ESPA_APPLICATION
-    $(error ESPA_APPLICATION is undefined)
-endif
 
