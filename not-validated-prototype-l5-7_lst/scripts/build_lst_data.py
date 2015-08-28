@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: l5-7_build_lst_data.py
+    FILE: build_lst_data.py
 
     PURPOSE: Builds the LST product from the intermediate data that was
              generated.

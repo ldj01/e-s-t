@@ -32,8 +32,8 @@ import metadata_api
 # Import local modules
 import lst_utilities as util
 
-import l5_7_estimate_landsat_emissivity as estimate_landsat_emissivity
-import l5_7_build_lst_data as build_lst_data
+import estimate_landsat_emissivity
+import build_lst_data
 
 
 # ============================================================================

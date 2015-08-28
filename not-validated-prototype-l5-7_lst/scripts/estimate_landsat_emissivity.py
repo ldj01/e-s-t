@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: l5-7_landsat_emissivity_from_aster_ged.py
+    FILE: estimate_landsat_emissivity.py
 
     PURPOSE: Estimates a Landsat Emissivity product from ASTER Emissivity and
              NDVI.  The results are meant to be used for generation of a Land
