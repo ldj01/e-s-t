@@ -491,8 +491,13 @@ def parse_commandline():
     '''
 
     # Create a command line arugment parser
-    description = ('Downloads LST auxillary inputs, then archives them for'
-                   ' future use.')
+    description = ('Downloads NARR data and extracts the required parameters'
+                   ' for Land Surface Temperature processing.  The parameters'
+                   ' are then archived for later use.  The NARR data is'
+                   ' packaged into gzipped tar balls containing 1 to 4 days'
+                   ' worth of data from the source site.  Because of that,'
+                   ' all days contained in the package will always be'
+                   ' processed.')
     parser = ArgumentParser(description=description)
 
     # ---- Add parameters ----
@@ -502,7 +507,7 @@ def parse_commandline():
                         metavar='DATE',
                         required=False,
                         help=('The start date YYYYMMDD(inclusive)'
-                              ' if requiring a range.'
+                              ' if specifying a range.'
                               '  Defaults to --end-date if not specified.'))
 
     parser.add_argument('--end-date',
@@ -511,7 +516,7 @@ def parse_commandline():
                         metavar='DATE',
                         required=False,
                         help=('The end date YYYYMMDD(inclusive)'
-                              ' if requiring a range.'))
+                              ' if specifying a range.'))
 
     parser.add_argument('--date',
                         action='store',
@@ -559,7 +564,7 @@ def parse_commandline():
 
 
 # ============================================================================
-if __name__ == '__main__':
+def main():
 
     # Setup the default logger format and level. log to STDOUT
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
@@ -594,3 +599,7 @@ if __name__ == '__main__':
         sys.exit(1)  # EXIT FAILURE
 
     sys.exit(0)  # EXIT SUCCESS
+
+# ============================================================================
+if __name__ == '__main__':
+    main()
