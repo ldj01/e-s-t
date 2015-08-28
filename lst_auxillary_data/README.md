@@ -8,4 +8,4 @@ This script is used to retrieve data from the NARR archive located at http://rda
 
 #### ??????????.py
 
-This script is used to update the archive on a daily basis from http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive where files are available for the current year in 3 hour increments.  However there is a delay before new files are provided as time is needed to wait for input data and to generate the parameters.  See http://rda.ucar.edufor more details about the contents of the data.
+This script is used to update the archive on a daily basis from http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive where files are available for the current year in 3 hour increments.  However there is a delay before new files are provided as time is needed to wait for input data and to generate the parameters.  See http://rda.ucar.edu for more details about the contents of the data.
