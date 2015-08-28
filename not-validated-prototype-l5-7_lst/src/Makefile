@@ -3,7 +3,7 @@
 #
 # For building land-surface-temperature.
 #------------------------------------------------------------------------------
-.PHONY: check-environment
+.PHONY: all install clean check-environment
 
 BIN_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
 

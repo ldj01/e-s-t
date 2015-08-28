@@ -3,6 +3,7 @@
 #
 # Simple makefile for building and installing land-surface-temperature.
 #------------------------------------------------------------------------------
+.PHONY: all install clean
 
 export ESPA_APPLICATION = l5-7_lst
 

@@ -3,7 +3,7 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
-.PHONY: check-environment
+.PHONY: all install clean check-environment
 
 export ESPA_APPLICATION = lst_auxillary_data
 
@@ -13,7 +13,7 @@ all:
 
 install: check-environment
 	install -d $(AUX_INSTALL_PATH)
-	install -m 755 update_narr_aux_data_from_CISL_RDA.py $(AUX_INSTALL_PATH)
+	install -m 755 build_narr_aux_archive_from_CISL_RDA.py $(AUX_INSTALL_PATH)
 	install -m 644 example-lst_auxillary.config $(AUX_INSTALL_PATH)
 
 clean:

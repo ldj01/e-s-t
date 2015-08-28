@@ -3,7 +3,7 @@
 #
 # Simple makefile for installing the static data.
 #------------------------------------------------------------------------------
-.PHONY: check-environment
+.PHONY: all install clean check-environment
 
 STATIC_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/static_data
 

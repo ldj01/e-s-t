@@ -3,7 +3,7 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
-.PHONY: check-environment
+.PHONY: all install clean check-environment
 
 SCRIPT_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/bin
 

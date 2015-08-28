@@ -4,6 +4,7 @@
 # Simple makefile for building and installing land-surface-temperature
 # applications.
 #------------------------------------------------------------------------------
+.PHONY: all install clean all-script install-script clean-script all-l5-7 install-l5-7 clean-l5-7 install-aux
 
 export ESPA_PROJECT = espa-land-surface-temperature
 

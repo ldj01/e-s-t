@@ -3,20 +3,25 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
-.PHONY: check-environment
+.PHONY: all install clean check-environment
 
 SCRIPT_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
 
-# Target for the executable
+SCRIPT_FILES = \
+    l5_7_lst.py \
+    l5_7_build_lst_data.py \
+    l5_7_estimate_landsat_emissivity.py \
+    lst_extract_modtran_results.py \
+    lst_utilities.py \
+
 all:
 
 install: check-environment
 	install -d $(SCRIPT_INSTALL_PATH)
-	install -m 755 l5_7_lst.py $(SCRIPT_INSTALL_PATH)
-	install -m 755 l5_7_build_lst_data.py $(SCRIPT_INSTALL_PATH)
-	install -m 755 l5_7_estimate_landsat_emissivity.py $(SCRIPT_INSTALL_PATH)
-	install -m 755 lst_extract_modtran_results.py $(SCRIPT_INSTALL_PATH)
-	install -m 644 lst_utilities.py $(SCRIPT_INSTALL_PATH)
+	@for file in $(SCRIPT_FILES); do \
+            echo "  installing $$file"; \
+            install -m 755 $$file $(SCRIPT_INSTALL_PATH); \
+        done;
 
 clean:
 
