@@ -14,7 +14,7 @@ bin_install_path = $(l57_algorithm_dir)/bin
 # Set up compile options
 CC = gcc
 RM = rm -f
-EXTRA = -Wall -g -O2
+EXTRA = $(build_type) -Wall -g -O2
 
 # Define the include files
 INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h \

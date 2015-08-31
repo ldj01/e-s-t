@@ -19,5 +19,5 @@ install: all
 
 clean:
 	echo "make clean in src..."; \
-        (cd clean; $(MAKE) -f Makefile)
+        (cd src; $(MAKE) -f Makefile clean)
 
