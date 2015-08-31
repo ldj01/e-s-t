@@ -9,7 +9,6 @@
 include make.config
 
 MAKEFILE_NAME = Makefile
-STATIC_MAKEFILE_NAME = Makefile.static
 
 DIR_L5-7 = not-validated-prototype-l5-7_lst
 DIR_AUX = lst_auxillary_data
