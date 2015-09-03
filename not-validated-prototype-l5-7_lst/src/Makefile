@@ -58,8 +58,10 @@ $(EXE): $(OBJ) $(INC)
 	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
 
 install:
+	install -d $(link_path)
 	install -d $(bin_install_path)
 	install -m 755 $(EXE) $(bin_install_path)
+	ln -sf ../$(project_name)/$(l57_algorithm)/bin/$(EXE) $(link_path)/$(EXE)
 
 clean:
 	$(RM) *.o $(EXE)
