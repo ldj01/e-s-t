@@ -16,9 +16,9 @@ See the [PLACE HOLDER](butter) product guide for information about the Land Surf
 ## Installation
 
 ### Dependencies
-* ESPA raw binary libraries, tools, and it's dependencies, found here [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter)
-* Python 2.7+ and Scipy
-* [GDAL](http://www.gdal.org/) command line tools are utilized for some of the processing steps.
+* ESPA raw binary libraries, tools, and it's dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
+* Python 2.7+ and Scipy/Numpy
+* [GDAL](http://www.gdal.org/) 1.11.1 command line tools are utilized for some of the processing steps.
 
 ### Environment Variables
 * Required for building this software
@@ -62,7 +62,7 @@ The following input data are required to generate the spectral indicies products
 * Top of Atmosphere Reflectance (TOA)
   - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
 * Elevation
-  - Elevation data is expected to be in the same projection and image dimensions as the TOA products.
+  - Elevation data is expected to be in the same projection and image dimensions as the TOA products and in the ENVI file format.  The filename is also expected be `<sceneid>_dem.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
 * ASTER GED
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
 * North American Regional Reanalysis (NARR)
