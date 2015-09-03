@@ -18,6 +18,7 @@ See the [PLACE HOLDER](butter) product guide for information about the Land Surf
 ### Dependencies
 * ESPA raw binary libraries, tools, and it's dependencies, found here [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter)
 * Python 2.7+ and Scipy
+* [GDAL](http://www.gdal.org/) command line tools are utilized for some of the processing steps.
 
 ### Environment Variables
 * Required for building this software
@@ -49,20 +50,23 @@ See `land_surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
-    export ASTER_GED_SERVER_NAME="server.name.where.the.GED.data.resides"
-    export ASTER_GED_SERVER_PATH="/path/on/server/to/the/data/"
+* ASTER_GED_SERVER_NAME
+  - `export ASTER_GED_SERVER_NAME="e4ftl01.cr.usgs.gov"`
+* ASTER_GED_SERVER_PATH
+  - `export ASTER_GED_SERVER_PATH="/ASTT/AG100.003/2000.01.01/"`
 
 ### Data Processing Requirements
 This version of the Land Surface Temperature application requires the input products to be in the ESPA internal file format.
 
 The following input data are required to generate the spectral indicies products:
 * Top of Atmosphere Reflectance (TOA)
+  - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
 * Elevation
+  - Elevation data is expected to be in the same projection and image dimensions as the TOA products.
 * ASTER GED
+  - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
 * North American Regional Reanalysis (NARR)
-
-The TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.<br>
-The ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).<br>
+  - NARR data, it would be best to utilize the `lst_aux_data` software provided in this project to download and build your own archive for the dates you require.
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.
