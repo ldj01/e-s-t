@@ -17,8 +17,9 @@ See the [PLACE HOLDER](butter) product guide for information about the Land Surf
 
 ### Dependencies
 * ESPA raw binary libraries, tools, and it's dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
-* Python 2.7+ and Scipy/Numpy
-* [GDAL](http://www.gdal.org/) 1.11.1 command line tools are utilized for some of the processing steps.
+* Python 2.7+ and Scipy/Numpy/GDAL
+* [GDAL](http://www.gdal.org/) 1.11.1
+  - The command line tools are utilized for some of the processing steps.
 
 ### Environment Variables
 * Required for building this software
