@@ -280,7 +280,7 @@ class NARR_AuxProcessor(object):
         self.logger = logging.getLogger(__name__)
 
         # Define the name of the configuration file that we will use
-        self.lst_aux_config_filename = 'lst_auxillary.config'
+        self.lst_aux_config_filename = 'lst_auxiliary.config'
 
         # Verify the archive environment variable exists along with the
         # directory that is specified

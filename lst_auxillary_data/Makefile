@@ -3,29 +3,22 @@
 #
 # Simple makefile for installing the scripts.
 #------------------------------------------------------------------------------
-.PHONY: all install clean check-environment
+.PHONY: all install clean
 
-export ESPA_APPLICATION = lst_auxillary_data
+# Inherit from upper-level make.config
+TOP = ..
+include $(TOP)/make.config
 
-AUX_INSTALL_PATH = $(PREFIX)/$(ESPA_PROJECT)/$(ESPA_APPLICATION)/bin
+aux_install_path = $(espa_project_dir)/bin
 
 all:
 
-install: check-environment
-	install -d $(AUX_INSTALL_PATH)
-	install -m 755 build_narr_aux_archive_from_CISL_RDA.py $(AUX_INSTALL_PATH)
-	install -m 644 example-lst_auxillary.config $(AUX_INSTALL_PATH)
+install:
+	install -d $(aux_install_path)
+	install -m 755 build_narr_aux_archive_from_CISL_RDA.py $(aux_install_path)
+	install -m 644 example-lst_auxiliary.config $(aux_install_path)
+	ln -sf ../$(project_name)/bin/build_narr_aux_archive_from_CISL_RDA.py $(link_path)/build_narr_aux_archive_from_CISL_RDA.py
+	ln -sf ../$(project_name)/bin/example-lst_auxiliary.config $(link_path)/example-lst_auxiliary.config
 
 clean:
-
-check-environment:
-ifndef PREFIX
-    $(error PREFIX is undefined)
-endif
-ifndef ESPA_PROJECT
-    $(error ESPA_PROJECT is undefined)
-endif
-ifndef ESPA_APPLICATION
-    $(error ESPA_APPLICATION is undefined)
-endif
 
