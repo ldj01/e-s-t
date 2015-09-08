@@ -5,22 +5,25 @@
 #     particular release to build an RPM for.
 
 # ----------------------------------------------------------------------------
+
+# Change the default rpm name format for the rpm built by this spec file
+%define _build_name_fmt %%{NAME}-aux.%%{VERSION}.%%{RELEASE}.rpm
+
 Name:		espa-land-surface-temperature
 Version:	0.0.1
 Release:	1%{?dist}
-Summary:	ESPA Land Surface Temperature Software
+Summary:	ESPA Land Surface Temperature Auxiliary Software
 
 Group:		ESPA
 License:	Nasa Open Source Agreement
 URL:		https://github.com/USGS-EROS/espa-land-surface-temperature.git
 
-BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-aux-%{version}-%{release}-XXXXXX)
+BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch:	x86_64
 Packager:	USGS EROS LSRD
 
 BuildRequires:	espa-common
 Requires:	espa-common >= 1.4.0
-
 
 # ----------------------------------------------------------------------------
 %description
@@ -31,7 +34,7 @@ Provides science application executables for generating land surface temperature
 # Specify the repository tag/branch to clone and build from
 %define tagname dev_v0.0.1
 # Specify the name of the directory to clone into
-%define clonedname %{name}-aux-%{tagname}
+%define clonedname %{name}-%{tagname}
 
 
 # ----------------------------------------------------------------------------
@@ -46,6 +49,7 @@ Provides science application executables for generating land surface temperature
 rm -rf %{clonedname}
 git clone --depth 1 --branch %{tagname} %{url} %{clonedname}
 # Build the applications
+# Currently nothing to build for this auxiliary data
 # cd %{clonedname}
 # make BUILD_TYPE=-static
 
