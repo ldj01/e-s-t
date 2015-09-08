@@ -14,6 +14,7 @@ aux_install_path = $(lst_auxiliary_dir)/bin
 all:
 
 install:
+	install -d $(link_path)
 	install -d $(aux_install_path)
 	install -m 755 build_narr_aux_archive_from_CISL_RDA.py $(aux_install_path)
 	install -m 644 example-lst_auxiliary.config $(aux_install_path)
