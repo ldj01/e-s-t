@@ -11,7 +11,7 @@ include make.config
 MAKEFILE_NAME = Makefile
 
 DIR_L5-7 = not-validated-prototype-l5-7_lst
-DIR_AUX = lst_auxillary_data
+DIR_AUX = lst_auxiliary_data
 
 all: all-script all-l5-7
 
@@ -47,7 +47,7 @@ clean-l5-7: clean-script
 
 #------------------------------------------------------------------------------
 install-aux:
-	echo "make install in lst_auxillary_data"; \
+	echo "make install in lst_auxiliary_data"; \
         (cd $(DIR_AUX); $(MAKE) install -f $(MAKEFILE_NAME));
 
 check-environment:
