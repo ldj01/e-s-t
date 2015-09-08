@@ -23,14 +23,17 @@ SCRIPT_IMPORTS = \
 all:
 
 install:
+	install -d $(link_path)
 	install -d $(script_install_path)
 	@for file in $(SCRIPT_EXECUTABLES); do \
             echo "  installing $$file"; \
             install -m 755 $$file $(script_install_path); \
+            ln -sf ../$(project_name)/$(l57_algorithm)/bin/$$file $(link_path)/$$file; \
         done;
 	@for file in $(SCRIPT_IMPORTS); do \
             echo "  installing $$file"; \
             install -m 644 $$file $(script_install_path); \
+            ln -sf ../$(project_name)/$(l57_algorithm)/bin/$$file $(link_path)/$$file; \
         done;
 
 clean:
