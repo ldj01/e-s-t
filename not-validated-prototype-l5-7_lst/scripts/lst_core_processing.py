@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: l5-7_lst.py
+    FILE: lst_core_processing.py
 
     PURPOSE: Calls the executables required to generate the LST products.
 
@@ -49,14 +49,16 @@ class AuxNARRGribProcessor(object):
 
         # Keep local copies of these
         self.xml_filename = xml_filename
-        self.base_aux_dir = base_aux_dir
 
         self.parms_to_extract = ['HGT', 'SPFH', 'TMP']
         self.aux_path_template = '{0:0>4}/{1:0>2}/{2:0>2}'
         self.aux_name_template = 'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'
 
         self.date_template = '{0:0>4}{1:0>2}{2:0>2}'
-        self.dir_template = '{0}/{1}/{2}'
+        self.dir_template = base_aux_dir + '/{0}/{1}'
+
+        self.record_idx = 0
+        self.pressure_idx = 6
 
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
@@ -79,8 +81,8 @@ class AuxNARRGribProcessor(object):
             for line in hdr_fd.readlines():
                 self.logger.debug(line.strip())
                 parts = line.strip().split(':')
-                record = parts[0]
-                pressure = parts[6].split('=')[1]
+                record = parts[self.record_idx]
+                pressure = parts[self.pressure_idx].split('=')[1]
                 self.logger.debug('{0} {1}'.format(record, pressure))
 
                 filename = '.'.join([pressure, 'txt'])
@@ -141,50 +143,42 @@ class AuxNARRGribProcessor(object):
         self.logger.debug('Date 1 = {0}'.format(str(date_1)))
         self.logger.debug('Date 2 = {0}'.format(str(date_2)))
 
-        d1_year = date_1.year
-        d1_month = date_1.month
-        d1_day = date_1.day
-        d1_hour = date_1.hour * 100
-
-        d2_year = date_2.year
-        d2_month = date_2.month
-        d2_day = date_2.day
-        d2_hour = date_2.hour * 100
-
         for parm in self.parms_to_extract:
             # Build the source filenames for date 1
-            hdr_1_name = (
-                self.aux_name_template.format(parm, d1_year, d1_month, d1_day,
-                                              d1_hour, 'hdr'))
-            grb_1_name = (
-                self.aux_name_template.format(parm, d1_year, d1_month, d1_day,
-                                              d1_hour, 'grb'))
-            self.logger.debug('hdr 1 = {0}'.format(hdr_1_name))
-            self.logger.debug('grb 1 = {0}'.format(grb_1_name))
+            filename = self.aux_name_template.format(parm,
+                                                     date_1.year,
+                                                     date_1.month,
+                                                     date_1.day,
+                                                     date_1.hour * 100,
+                                                     'hdr')
 
-            tmp = (self.aux_path_template.format(d1_year, d1_month, d1_day))
-            hdr_1_path = (self.dir_template
-                          .format(base_aux_dir, tmp, hdr_1_name))
-            grb_1_path = (self.dir_template
-                          .format(base_aux_dir, tmp, grb_1_name))
+            aux_path = (self.aux_path_template.format(date_1.year,
+                                                      date_1.month,
+                                                      date_1.day))
+
+            hdr_1_path = self.dir_template.format(aux_path, filename)
+
+            grb_1_path = hdr_1_path.replace('.hdr', '.grb')
+
             self.logger.info('Using {0}'.format(hdr_1_path))
             self.logger.info('Using {0}'.format(grb_1_path))
 
             # Build the source filenames for date 2
-            hdr_2_name = (
-                self.aux_name_template.format(parm, d2_year, d2_month, d2_day,
-                                              d2_hour, 'hdr'))
-            grb_2_name = (
-                self.aux_name_template.format(parm, d2_year, d2_month, d2_day,
-                                              d2_hour, 'grb'))
-            self.logger.debug('hdr 2 = {0}'.format(hdr_2_name))
-            self.logger.debug('grb 2 = {0}'.format(grb_2_name))
+            filename = self.aux_name_template.format(parm,
+                                                     date_2.year,
+                                                     date_2.month,
+                                                     date_2.day,
+                                                     date_2.hour * 100,
+                                                     'hdr')
 
-            tmp = (self.aux_path_template.format(d2_year, d2_month, d2_day))
-            hdr_2_path = (self.dir_template
-                          .format(base_aux_dir, tmp, hdr_2_name))
-            grb_2_path = (self.dir_template
-                          .format(base_aux_dir, tmp, grb_2_name))
+            aux_path = (self.aux_path_template.format(date_2.year,
+                                                      date_2.month,
+                                                      date_2.day))
+
+            hdr_2_path = self.dir_template.format(aux_path, filename)
+
+            grb_2_path = hdr_2_path.replace('.hdr', '.grb')
+
             self.logger.info('Using {0}'.format(hdr_2_path))
             self.logger.info('Using {0}'.format(grb_2_path))
 
@@ -195,10 +189,46 @@ class AuxNARRGribProcessor(object):
                     not os.path.exists(grb_2_path)):
                 raise Exception('Required LST AUX files are missing')
 
+            # Date 1
             output_dir = '{0}_1'.format(parm)
             self.extract_grib_data(hdr_1_path, grb_1_path, output_dir)
+
+            # Date 2
             output_dir = '{0}_2'.format(parm)
             self.extract_grib_data(hdr_2_path, grb_2_path, output_dir)
+
+
+# ============================================================================
+def verify_environment():
+    '''
+    Description:
+        Verifies that all the required environment variables exist and
+        returns any used locally in the code.
+
+    Returns:
+        <string> : base LST auxiliary data directory
+    '''
+
+    # Not used here, only verified because a sub-executable requires it
+    tmp = os.environ.get('LST_DATA_DIR')
+    if tmp is None:
+        raise Exception('Missing environment variable LST_DATA_DIR')
+
+    # Not used here, only verified because a sub-executable requires it
+    tmp = os.environ.get('ASTER_GED_SERVER_NAME')
+    if tmp is None:
+        raise Exception('Missing environment variable ASTER_GED_SERVER_NAME')
+
+    # Used in here in this code
+    base_aux_dir = os.environ.get('LST_AUX_DIR')
+    if base_aux_dir is None:
+        raise Exception('Missing environment variable LST_AUX_DIR')
+
+    # Verify that the base_aux_dir directory exists
+    if not os.path.isdir(base_aux_dir):
+        raise Exception('LST_AUX_DIR directory does not exist')
+
+    return base_aux_dir
 
 
 # ============================================================================
@@ -240,7 +270,7 @@ def generate_lst(xml_filename, base_aux_dir,
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
     # the atmospheric transmittance band
-    cmd = ['l5_7_intermedtiate_data',
+    cmd = ['l5_7_intermediate_data',
            '--xml', xml_filename,
            '--dem', dem_filename,
            '--verbose']
@@ -371,7 +401,10 @@ if __name__ == '__main__':
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
-        sys.exit(1)  # EXIT FAILURE
+
+    # Verify that the XML filename provided is not an empty string
+    if args.xml_filename == '':
+        raise Exception('No XML metadata filename provided.')
 
     # Setup the logging level
     log_level = logging.INFO
@@ -390,36 +423,9 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    # Verify required environment variables exists
-    base_aux_dir = os.environ.get('LST_AUX_DIR')
-    if base_aux_dir is None:
-        logger.info('Missing environment variable LST_AUX_DIR')
-        sys.exit(1)  # EXIT FAILURE
-
-    # Not used here, only verified because a sub-executable requires it
-    tmp = os.environ.get('LST_DATA_DIR')
-    if tmp is None:
-        logger.info('Missing environment variable LST_DATA_DIR')
-        sys.exit(1)  # EXIT FAILURE
-
-    # Not used here, only verified because a sub-executable requires it
-    tmp = os.environ.get('ASTER_GED_SERVER_NAME')
-    if tmp is None:
-        logger.info('Missing environment variable ASTER_GED_SERVER_NAME')
-        sys.exit(1)  # EXIT FAILURE
-
-    # Verify that the base_aux_dir exists
-    if not os.path.isdir(base_aux_dir):
-        logger.info('LST_AUX_DIR directory does not exist')
-        sys.exit(1)  # EXIT FAILURE
-
-    # Verify that the XML filename provided is not an empty string
-    if args.xml_filename == '':
-        logger.fatal('No XML metadata filename provided.')
-        logger.fatal('Error processing LST.  Processing will terminate.')
-        sys.exit(1)  # EXIT FAILURE
-
     try:
+        base_aux_dir = verify_environment()
+
         logger.info('Generating LST products')
 
         generate_lst(args.xml_filename, base_aux_dir,
