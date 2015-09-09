@@ -36,61 +36,61 @@ class ExecuteError(Exception):
 
 
 def execute_cmd(cmd_string):
-        '''Execute a command line and return the terminal output
+    '''Execute a command line and return the terminal output
 
-        Raises:
-            ExecuteError (Stdout/Stderr)
+    Raises:
+        ExecuteError (Stdout/Stderr)
 
-        Returns:
-            output:The stdout and/or stderr from the executed command.
-        '''
+    Returns:
+        output:The stdout and/or stderr from the executed command.
+    '''
 
-        (status, output) = commands.getstatusoutput(cmd_string)
+    (status, output) = commands.getstatusoutput(cmd_string)
 
-        if status < 0:
-            message = ('Application terminated by signal [{0}]'
-                       .format(cmd_string))
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise ExecuteError(message)
+    if status < 0:
+        message = ('Application terminated by signal [{0}]'
+                   .format(cmd_string))
+        if len(output) > 0:
+            message = ' Stdout/Stderr is: '.join([message, output])
+        raise ExecuteError(message)
 
-        if status != 0:
-            message = 'Application failed to execute [{0}]'.format(cmd_string)
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise ExecuteError(message)
+    if status != 0:
+        message = 'Application failed to execute [{0}]'.format(cmd_string)
+        if len(output) > 0:
+            message = ' Stdout/Stderr is: '.join([message, output])
+        raise ExecuteError(message)
 
-        if os.WEXITSTATUS(status) != 0:
-            message = ('Application [{0}] returned error code [{1}]'
-                       .format(cmd_string, os.WEXITSTATUS(status)))
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise ExecuteError(message)
+    if os.WEXITSTATUS(status) != 0:
+        message = ('Application [{0}] returned error code [{1}]'
+                   .format(cmd_string, os.WEXITSTATUS(status)))
+        if len(output) > 0:
+            message = ' Stdout/Stderr is: '.join([message, output])
+        raise ExecuteError(message)
 
-        return output
+    return output
 
 
 def parse_cmd_line():
-        '''Will only parse --xml XML_FILENAME from cmdline.
+    '''Will only parse --xml XML_FILENAME from cmdline.
 
-        Precondition:
-            '--xml FILENAME' exists in command line arguments
-        Postcondition:
-            returns xml_filename
+    Precondition:
+        '--xml FILENAME' exists in command line arguments
+    Postcondition:
+        returns xml_filename
 
-        Note: Help is not included because the program will return
-              the help from the underlying program.
-        '''
+    Note: Help is not included because the program will return
+          the help from the underlying program.
+    '''
 
-        # Try to parse out the XML so the application can be determined
-        parse_xml = argparse.ArgumentParser(add_help=False)
-        parse_xml.add_argument('--xml', action='store',
-                               dest='xml_filename', required=True,
-                               help='Input XML metadata file',
-                               metavar='FILE')
-        (temp, extra_args) = parse_xml.parse_known_args()
+    # Try to parse out the XML so the application can be determined
+    parse_xml = argparse.ArgumentParser(add_help=False)
+    parse_xml.add_argument('--xml', action='store',
+                           dest='xml_filename', required=True,
+                           help='Input XML metadata file',
+                           metavar='FILE')
+    (temp, extra_args) = parse_xml.parse_known_args()
 
-        return temp.xml_filename
+    return temp.xml_filename
 
 
 def get_science_application_name(satellite_sensor_code):
@@ -101,8 +101,8 @@ def get_science_application_name(satellite_sensor_code):
     if satellite_sensor_code in available:
         return 'lst_core_processing.py'
     else:
-        raise Exception('Satellite code ({0}) from {1} not understood'
-                        .format(satellite_code, xml_filename))
+        raise Exception('Satellite-Sensor code ({0}) not understood'
+                        .format(satellite_sensor_code))
 
 
 def main():
