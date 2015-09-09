@@ -210,7 +210,7 @@ main (int argc, char *argv[])
         {
             /* Use modtran generated tape6 output */
             snprintf (command, sizeof (command),
-                      "lst_extract_modtran_results.py"
+                      "extract_modtran_results.py"
                       " --tape6"
                       " --input-path %s"
                       " --output-path %s",
@@ -221,7 +221,7 @@ main (int argc, char *argv[])
         {
             /* Use modtran generated pltout.asc output */
             snprintf (command, sizeof (command),
-                      "lst_extract_modtran_results.py"
+                      "extract_modtran_results.py"
                       " --pltout"
                       " --input-path %s"
                       " --output-path %s",
@@ -234,7 +234,7 @@ main (int argc, char *argv[])
 
         if (system (command) != SUCCESS)
         {
-            RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
+            RETURN_ERROR ("Failed executing extract_modtran_results.py",
                           FUNC_NAME, EXIT_FAILURE);
         }
     }

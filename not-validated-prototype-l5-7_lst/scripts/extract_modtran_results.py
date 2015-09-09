@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    FILE: lst_extract_tape6_results.py
+    FILE: extract_modtran_results.py
 
     PURPOSE: Parses the tape6 and extracts the WAVELENGTH and TOTAL_RADIANCE
              values.  Writes the values to the requested output file.
