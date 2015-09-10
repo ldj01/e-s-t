@@ -129,6 +129,12 @@ class EstimateLandsatEmissivity(object):
         self.src_proj4 = None
         self.satellite = None
 
+        self.estimated_coeff_1 = None
+        self.estimated_coeff_2 = None
+        self.estimated_coeff_3 = None
+        self.snow_emis_value = None
+        self.vegetation_coeff = None
+
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
@@ -382,8 +388,9 @@ class EstimateLandsatEmissivity(object):
 
                 # ------------------------------------------------------------
                 # Create the estimated Landsat EMIS data
-                ls_emis_data = (0.44 * aster_b13_data +
-                                0.4 * aster_b14_data + 0.156)
+                ls_emis_data = (self.estimated_coeff_1 * aster_b13_data +
+                                self.estimated_coeff_2 * aster_b14_data +
+                                self.estimated_coeff_3)
 
                 # Re-apply the no data and gap locations.
                 ls_emis_data[aster_b13_gap_locations] = 0
@@ -616,6 +623,23 @@ class EstimateLandsatEmissivity(object):
         del espa_xml
 
     # ------------------------------------------------------------------------
+    def determine_sensor_specific_coefficients(self):
+        if self.satellite == 'LANDSAT_5':
+            self.estimated_coeff_1 = 0.305
+            self.estimated_coeff_2 = 0.468
+            self.estimated_coeff_3 = 0.223
+            self.snow_emis_value = 0.9851
+            self.vegetation_coeff = 0.9851
+        elif self.satellite == 'LANDSAT_7':
+            self.estimated_coeff_1 = 0.440
+            self.estimated_coeff_2 = 0.400
+            self.estimated_coeff_3 = 0.156
+            self.snow_emis_value = 0.9869
+            self.vegetation_coeff = 0.9848
+        else:
+            raise Exception('Unsupported satellite sensor')
+
+    # ------------------------------------------------------------------------
     # TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER TILE
     #        DATA FOR SOME OF THE SCENE AND WILL NEED TO DO SOMETHING ELSE
     #      - I have implemented a solution for this, but have not been able to
@@ -638,6 +662,12 @@ class EstimateLandsatEmissivity(object):
             self.retrieve_metadata_information()
         except Exception:
             self.logger.exception('Failed reading input XML metadata file')
+            raise
+
+        try:
+            self.determine_sensor_specific_coefficients()
+        except Exception:
+            self.logger.exception('Failed determining sensor coefficients')
             raise
 
         # Register all the gdal drivers and choose the GeoTiff for our temp
@@ -781,7 +811,8 @@ class EstimateLandsatEmissivity(object):
 
         self.logger.info('Normalizing Landsat and ASTER NDVI')
         # Normalize Landsat NDVI by max value
-        # TODO TODO TODO - Min is always Zero here, but wonder if it should be the lowest above zero.
+        # TODO TODO TODO - Min is always Zero here, but wonder if it should be
+        #                  the lowest above zero.
         min_ls_ndvi = ls_ndvi_data.min()
         max_ls_ndvi = ls_ndvi_data.max()
         self.logger.info('Min LS NDVI {0}'.format(min_ls_ndvi))
@@ -789,7 +820,8 @@ class EstimateLandsatEmissivity(object):
         ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
 
         # Normalize ASTER NDVI by max value
-        # TODO TODO TODO - Min is always Zero here, but wonder if it should be the lowest above zero.
+        # TODO TODO TODO - Min is always Zero here, but wonder if it should be
+        #                  the lowest above zero.
         min_ls_ndvi = ls_ndvi_data.min()
         min_aster_ndvi = aster_ndvi_data.min()
         max_aster_ndvi = aster_ndvi_data.max()
@@ -816,30 +848,14 @@ class EstimateLandsatEmissivity(object):
         del ls_emis_data
         del fv_Aster
 
-        snow_emis_value = None
-
         # Adjust estimated Landsat EMIS for vegetation and snow, to generate
         # the final Landsat EMIS data
-        if self.satellite == 'LANDSAT_7':
-            self.logger.info('Adjusting estimated Landsat 7 EMIS'
-                             ' for vegetation and snow')
-            # Mod - From prototype code variable name
-            ls_emis_final = (0.9848 * fv_Landsat +
-                             ls_emis_final * (1.0 - fv_Landsat))
-
-            snow_emis_value = 0.9869
-
-        elif self.satellite == 'LANDSAT_5':
-            self.logger.info('Adjusting estimated Landsat 5 EMIS'
-                             ' for vegetation and snow')
-            # Mod - From prototype code variable name
-            ls_emis_final = (0.9851 * fv_Landsat +
-                             ls_emis_final * (1.0 - fv_Landsat))
-
-            snow_emis_value = 0.9851
+        self.logger.info('Adjusting estimated EMIS for vegetation and snow')
+        ls_emis_final = (self.vegetation_coeff * fv_Landsat +
+                         ls_emis_final * (1.0 - fv_Landsat))
 
         # Medium snow
-        ls_emis_final[selected_snow_locations] = snow_emis_value
+        ls_emis_final[selected_snow_locations] = self.snow_emis_value
 
         # Memory cleanup
         del fv_Landsat
@@ -935,8 +951,8 @@ class EstimateLandsatEmissivity(object):
         bands.add_band(emis_band)
 
         # Write the XML metadata file out
-        with open(self.xml_filename, 'w') as fd:
-            metadata_api.export(fd, espa_xml)
+        with open(self.xml_filename, 'w') as output_fd:
+            metadata_api.export(output_fd, espa_xml)
 
         # Memory cleanup
         del ls_emis_final
