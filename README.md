@@ -22,7 +22,7 @@ See the [PLACE HOLDER](butter) product guide for information about the Land Surf
   - The command line tools are utilized for some of the processing steps.
 
 ### Environment Variables
-* Required for building this software
+* Required for building this software (For an example see setup-build-environment.sh)
 ```
 export PREFIX="path_to_Installation_Directory"
 export XML2INC="path_to_LIBXML2_include_files"
