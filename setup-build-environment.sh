@@ -1,6 +1,20 @@
 #!/bin/bash
 
-# Always required to be installed for building
+# ----------------------------------------------------------------------------
+# If not defined... define the base environment variables
+
+# Where the software will be installed
+if [ -z "$PREFIX" ]; then
+    export PREFIX=/usr/local
+fi
+
+# Where the external libraries are installed
+if [ -z "$COTS" ]; then
+    export COTS=/data/cots
+fi
+
+# ----------------------------------------------------------------------------
+# Always required to be installed for building since it is part of the ESPA
 export ESPAINC=${PREFIX}/espa-common/include
 export ESPALIB=${PREFIX}/espa-common/lib
 
