@@ -3,18 +3,33 @@
 #
 # Simple makefile for installing the static data.
 #------------------------------------------------------------------------------
+.PHONY: all install clean
 
-# Target for the executable
+# Inherit from upper-level make.config
+TOP = ../..
+include $(TOP)/make.config
+
+static_install_path = $(l57_algorithm_dir)/static_data
+
+STATIC_DATA_FILES = \
+    modtran_head.txt                  \
+    modtran_tail.txt                  \
+    narr_coordinates.txt              \
+    std_mid_lat_summer_atmos.txt      \
+    L5_Brightness_Temperature_LUT.txt \
+    L5_Spectral_Response.txt          \
+    L7_Brightness_Temperature_LUT.txt \
+    L7_Spectral_Response.txt          \
+    L8_Spectral_Response.txt
+
 all:
 
 install:
-	install -d $(PREFIX)/static_data
-	install -m 644 modtran_head.txt $(PREFIX)/static_data
-	install -m 644 modtran_tail.txt $(PREFIX)/static_data
-	install -m 644 narr_coordinates.txt $(PREFIX)/static_data
-	install -m 644 std_mid_lat_summer_atmos.txt $(PREFIX)/static_data
-	install -m 644 L5_Spectral_Response.rsp $(PREFIX)/static_data
-	install -m 644 L7_Spectral_Response.rsp $(PREFIX)/static_data
+	install -d $(static_install_path)
+	@for file in $(STATIC_DATA_FILES); do \
+            echo "  installing $$file"; \
+            install -m 644 $$file $(static_install_path); \
+        done;
 
 clean:
 

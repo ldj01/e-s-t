@@ -7,15 +7,25 @@ provided by the authors and subsequent conversations and emails.
 ==============================================================================
 Algorithm Authors:
 
-TODO TODO TODO - Need more information for these folks and to verify if they are correct.  Maybe more, maybe less.
-
     Monica Cook
-
-    John R. Schott
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        mxc7441@rit.edu
 
     Simon J. Hook
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: Simon.J.Hook@jpl.nasa.gov
 
-    Glenn C. Hulley
+    Glynn C. Hulley
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: glynn.hulley@nasa.gov
+
+    John R. Schott
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        schott@cis.rit.edu
 
 ==============================================================================
 Algorithm Description - Overview:
@@ -29,7 +39,7 @@ Algorithm Description - Inputs:
 
         L1T thermal band retrieved from LPGS L1T products
         NARR grib formatted data
-        ???? ASTER derived emissivity ????
+        ASTER Emissivity and NDVI data
         GLS2000 derived DEM (same as what Landsat uses)
 
     The L1T thermal band .....................................

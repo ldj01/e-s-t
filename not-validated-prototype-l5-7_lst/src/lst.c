@@ -1,4 +1,8 @@
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -15,13 +19,6 @@
 #include "build_modtran_input.h"
 #include "calculate_point_atmospheric_parameters.h"
 #include "calculate_pixel_atmospheric_parameters.h"
-
-
-/* These are for compile time debugging logic.
-   Set them to 0 to turn them off.
-   They need to be set to 1 for production/standard processing. */
-#define RUN_MODTRAN 1
-#define EXTRACT_TAPE6_RESULTS 1
 
 
 /******************************************************************************
@@ -49,7 +46,6 @@ main (int argc, char *argv[])
     char msg_str[MAX_STR_LEN];
     char xml_filename[PATH_MAX];        /* input XML filename */
     char dem_filename[PATH_MAX];        /* input DEM filename */
-    char emissivity_filename[PATH_MAX]; /* input Emissivity filename */
     char command[PATH_MAX];
 
     Input_t *input = NULL;          /* input data and meta data */
@@ -61,7 +57,6 @@ main (int argc, char *argv[])
 
     int modtran_run;
 
-    double alb = 0.1;
     double **modtran_results = NULL;
 
     char *tmp_env = NULL;
@@ -78,7 +73,7 @@ main (int argc, char *argv[])
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
-    if (get_args (argc, argv, xml_filename, dem_filename, emissivity_filename,
+    if (get_args (argc, argv, xml_filename, dem_filename,
                   &use_tape6, &verbose, &debug) != SUCCESS)
     {
         RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
@@ -158,34 +153,52 @@ main (int argc, char *argv[])
         RETURN_ERROR ("Building POINTS input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    if (verbose)
-    {
-        printf ("Number of Points: %d\n", points.num_points);
-    }
+    snprintf (msg_str, sizeof(msg_str),
+              "Number of Points: %d\n", points.num_points);
+    LOG_MESSAGE (msg_str, FUNC_NAME);
 
     /* Call build_modtran_input to generate the tape5 file input and
        the MODTRAN commands for each point and height */
-    if (build_modtran_input (input, &points, verbose, debug)
-        != SUCCESS)
+    if (build_modtran_input (input, &points, verbose, debug) != SUCCESS)
     {
         RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Perform MODTRAN runs by calling each command */
+    bool abort_modtran = false;
+#ifdef _OPENMP
+    #pragma omp parallel for schedule(static, 1) shared(abort_modtran)
+#endif
     for (modtran_run = 0; modtran_run < points.num_modtran_runs; modtran_run++)
     {
-        snprintf (msg_str, sizeof(msg_str),
-                  "Executing MODTRAN [%s]",
-                   points.modtran_runs[modtran_run].command);
-        LOG_MESSAGE (msg_str, FUNC_NAME);
-
-#if RUN_MODTRAN
-        if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
-        {
-            RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME,
-                          EXIT_FAILURE);
-        }
+#ifdef _OPENMP
+        #pragma omp flush (abort_modtran)
 #endif
+        if (!abort_modtran)
+        {
+            if (verbose)
+            {
+                snprintf (msg_str, sizeof(msg_str),
+                          "Executing MODTRAN [%s]",
+                           points.modtran_runs[modtran_run].command);
+                LOG_MESSAGE (msg_str, FUNC_NAME);
+            }
+
+            if (system (points.modtran_runs[modtran_run].command) != SUCCESS)
+            {
+                abort_modtran = true;
+#ifdef _OPENMP
+                #pragma omp flush (abort_modtran)
+#endif
+            }
+        }
+    }
+
+    /* If we aborted one of the modtran runs for some reason, then error and
+       exit the application */
+    if (abort_modtran)
+    {
+        RETURN_ERROR ("Error executing MODTRAN", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* PARSING MODTRAN RESULTS:
@@ -197,7 +210,7 @@ main (int argc, char *argv[])
         {
             /* Use modtran generated tape6 output */
             snprintf (command, sizeof (command),
-                      "lst_extract_modtran_results.py"
+                      "extract_modtran_results.py"
                       " --tape6"
                       " --input-path %s"
                       " --output-path %s",
@@ -208,7 +221,7 @@ main (int argc, char *argv[])
         {
             /* Use modtran generated pltout.asc output */
             snprintf (command, sizeof (command),
-                      "lst_extract_modtran_results.py"
+                      "extract_modtran_results.py"
                       " --pltout"
                       " --input-path %s"
                       " --output-path %s",
@@ -219,13 +232,11 @@ main (int argc, char *argv[])
         snprintf (msg_str, sizeof(msg_str), "Executing [%s]", command);
         LOG_MESSAGE (msg_str, FUNC_NAME);
 
-#if EXTRACT_TAPE6_RESULTS
         if (system (command) != SUCCESS)
         {
-            RETURN_ERROR ("Failed executing lst_extract_tape6_results.py",
+            RETURN_ERROR ("Failed executing extract_modtran_results.py",
                           FUNC_NAME, EXIT_FAILURE);
         }
-#endif
     }
 
     /* Allocate memory for MODTRAN results */
@@ -239,7 +250,7 @@ main (int argc, char *argv[])
     }
 
     /* Generate parameters for each height and NARR point */
-    if (calculate_point_atmospheric_parameters (input, &points, alb,
+    if (calculate_point_atmospheric_parameters (input, &points,
                                                 modtran_results, verbose)
         != SUCCESS)
     {
@@ -251,7 +262,6 @@ main (int argc, char *argv[])
     if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 xml_filename,
                                                 dem_filename,
-                                                emissivity_filename,
                                                 modtran_results, verbose)
         != SUCCESS)
     {

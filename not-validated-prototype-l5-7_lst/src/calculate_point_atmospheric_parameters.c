@@ -350,8 +350,8 @@ int int_tabulated
 /******************************************************************************
 MODULE:  calculate_lt
 
-PURPOSE: Calculate blackbody radiance from temperature using spectral repsonse 
-         function
+PURPOSE: Calculate blackbody radiance from temperature using spectral response
+         function.
 
 RETURN: SUCCESS
         FAILURE
@@ -401,7 +401,7 @@ int calculate_lt
        wavelength for the current temperature */
     planck_eq (spectral_response[0], num_srs, temperature, blackbody_radiance);
 
-    /* multiply the calculated planck radiance by the spectral reponse and
+    /* multiply the calculated planck radiance by the spectral response and
        integrate over wavelength to get one number for current temp */
     for (i = 0; i < num_srs; i++)
     {
@@ -495,7 +495,7 @@ void linear_interpolate_over_modtran
 MODULE:  calculate_lobs
 
 PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
-         reponse function.
+         response function.
 
 RETURN: SUCCESS
         FAILURE
@@ -546,7 +546,7 @@ int calculate_lobs
     linear_interpolate_over_modtran (modtran, index, spectral_response[0],
                                      num_entries, num_srs, temp_rad);
 
-    /* multiply the calculated radiance by the spectral reponse and integrate
+    /* multiply the calculated radiance by the spectral response and integrate
        over wavelength to get one number for current temperature */
     for (i = 0; i < num_srs; i++)
     {
@@ -720,11 +720,14 @@ Date        Programmer       Reason
 #define L7_TM_SRS_COUNT (47)
 #define L8_OLITIRS_SRS_COUNT (101)
 #define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
+/* This emissivity/albedo is for water */
+#define WATER_ALBEDO (0.1)
+#define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
+#define INV_WATER_ALBEDO (1.0 / WATER_ALBEDO)
 int calculate_point_atmospheric_parameters
 (
     Input_t *input,            /* I: Input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    double albedo,             /* I: Albedo */
     double **modtran_results,  /* O: Atmospheric parameters from modtran runs */
     bool verbose               /* I: Value to indicate if intermediate
                                      messages should be printed */
@@ -765,13 +768,6 @@ int calculate_point_atmospheric_parameters
     double tau; /* Transmission */
     double lu;  /* Upwelled Radiance */
     double ld;  /* Downwelled Radiance */
-    /* TODO TODO TODO - This emissivity/albedo is just for water which is all
-                        that has been implemented.  But the goal is to be
-                        doing LAND, so integration with the Aster data and
-                        JPL conversion code will probably be needed before
-                        execution of this routine, and then utilized here. */
-    double emissivity = 1.0 - albedo;
-    double inv_albedo = 1.0 / albedo;
 
     /* Variables to hold matricies and the results for the operations perfomed
        on them */
@@ -807,7 +803,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L5_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L5_Spectral_Response.rsp");
+                  "%s/%s", lst_data_dir, "L5_Spectral_Response.txt");
     }
     else if (input->meta.instrument == INST_ETM
              && input->meta.satellite == SAT_LANDSAT_7)
@@ -815,7 +811,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L7_TM_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L7_Spectral_Response.rsp");
+                  "%s/%s", lst_data_dir, "L7_Spectral_Response.txt");
     }
     else if (input->meta.instrument == INST_OLI_TIRS
              && input->meta.satellite == SAT_LANDSAT_8)
@@ -823,7 +819,7 @@ int calculate_point_atmospheric_parameters
         num_srs = L8_OLITIRS_SRS_COUNT;
 
         snprintf (srs_file_path, sizeof (srs_file_path),
-                  "%s/%s", lst_data_dir, "L8_B10.rsp");
+                  "%s/%s", lst_data_dir, "L8_Spectral_Response.txt");
     }
     else
     {
@@ -1033,15 +1029,16 @@ int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
 
-            /* Calculate the downwelled radiance */
-            /* TODO - These are all equivalent today, but may need to change
-                      to use the (1.0 - emissivity) when emissivity is
-                      provided. */
-            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/(1.0-emissivity) */
-            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))/abledo */
-            /* Ld = (((Lobs-Lu)/tau) - (Lt*emissivity))*inv_albedo */
+            /* Calculate the downwelled radiance
+               These are all equivalent */
+            /* Ld = (((Lobs - Lu) / tau)
+                     - (Lt * WATER_EMISSIVITY)) / (1.0 - WATER_EMISSIVITY) */
+            /* Ld = (((Lobs - Lu) / tau)
+                     - (Lt * WATER_EMISSIVITY)) / WATER_ALBEDO */
+            /* Ld = (((Lobs - Lu) / tau)
+                     - (Lt * WATER_EMISSIVITY)) * INV_WATER_ALBEDO */
             ld = (((obs_radiance_0 - lu) / tau)
-                  - (temp_radiance_0 * emissivity)) * inv_albedo;
+                  - (temp_radiance_0 * WATER_EMISSIVITY)) * INV_WATER_ALBEDO;
 
             /* Place results into MODTRAN results array */
             modtran_results[result_loc][MGPE_TRANSMISSION] = tau;
