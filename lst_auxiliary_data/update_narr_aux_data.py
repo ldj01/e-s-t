@@ -733,16 +733,12 @@ def update(data_to_be_updated):
         No temporary files exist in the working directory
     '''
     for data in data_to_be_updated:
-        data.get_grib_file()
-
-    for data in data_to_be_updated:
-        data.extract_vars_from_grib()
-
-    for data in data_to_be_updated:
-        data.move_files_to_archive()
-
-    for data in data_to_be_updated:
-        data.remove_grib_file()
+        try:
+            data.get_grib_file()
+            data.extract_vars_from_grib()
+            data.move_files_to_archive()
+        finally:
+            data.remove_grib_file()
 
 
 def report(data_to_report):
