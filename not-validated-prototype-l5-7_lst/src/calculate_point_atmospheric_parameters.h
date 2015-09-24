@@ -14,7 +14,6 @@ int calculate_point_atmospheric_parameters
 (
     Input_t *input,            /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    double albedo,             /* I: albedo */
     double **results,          /* O: atmospheric parameter for modtarn run */
     bool verbose               /* I: value to indicate if intermediate
                                      messages will be printed */

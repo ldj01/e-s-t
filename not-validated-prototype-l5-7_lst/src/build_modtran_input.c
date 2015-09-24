@@ -1383,7 +1383,8 @@ int build_modtran_input
                           " | sed 's/tmp/%s/'"
                           " | sed 's/alb/%4.2f/'"
                           " > %s/tape5",
-                          temp_strs[temperature], alb[temperature], current_alb);
+                          temp_strs[temperature], alb[temperature],
+                          current_alb);
                 if (system (command) != SUCCESS)
                 {
                     RETURN_ERROR ("Failed creating tape5", FUNC_NAME, FAILURE);
@@ -1401,7 +1402,7 @@ int build_modtran_input
                 snprintf (points->modtran_runs[case_counter].path, PATH_MAX,
                           "%s", current_alb);
                 snprintf (points->modtran_runs[case_counter].command, PATH_MAX,
-                          "pushd %s; ln -s %s; %s/Mod90_5.2.2.exe; popd",
+                          "cd %s; ln -s %s; %s/Mod90_5.2.2.exe",
                           points->modtran_runs[case_counter].path,
                           modtran_data_dir, modtran_path);
 

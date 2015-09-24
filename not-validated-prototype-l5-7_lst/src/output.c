@@ -38,6 +38,7 @@ add_lst_band_product
 (
     char *xml_filename,
     char *thermal_band_name,
+    char *image_filename,
     char *product_name,
     char *band_name,
     char *short_name,
@@ -49,11 +50,9 @@ add_lst_band_product
 {
     char FUNC_NAME[] = "add_lst_band_product";
 
-    int count;
     int band_index = -1;
     int src_index = -1;
     char scene_name[PATH_MAX];
-    char image_filename[PATH_MAX];
     char *tmp_char = NULL;
     Espa_internal_meta_t in_meta;
     Espa_internal_meta_t tmp_meta;
@@ -113,14 +112,6 @@ add_lst_band_product
         RETURN_ERROR ("formatting the production date/time", FUNC_NAME, ERROR);
     }
 
-    /* Figure out the output filename */
-    count = snprintf (image_filename, sizeof (image_filename),
-                      "%s_%s.img", scene_name, product_name);
-    if (count < 0 || count >= sizeof (image_filename))
-    {
-        RETURN_ERROR ("Failed creating output filename", FUNC_NAME, ERROR);
-    }
-
     /* Gather all the band information from the representative band */
 
     /* Initialize the internal metadata for the output product. The global
@@ -146,7 +137,7 @@ add_lst_band_product
     bmeta[0].pixel_size[1] = in_meta.band[src_index].pixel_size[1];
     snprintf (bmeta[0].pixel_units, sizeof (bmeta[0].pixel_units), "meters");
     snprintf (bmeta[0].app_version, sizeof (bmeta[0].app_version),
-              "lst_%s", LST_VERSION);
+              "l5-7_lst_%s", LST_VERSION);
     snprintf (bmeta[0].production_date, sizeof (bmeta[0].production_date),
               production_date);
     bmeta[0].data_type = ESPA_FLOAT32;
