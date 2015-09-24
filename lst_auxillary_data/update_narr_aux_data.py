@@ -353,7 +353,6 @@ class Ncep(object):
     mtime_by_name = None
     session = None
 
-    # NOAA_FMT.format(year, month, day, hour)
     @staticmethod
     def get_url(filename):
         return Config.get('ncep_url_format').format(filename)
@@ -363,6 +362,7 @@ class Ncep(object):
         fmt = Config.get('remote_name_format')
         return fmt.format(year, month, day, hour)
 
+    @staticmethod
     def get_datetime_from_filename(self, filename):
         '''Extracts tuple (year, month, day, hour) from filename
 
@@ -393,42 +393,6 @@ class Ncep(object):
             logger.info('Retrieving {0}'.format(filename))
             cls.get_session().http_transfer_file(cls.get_url(filename),
                                                  filename)
-
-    @staticmethod
-    def get_list_of_external_data2():
-        '''Retrieves list of available data from website's directory listing
-
-        Sample line from url reqest the list of files (single line):
-        '<tr><td><a href="rcdas.2015010300.awip32.merged.b">
-            rcdas.2015010300.awip32.merged.b</a></td>
-        <td align="right">08-Jan-2015 10:12  </td>
-        <td align="right">1.3M</td></tr>\n'
-        '''
-        logger = logging.getLogger(__name__)
-        ArchiveData = collections.namedtuple('ArchiveData',
-                                             ['name', 'mtime', 'size'])
-        lines_thrown = 0
-        data_list = []
-        try:
-            response = requests.get()
-        except requests.ConnectionError as ce:
-            logger.error('ConnectionError for request='+str(Ncep.get_url('')))
-            raise
-
-        for line in response.iter_lines():
-            if('awip' not in line):
-                lines_thrown = lines_thrown + 1
-                continue  # go to next line
-            (garbage, partial_line) = line.split('">', 1)
-            (name, partial_line) = partial_line.split('</a>', 1)
-            (garbage, partial_line) = partial_line.split('">', 1)
-            (mtime, partial_line) = partial_line.split('</td>', 1)
-            (garbage, partial_line) = partial_line.split('">', 1)
-            (size, partial_line) = partial_line.split('</td>', 1)
-
-            mtime = mtime.strip()  # Remove extra space
-            data_list.append(ArchiveData(name=name, mtime=mtime, size=size))
-        return data_list
 
     @classmethod
     def get_list_of_external_data(cls):
@@ -477,6 +441,8 @@ class Ncep(object):
     def get_dict_of_date_modified(cls):
         '''Returns a dictionary of mtime for ext. files with filename as key
 
+        Note:
+            If the dictionary has been cached then use it otherwise create it.
         Precondition:
             Requires that get_list_of_external_data() returns list containing
                 NamedTuples with tuple.mtime and tuple.name defined.
