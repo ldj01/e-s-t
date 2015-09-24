@@ -744,15 +744,14 @@ class NarrArchive(object):
     @classmethod
     def get_base_aux_dir(cls):
         if cls._base_aux_dir is None:  # Check if its not already stored
-            logger = logging.getLogger(__name__)
             cls._base_aux_dir = os.environ.get('LST_AUX_DIR')
+
             # print("$LST_AUX_DIR="+str(base_aux_dir))
             if cls._base_aux_dir is None:
-                logger.info('Missing environment variable LST_AUX_DIR')
-                sys.exit(1)
+                Exception('Missing environment variable LST_AUX_DIR')
             if not os.path.isdir(cls._base_aux_dir):
-                logger.info('LST_AUX_DIR directory does not exist')
-                sys.exit(1)
+                Exception('LST_AUX_DIR directory does not exist')
+
         return cls._base_aux_dir
 
 
@@ -793,19 +792,24 @@ def report(data_to_report):
     # print(Ncep.get_dict_of_date_modified())
 
     report = []
-    report.append('Measured, UpdatedLocally, UpdatedOnline')
+    report.append('Measured, UpdatedLocally, UpdatedOnline')  # Header
+
     for data in data_to_report:
         line = []
-        line.append(data.dt.isoformat())
+        line.append(data.dt.isoformat())  # Measured datetime
+
         try:
             line.append(data.get_internal_last_modified().isoformat())
         except NarrData.FileMissing:
             line.append('-')
+
         try:
             line.append(data.get_external_last_modified().isoformat())
         except NarrData.FileMissing:
             line.append('-')
+
         report.append(', '.join(line))
+
     return '\n'.join(report)
 
 
@@ -818,8 +822,9 @@ def YYYYMMDD_date(datestring):
     try:
         return datetime.strptime(datestring, '%Y%m%d').date()
     except ValueError:
-        print('Dates must be the in the format: "YYYYMMDD"')
-        raise ValueError
+        logger = logging.getLogger(__name__)
+        logger.error('Dates must be the in the format: "YYYYMMDD"')
+        raise
 
 
 def parse_arguments():
@@ -864,6 +869,7 @@ def parse_arguments():
     if args.date is not None:
         args.start_date = args.date
         args.end_date = args.date
+
     return args
 
 
@@ -888,8 +894,6 @@ def main(start_date, end_date):
 
     logger = logging.getLogger(__name__)
 
-    # Shows modified time of files related to each NarrData
-    # logger.debug('\n'+report_between_dates(start_date, end_date))
 
     # Determine the data that exists within the date range
     data = NarrData.get_next_narr_data_gen(start_date, end_date)
