@@ -395,7 +395,7 @@ if __name__ == '__main__':
 
     # Report the version and exit
     if args.version:
-        print util.Version.version_text()
+        print(util.Version.version_text())
         sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
