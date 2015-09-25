@@ -114,7 +114,7 @@ int convert_geopotential_geometric
                            * inv_std_gravity;
     }
 
-    /* Calculate the geompetric height for each point in each layer */
+    /* Calculate the geometric height for each point in each layer */
     for (i = 0; i < P_LAYER; i++)
     {
         for (j = 0; j < num_points; j++)
