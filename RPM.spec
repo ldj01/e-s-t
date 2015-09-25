@@ -5,6 +5,14 @@
 #     particular release to build an RPM for.
 
 # ----------------------------------------------------------------------------
+# Disable the creation of debug-info RPM package
+# that contains stripped binary debug symbols
+%global _enable_debug_package 0
+%global debug_package %{nil}
+# Disable stripped binary generation
+%define __os_install_post %{nil}
+
+# ----------------------------------------------------------------------------
 Name:		espa-land-surface-temperature
 Version:	0.0.1
 Release:	1%{?dist}

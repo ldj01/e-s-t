@@ -5,7 +5,14 @@
 #     particular release to build an RPM for.
 
 # ----------------------------------------------------------------------------
+# Disable the creation of debug-info RPM package
+# that contains stripped binary debug symbols
+%global _enable_debug_package 0
+%global debug_package %{nil}
+# Disable stripped binary generation
+%define __os_install_post %{nil}
 
+# ----------------------------------------------------------------------------
 # Change the default rpm name format for the rpm built by this spec file
 %define _build_name_fmt %%{NAME}-aux.%%{VERSION}.%%{RELEASE}.rpm
 
