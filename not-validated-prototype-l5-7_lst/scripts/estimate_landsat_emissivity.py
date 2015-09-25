@@ -697,13 +697,17 @@ class EstimateLandsatEmissivity(object):
         ls_red_data = ls_red_data * self.toa_red_scale_factor
 
         # NDVI ---------------------------------------------------------------
-        # Also scale from (-1.0, 1.0) to (0.0, 1.0) the ASTER range
-        ls_ndvi_data = (((ls_nir_data - ls_red_data) /
-                         (ls_nir_data + ls_red_data)) + 1.0) / 2.0
+        ls_ndvi_data = ((ls_nir_data - ls_red_data) /
+                        (ls_nir_data + ls_red_data))
 
         # Cleanup no data locations
         ls_ndvi_data[nir_no_data_locations] = self.no_data_value
         ls_ndvi_data[red_no_data_locations] = self.no_data_value
+
+        if self.keep_intermediate_data:
+            geo_transform = data_set.GetGeoTransform()
+            ds_srs = osr.SpatialReference()
+            ds_srs.ImportFromWkt(data_set.GetProjection())
 
         # Memory cleanup
         del ls_red_data
@@ -770,6 +774,17 @@ class EstimateLandsatEmissivity(object):
         # Use a realy small value so that we don't have negative zero (-0.0)
         ls_ndvi_data[ls_ndvi_data < 0.0000001] = 0
 
+        if self.keep_intermediate_data:
+            self.logger.info('Writing Landsat NDVI raster')
+            util.Geo.generate_raster_file(geotiff_driver,
+                                          'internal_landsat_ndvi.tif',
+                                          ls_ndvi_data,
+                                          x_dim, y_dim,
+                                          geo_transform,
+                                          ds_srs.ExportToWkt(),
+                                          self.no_data_value,
+                                          gdal.GDT_Float32)
+
         # Build the estimated Landsat EMIS data from the ASTER GED data and
         # warp it to the Landsat scenes projection and image extents
         # For convenience the ASTER NDVI is also extracted and warped to the
@@ -811,54 +826,58 @@ class EstimateLandsatEmissivity(object):
 
         self.logger.info('Normalizing Landsat and ASTER NDVI')
         # Normalize Landsat NDVI by max value
-        # TODO TODO TODO - Min is always Zero here, but wonder if it should be
-        #                  the lowest above zero.
-        min_ls_ndvi = ls_ndvi_data.min()
         max_ls_ndvi = ls_ndvi_data.max()
-        self.logger.info('Min LS NDVI {0}'.format(min_ls_ndvi))
         self.logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
         ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
 
+        if self.keep_intermediate_data:
+            self.logger.info('Writing Landsat NDVI NORM MAX raster')
+            util.Geo.generate_raster_file(geotiff_driver,
+                                          'internal_landsat_ndvi_norm_max.tif',
+                                          ls_ndvi_data,
+                                          x_dim, y_dim,
+                                          geo_transform,
+                                          ds_srs.ExportToWkt(),
+                                          self.no_data_value,
+                                          gdal.GDT_Float32)
+
         # Normalize ASTER NDVI by max value
-        # TODO TODO TODO - Min is always Zero here, but wonder if it should be
-        #                  the lowest above zero.
-        min_ls_ndvi = ls_ndvi_data.min()
-        min_aster_ndvi = aster_ndvi_data.min()
         max_aster_ndvi = aster_ndvi_data.max()
-        self.logger.info('Min ASTER NDVI {0}'.format(min_aster_ndvi))
         self.logger.info('Max ASTER NDVI {0}'.format(max_aster_ndvi))
         aster_ndvi_data = aster_ndvi_data / float(max_aster_ndvi)
 
-        # Calculate fractional veg-cover for both Landsat and ASTER NDVI
-        self.logger.info('Calculating fractional vegetation cover')
-        fv_Landsat = 1.0 - ((max_ls_ndvi - ls_ndvi_data) /
-                            (max_ls_ndvi - min_ls_ndvi))
-        fv_Aster = 1.0 - ((max_aster_ndvi - aster_ndvi_data) /
-                          (max_aster_ndvi - min_aster_ndvi))
+        if self.keep_intermediate_data:
+            self.logger.info('Writing Aster NDVI NORM MAX raster')
+            util.Geo.generate_raster_file(geotiff_driver,
+                                          'internal_aster_ndvi_norm_max.tif',
+                                          aster_ndvi_data,
+                                          x_dim, y_dim,
+                                          geo_transform,
+                                          ds_srs.ExportToWkt(),
+                                          self.no_data_value,
+                                          gdal.GDT_Float32)
 
-        # Memory cleanup
-        del ls_ndvi_data
-        del aster_ndvi_data
 
         # Soil - From prototype code variable name
-        ls_emis_final = ((ls_emis_data - 0.975 * fv_Aster) /
-                         (1.0 - fv_Aster))
+        ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
+                         (1.0 - aster_ndvi_data))
 
         # Memory cleanup
+        del aster_ndvi_data
         del ls_emis_data
-        del fv_Aster
 
         # Adjust estimated Landsat EMIS for vegetation and snow, to generate
         # the final Landsat EMIS data
-        self.logger.info('Adjusting estimated EMIS for vegetation and snow')
-        ls_emis_final = (self.vegetation_coeff * fv_Landsat +
-                         ls_emis_final * (1.0 - fv_Landsat))
+        self.logger.info('Adjusting estimated EMIS for vegetation')
+        ls_emis_final = (self.vegetation_coeff * ls_ndvi_data +
+                         ls_emis_final * (1.0 - ls_ndvi_data))
 
         # Medium snow
+        self.logger.info('Adjusting estimated EMIS for snow')
         ls_emis_final[selected_snow_locations] = self.snow_emis_value
 
         # Memory cleanup
-        del fv_Landsat
+        del ls_ndvi_data
         del selected_snow_locations
 
         # Add the fill and scan gaps and ASTER gaps back into the results,
