@@ -41,9 +41,9 @@ class ExtractModtranResults(object):
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
-
     # ------------------------------------------------------------------------
-    def _extract_tpst(self, tape6_fd):
+    @classmethod
+    def _extract_tpst(cls, tape6_fd):
         '''
         Description:
             Extract the target pixel surface temperature value from the
@@ -222,8 +222,18 @@ if __name__ == '__main__':
                         action='store', dest='output_path', required=True,
                         help='Where to place the output files.')
 
+    parser.add_argument('--version',
+                        action='store_true', dest='version',
+                        required=False, default=False,
+                        help='Reports the version of the software')
+
     # Parse the command line parameters
     args = parser.parse_args()
+
+    # Report the version and exit
+    if args.version:
+        print(util.Version.version_text())
+        sys.exit(0)  # EXIT SUCCESS
 
     # Setup the default logger format and level. log to STDOUT.
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
@@ -237,7 +247,7 @@ if __name__ == '__main__':
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    if ((not args.tape6) and (not args.pltout)):
+    if (not args.tape6) and (not args.pltout):
         logger.fatal('No data source specified.')
         logger.fatal('Error processing LST MODTRAN results.'
                      '  Processing will terminate.')
