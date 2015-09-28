@@ -931,7 +931,7 @@ int calculate_point_atmospheric_parameters
             }
             fclose (fd);
 
-            /* for each height, read in radiance inforomation for three
+            /* for each height, read in radiance information for three
                modtran runs, columns of array are organized:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
             current_data =
