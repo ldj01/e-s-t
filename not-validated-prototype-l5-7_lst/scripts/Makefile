@@ -18,6 +18,8 @@ SCRIPT_EXECUTABLES = \
 SCRIPT_IMPORTS = \
     build_lst_data.py \
     estimate_landsat_emissivity.py \
+    extract_auxiliary_narr_data.py \
+    lst_environment.py
     lst_utilities.py
 
 all:
