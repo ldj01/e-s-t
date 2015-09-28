@@ -40,7 +40,22 @@ class Version(object):
 
     # ------------------------------------------------------------------------
     @staticmethod
+    def version_number():
+        '''
+        Description:
+            Returns the version number.
+        '''
+
+        return Version.version
+
+    # ------------------------------------------------------------------------
+    @staticmethod
     def version_text():
+        '''
+        Description:
+            Returns the version information as a spelled out string.
+        '''
+
         msg = ('Landsat 5 and 7 - Land Surface Temperature - Version {0}'
                .format(Version.version))
         return msg
@@ -48,6 +63,11 @@ class Version(object):
     # ------------------------------------------------------------------------
     @staticmethod
     def app_version():
+        '''
+        Description:
+            Returns the version information.
+        '''
+
         version_text = 'l5-7_lst_{0}'.format(Version.version)
         return version_text
 
@@ -127,6 +147,11 @@ class Metadata(object):
     # ------------------------------------------------------------------------
     @staticmethod
     def remove_products(xml_filename, product_list):
+        '''
+        Description:
+            Removes the specified products from the file system, as well as
+            from the XML file.
+        '''
 
         if not product_list:
             # We don't error, just nothing to do.
@@ -166,8 +191,8 @@ class Metadata(object):
             except Exception:
                 raise
 
-        del (bands)
-        del (espa_xml)
+        del bands
+        del espa_xml
 
 
 # ============================================================================
@@ -368,7 +393,7 @@ class Warp(object):
 class Geo(object):
     '''
     Description:
-        Provides methods for interfacing with web resources.
+        Provides methods for interfacing with geographic projections.
     '''
 
     # ------------------------------------------------------------------------
@@ -382,18 +407,18 @@ class Geo(object):
             proj4 - The proj4 projection string for the image.
         '''
 
-        ds = gdal.Open(img_filename)
-        if ds is None:
+        data_set = gdal.Open(img_filename)
+        if data_set is None:
             raise RuntimeError('GDAL failed to open ({0})'
                                .format(img_filename))
 
         ds_srs = osr.SpatialReference()
-        ds_srs.ImportFromWkt(ds.GetProjection())
+        ds_srs.ImportFromWkt(data_set.GetProjection())
 
         proj4 = ds_srs.ExportToProj4()
 
-        del (ds_srs)
-        del (ds)
+        del ds_srs
+        del data_set
 
         return proj4
 
@@ -406,7 +431,7 @@ class Geo(object):
             since it is not supported by the GDAL ENVI driver.
         '''
 
-        sb = StringIO()
+        hdr_text = StringIO()
         with open(hdr_file_path, 'r') as tmp_fd:
             while True:
                 line = tmp_fd.readline()
@@ -416,7 +441,7 @@ class Geo(object):
                         line.startswith('description')):
                     pass
                 else:
-                    sb.write(line)
+                    hdr_text.write(line)
 
                 if line.startswith('description'):
                     # This may be on multiple lines so read lines until
@@ -427,15 +452,16 @@ class Geo(object):
                             if (not next_line or
                                     next_line.strip().endswith('}')):
                                 break
-                    sb.write('description = {USGS-EROS-ESPA generated}\n')
+                    hdr_text.write('description ='
+                                   ' {USGS-EROS-ESPA generated}\n')
                 elif (line.startswith('data type') and
                       (no_data_value is not None)):
-                    sb.write('data ignore value = {0}\n'
-                             .format(no_data_value))
+                    hdr_text.write('data ignore value = {0}\n'
+                                   .format(no_data_value))
 
         # Do the actual replace here
         with open(hdr_file_path, 'w') as tmp_fd:
-            tmp_fd.write(sb.getvalue())
+            tmp_fd.write(hdr_text.getvalue())
 
     # ------------------------------------------------------------------------
     @staticmethod
@@ -465,7 +491,7 @@ class Geo(object):
             raster.FlushCache()
 
             # Cleanup memory
-            del (raster)
+            del raster
 
         except Exception:
             raise
