@@ -38,3 +38,6 @@ install:
 
 clean:
 
+check:
+	@cd unit-tests; nosetests unit-tests.py
+
