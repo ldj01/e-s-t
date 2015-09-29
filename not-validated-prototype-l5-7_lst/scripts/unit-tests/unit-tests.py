@@ -26,6 +26,7 @@ import unittest
 # Add the parent directory where the modules to test are located
 sys.path.insert(0, '..')
 from extract_auxiliary_narr_data import AuxNARRGribProcessor
+from lst_environment import Environment
 
 
 class LSRD_ValidationFramework(unittest.TestCase):
@@ -33,6 +34,14 @@ class LSRD_ValidationFramework(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(LSRD_ValidationFramework, self).__init__(*args, **kwargs)
         self.cleanup = True
+
+        if not self.name:
+            raise Exception('self.name must be defined')
+
+        # Verify the environment
+        self.lsrd_validation_dir = os.environ.get('LSRD_VALIDATION_DIR')
+        if self.lsrd_validation_dir is None:
+            raise Exception('Missing environment variable LSRD_VALIDATION_DIR')
 
     def assertFilesEqual(self, file_1, file_2):
         '''Assert that two files are equal or not.'''
@@ -48,37 +57,33 @@ class LSRD_ValidationFramework(unittest.TestCase):
 class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
     '''Tests for Grib file processing.'''
 
+    def __init__(self, *args, **kwargs):
+        self.name = 'AuxNARRGribProcessor_TestCase'
+        super(AuxNARRGribProcessor_TestCase, self).__init__(*args, **kwargs)
+
+        # Validation data is presummed to be available if the directory exists
+        self.validation_path = os.path.join(self.lsrd_validation_dir,
+                                            self.name)
+        if not os.path.isdir(self.validation_path):
+            raise Exception('Missing validation data for [{0}]'
+                            .format(self.name))
+
+        # Define the directories that are produced
+        self.directories = ['HGT_1', 'HGT_2',
+                            'SPFH_1', 'SPFH_2',
+                            'TMP_1', 'TMP_2']
+
     def setUp(self):
         '''setup'''
 
-        self.lsrd_validation_dir = os.environ.get('LSRD_VALIDATION_DIR')
-        if self.lsrd_validation_dir is None:
-            raise Exception('Missing environment variable LSRD_VALIDATION_DIR')
-
-        self.validation_path = os.path.join(self.lsrd_validation_dir,
-                                            'AuxNARRGribProcessor_TestCase')
         self.input_xml = os.path.join(self.validation_path,
                                       'LT50420342011119PAC01.xml')
 
         # Specify the XML metadata file defining the data to process
         self.processor = AuxNARRGribProcessor(self.input_xml)
 
-        # Define the directories that will be produced
-        self.directories = ['HGT_1', 'HGT_2',
-                            'SPFH_1', 'SPFH_2',
-                            'TMP_1', 'TMP_2']
-
-        # Define the files that will be produced in each directory
-        self.files = ['100.txt', '125.txt', '150.txt', '175.txt',
-                      '200.txt', '225.txt', '250.txt', '275.txt',
-                      '300.txt', '350.txt',
-                      '400.txt', '450.txt',
-                      '500.txt', '550.txt',
-                      '600.txt', '650.txt',
-                      '700.txt', '725.txt', '750.txt', '775.txt',
-                      '800.txt', '825.txt', '850.txt', '875.txt',
-                      '900.txt', '925.txt', '950.txt', '975.txt',
-                      '1000.txt']
+        # Process the associated AUX data
+        self.processor.extract_aux_data()
 
     def tearDown(self):
         '''Cleanup'''
@@ -91,8 +96,6 @@ class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
 
     def test_process_grib_data(self):
         '''Test the processing of grib files from our internal archive.'''
-
-        self.processor.extract_aux_data()
 
         for directory in self.directories:
             self.cleanup = self.assertEqual(True, os.path.isdir(directory))
@@ -119,25 +122,39 @@ class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
                 self.assertFilesEqual(validation_file, local_file)
 
 
-class Next_TestCase(LSRD_ValidationFramework):
-    '''Tests for XXXXX file processing.'''
+class Environment_TestCase(LSRD_ValidationFramework):
+    '''Tests Environment Class'''
+
+    def __init__(self, *args, **kwargs):
+        self.name = 'Environment_TestCase'
+        super(Environment_TestCase, self).__init__(*args, **kwargs)
 
     def setUp(self):
         '''setup'''
 
-        pass
+        os.environ['LST_DATA_DIR'] = '/usr/local'
+        os.environ['LST_AUX_DIR'] = '/usr/local'
+        os.environ['ASTER_GED_SERVER_NAME'] = 'ASTER_GED_SERVER_NAME'
 
-    def tearDown(self):
-        '''Cleanup'''
+        self.environment = Environment()
 
-        if self.cleanup:
-            # Add your cleanup code here
-            pass
+    def test_LST_DATA_DIR(self):
+        '''Test the LST_DATA_DIR environment variable'''
 
-    def test_something(self):
-        '''Something'''
+        self.assertEqual('/usr/local',
+            self.environment.get_lst_data_directory())
 
-        pass
+    def test_LST_AUX_DIR(self):
+        '''Test the LST_AUX_DIR environment variable'''
+
+        self.assertEqual('/usr/local',
+            self.environment.get_lst_aux_directory())
+
+    def test_ASTER_GED_SERVER_NAME(self):
+        '''Test the ASTER_GED_SERVER_NAME environment variable'''
+
+        self.assertEqual('ASTER_GED_SERVER_NAME',
+            self.environment.get_aster_ged_server_name())
 
 
 if __name__ == '__main__':
