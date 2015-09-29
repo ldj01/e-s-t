@@ -18,6 +18,9 @@
 
 import os
 import sys
+import shutil
+import glob
+import filecmp
 import unittest
 
 # Add the parent directory where the modules to test are located
@@ -25,14 +28,40 @@ sys.path.insert(0, '..')
 from extract_auxiliary_narr_data import AuxNARRGribProcessor
 
 
-class AuxNARRGribProcessor_TestCase(unittest.TestCase):
+class LSRD_ValidationFramework(unittest.TestCase):
+
+    def __init__(self, *args, **kwargs):
+        super(LSRD_ValidationFramework, self).__init__(*args, **kwargs)
+        self.cleanup = True
+
+    def assertFilesEqual(self, file_1, file_2):
+        '''Assert that two files are equal or not.'''
+
+        self.cleanup = self.assertTrue(os.path.exists(file_1),
+                                       '{0} Does not exist'.format(file_1))
+        self.cleanup = self.assertTrue(os.path.exists(file_2),
+                                       '{0} Does not exist'.format(file_2))
+
+        self.cleanup = self.assertTrue(filecmp.cmp(file_1, file_2))
+
+
+class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
     '''Tests for Grib file processing.'''
 
     def setUp(self):
         '''setup'''
 
+        self.lsrd_validation_dir = os.environ.get('LSRD_VALIDATION_DIR')
+        if self.lsrd_validation_dir is None:
+            raise Exception('Missing environment variable LSRD_VALIDATION_DIR')
+
+        self.validation_path = os.path.join(self.lsrd_validation_dir,
+                                            'AuxNARRGribProcessor_TestCase')
+        self.input_xml = os.path.join(self.validation_path,
+                                      'LT50420342011119PAC01.xml')
+
         # Specify the XML metadata file defining the data to process
-        self.processor = AuxNARRGribProcessor('LT50420342011119PAC01.xml')
+        self.processor = AuxNARRGribProcessor(self.input_xml)
 
         # Define the directories that will be produced
         self.directories = ['HGT_1', 'HGT_2',
@@ -54,15 +83,11 @@ class AuxNARRGribProcessor_TestCase(unittest.TestCase):
     def tearDown(self):
         '''Cleanup'''
 
-        for directory in self.directories:
+        if self.cleanup:
+            for directory in self.directories:
 
-            for filename in self.files:
-                path = os.path.join(directory, filename)
-                if os.path.exists(path):
-                    os.unlink(path)
-
-            if os.path.isdir(directory):
-                os.rmdir(directory)
+                if os.path.isdir(directory):
+                    shutil.rmtree(directory)
 
     def test_process_grib_data(self):
         '''Test the processing of grib files from our internal archive.'''
@@ -70,11 +95,49 @@ class AuxNARRGribProcessor_TestCase(unittest.TestCase):
         self.processor.extract_aux_data()
 
         for directory in self.directories:
-            self.assertEqual(True, os.path.isdir(directory))
+            self.cleanup = self.assertEqual(True, os.path.isdir(directory))
 
-            for filename in self.files:
-                path = os.path.join(directory, filename)
-                self.assertEqual(True, os.path.exists(path))
+            # Start with the local files
+            files = glob.glob(os.path.join(directory, '*'))
+
+            # Add the validation files
+            validation_directory = os.path.join(self.validation_path,
+                                                directory)
+            files.extend(glob.glob(os.path.join(validation_directory, '*')))
+
+            # We only want the filenames
+            files = [os.path.basename(x) for x in files]
+
+            # Make a unique list of the filenames
+            files = sorted(list(set(files)))
+
+            # Process through each file
+            for filename in files:
+                local_file = os.path.join(directory, filename)
+                validation_file = os.path.join(validation_directory, filename)
+
+                self.assertFilesEqual(validation_file, local_file)
+
+
+class Next_TestCase(LSRD_ValidationFramework):
+    '''Tests for XXXXX file processing.'''
+
+    def setUp(self):
+        '''setup'''
+
+        pass
+
+    def tearDown(self):
+        '''Cleanup'''
+
+        if self.cleanup:
+            # Add your cleanup code here
+            pass
+
+    def test_something(self):
+        '''Something'''
+
+        pass
 
 
 if __name__ == '__main__':

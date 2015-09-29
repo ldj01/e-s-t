@@ -19,7 +19,7 @@ SCRIPT_IMPORTS = \
     build_lst_data.py \
     estimate_landsat_emissivity.py \
     extract_auxiliary_narr_data.py \
-    lst_environment.py
+    lst_environment.py \
     lst_utilities.py
 
 all:
@@ -41,5 +41,5 @@ install:
 clean:
 
 check:
-	@cd unit-tests; nosetests unit-tests.py
+	@cd unit-tests; python unit-tests.py
 
