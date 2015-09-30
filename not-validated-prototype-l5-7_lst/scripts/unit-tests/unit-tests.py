@@ -33,7 +33,6 @@ class LSRD_ValidationFramework(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(LSRD_ValidationFramework, self).__init__(*args, **kwargs)
-        self.cleanup = True
 
         if not self.name:
             raise Exception('self.name must be defined')
@@ -46,12 +45,12 @@ class LSRD_ValidationFramework(unittest.TestCase):
     def assertFilesEqual(self, file_1, file_2):
         '''Assert that two files are equal or not.'''
 
-        self.cleanup = self.assertTrue(os.path.exists(file_1),
+        self.assertTrue(os.path.exists(file_1),
                                        '{0} Does not exist'.format(file_1))
-        self.cleanup = self.assertTrue(os.path.exists(file_2),
+        self.assertTrue(os.path.exists(file_2),
                                        '{0} Does not exist'.format(file_2))
 
-        self.cleanup = self.assertTrue(filecmp.cmp(file_1, file_2))
+        self.assertTrue(filecmp.cmp(file_1, file_2))
 
 
 class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
@@ -88,17 +87,15 @@ class AuxNARRGribProcessor_TestCase(LSRD_ValidationFramework):
     def tearDown(self):
         '''Cleanup'''
 
-        if self.cleanup:
-            for directory in self.directories:
-
-                if os.path.isdir(directory):
-                    shutil.rmtree(directory)
+        for directory in self.directories:
+            if os.path.isdir(directory):
+                shutil.rmtree(directory)
 
     def test_process_grib_data(self):
         '''Test the processing of grib files from our internal archive.'''
 
         for directory in self.directories:
-            self.cleanup = self.assertEqual(True, os.path.isdir(directory))
+            self.assertEqual(True, os.path.isdir(directory))
 
             # Start with the local files
             files = glob.glob(os.path.join(directory, '*'))
