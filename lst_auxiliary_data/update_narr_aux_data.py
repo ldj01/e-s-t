@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 '''
-    PURPOSE: Retieves archived NARR files from the NCEP for the dates
+    PURPOSE: Retrieves archived NARR files from the NCEP for the dates
              requested.  Extracts the variables LST requires (HGT, TMP, SPFH)
              and repackages them into our internal location and filenames.
 
@@ -43,18 +43,6 @@ from datetime import datetime, timedelta, date
 from contextlib import closing
 import collections
 import json
-
-
-def debug(tag, message):
-    logger = logging.getLogger(tag)
-    logger.debug(message)
-
-
-def substring_between(s, start, finish):
-    '''Find string between two substrings'''
-    end_of_start = s.index(start) + len(start)
-    start_of_finish = s.index(finish, end_of_start)
-    return s[end_of_start:start_of_finish]
 
 
 # ============================================================================
@@ -295,11 +283,15 @@ class System(object):
 
 
 class Config(object):
-    '''Access to configurable attributes of script
+    '''Provides access to configurable attributes of script
 
-    First it will try to read json data from the config file.
-    If the file does not exist then all config will be from default values.
-    If Key/value pair doesn't exist in file then default values will be used.
+    Provides transparent access to settings from configuration
+        1.Settings can specified as a json object stored in a file.
+            read_config will be used to insert these into Config.config dict.
+        2.Settings can be defined in the dictionary, Config.config, as
+            key/value pairs.
+        3.Settings can be defined in the default_config.
+    Beware: read_config will overwrite the contents of the configuration file
     '''
     config = None  # Stores result of reading json object from file.
     default_config = {'ncep_url_format': 'http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive/{0}',
@@ -307,9 +299,22 @@ class Config(object):
                       'archive_directory_format': '{0}/{1:0>4}/{2:0>2}/{3:0>2}',
                       'archive_name_format': 'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'
                      }
+
     @classmethod
-    def read_config(cls, cfg_file='lst_auxillary.config.example'):
-        # Load the file
+    def read_config(cls, cfg_file='lst_auxillary.config'):
+        '''Reads configurable options from a file in current directory
+
+        Note: By default the function will read a file but otherwise
+            another file could be indicated via parameter cfg_file
+        Precondition:
+            Assumes a JSON data object, this is defined by xjjson module.
+                json.loads is able to parse the contents of the file
+            Any line that starts with '#' will be ignored.
+        Postcondition:
+            dictionary representing the JSON object is stored in memeory
+            Config.config is stored as a class variable
+            Raises Exception if json object can't be parsed
+        '''
         with open(cfg_file, 'r') as fd:
             lines = list()
             for line in fd:
@@ -323,10 +328,17 @@ class Config(object):
 
         if cls.config is None:
             raise Exception('Failed loading configuration')
+
         return cls.config
 
     @classmethod
     def get(cls, attr):
+    '''Get value of setting from a configuration (either from file or defaults)
+
+        First it will try to read json data from the config file.
+        If the file does not exist then all config will be from default values.
+        If Key/value pair doesn't exist in file then default values will be used.
+    '''
         try:
             if(cls.config is None):
                 cls.config = cls.read_config()
@@ -378,6 +390,20 @@ class Ncep(object):
 
     @classmethod
     def get_grib_file(cls, filename):
+        '''
+
+        Precondition:
+            File with "filename" exists on the NCEP website.
+            "get_url" will return address of file on website
+            "get_last_modified" returns a datetime object
+                This datetime object should be the last time the item was
+                updated on the website.
+            File does not exists in current directory
+        Postcondition:
+            grib_file associated with this filename is in current directory
+            Logs the last modified time of file and the address used.
+            If file already exists then only an info message will be recorded.
+        '''
         logger = logging.getLogger(__name__)
         last_modified = (cls.get_session()
                             .get_last_modified(cls.get_url(filename),
@@ -427,6 +453,7 @@ class Ncep(object):
 
             mtime = mtime.strip()  # Remove extra space
             data_list.append(ArchiveData(name=name, mtime=mtime, size=size))
+
         return data_list
 
     @classmethod
@@ -448,7 +475,7 @@ class Ncep(object):
                 NamedTuples with tuple.mtime and tuple.name defined.
         Postcondition: Returns a dictionary
             filename as key, external last modified time as value
-            '''
+        '''
         if(cls.mtime_by_name is None):
             data_list = Ncep.get_list_of_external_data()
             cls.mtime_by_name = {}
@@ -456,6 +483,7 @@ class Ncep(object):
                 date_modified = datetime.strptime(item.mtime,
                                                   '%d-%b-%Y %H:%M')
                 cls.mtime_by_name[item.name] = date_modified
+
         return cls.mtime_by_name
 
 
@@ -474,6 +502,7 @@ class NarrData(object):
     def from_external_name(external_name):
         '''Creates NarrData object from name of external file'''
         date_measured = Ncep.get_datetime_from_filename(external_name)
+
         return NarrData(year=date_measured.year, month=date_measured.month,
                         day=date_measured.day, hour=date_measured.hour)
 
@@ -519,10 +548,6 @@ class NarrData(object):
                                              self.dt.month, self.dt.day,
                                              self.dt.hour, ext)
 
-    def get_internal_filepath(self, variable, ext):
-        return os.path.join(self.get_internal_drectory(),
-                            self.get_internal_filename(variable, ext))
-
     def get_internal_last_modified(self, variable='HGT', ext='hdr'):
         '''Stat internal file for mtime. Default to HGT's hdr file.
 
@@ -533,11 +558,14 @@ class NarrData(object):
             raises NarrData.FileMissing if precondition is violated
         '''
         try:
-            filename = self.get_internal_filepath(variable, ext)
+            os.path.join(self.get_internal_drectory(),
+                         self.get_internal_filename(variable, ext))
             ts_epoch = os.stat(filename).st_mtime
-            return datetime.fromtimestamp(ts_epoch)
+            mtime = datetime.fromtimestamp(ts_epoch)
         except OSError:  # Expecting 'No such file or directory'
             raise NarrData.FileMissing
+
+        return mtime
 
     def get_external_filename(self):
         '''Returns the name of the grib file as choosen by data source'''
@@ -750,8 +778,9 @@ def report(data_to_report):
         Reports [measured time, internal mtime, external mtime] as csv
     '''
     # Statements helpful for debugging
-    # print('\n'.join(Ncep.get_list_of_external_data()))
-    # print(Ncep.get_dict_of_date_modified())
+    logger = logging.getLogger(__name__)
+    logger.debug('\n'.join(Ncep.get_list_of_external_data()))
+    logger.debug(Ncep.get_dict_of_date_modified())
 
     report = []
     report.append('Measured, UpdatedLocally, UpdatedOnline')  # Header
