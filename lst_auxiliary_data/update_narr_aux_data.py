@@ -193,7 +193,8 @@ class Web(object):
             return status_code
 
         # --------------------------------------------------------------------
-        def get_last_modified(self, download_url, destination_file, headers=None):
+        def get_last_modified(self, download_url, destination_file,
+                              headers=None):
             '''
             Notes: Downloading this way streams 'block_size' of data at a
                    time.
@@ -333,23 +334,33 @@ class Config(object):
 
     @classmethod
     def get(cls, attr):
-    '''Get value of setting from a configuration (either from file or defaults)
+        '''Get value of configurable setting from a file or default
 
-        First it will try to read json data from the config file.
-        If the file does not exist then all config will be from default values.
-        If Key/value pair doesn't exist in file then default values will be used.
-    '''
+            First it will try to read json data from the config file.
+            If file does not exist then onfig will be from default values.
+            If Key/value pair doesn't exist in JSON-like object stored in the
+                file then default values will be used.
+        '''
+        value = None
+        logger = logging.getLogger(__name__)
         try:
             if(cls.config is None):
                 cls.config = cls.read_config()
             if attr in cls.config:
-                return cls.config[attr]
+                value = cls.config[attr]
+                logger.info('Using value({0}) from config file for {1}.'
+                            .format(value, attr))
+                value = cls.config[attr]
             else:
-                return cls.default_config[attr]
+                logger.warn('Using default value({0}) for {1}.'.format(value,
+                                                                       attr))
+                value = cls.default_config[attr]
         except IOError:
             # If no config is read then use defaults
-            return cls.default_config[attr]
+            value = cls.default_config[attr]
             pass
+
+        return value
 
 
 class Ncep(object):
@@ -405,12 +416,6 @@ class Ncep(object):
             If file already exists then only an info message will be recorded.
         '''
         logger = logging.getLogger(__name__)
-        last_modified = (cls.get_session()
-                            .get_last_modified(cls.get_url(filename),
-                                               filename))
-        logger.info('{0} last modified at {1} or at {2}'
-                    .format(filename, last_modified,
-                            cls.get_dict_of_date_modified()[filename]))
 
         if os.path.isfile(filename):
             logger.info('{0} already exists. Skipping download.'
@@ -558,9 +563,9 @@ class NarrData(object):
             raises NarrData.FileMissing if precondition is violated
         '''
         try:
-            os.path.join(self.get_internal_drectory(),
-                         self.get_internal_filename(variable, ext))
-            ts_epoch = os.stat(filename).st_mtime
+            filepath = os.path.join(self.get_internal_drectory(),
+                                    self.get_internal_filename(variable, ext))
+            ts_epoch = os.stat(filepath).st_mtime
             mtime = datetime.fromtimestamp(ts_epoch)
         except OSError:  # Expecting 'No such file or directory'
             raise NarrData.FileMissing
@@ -583,10 +588,24 @@ class NarrData(object):
             Raises NarrData.FileMissing if either precondition is violated.
         '''
         filename = self.get_external_filename()
+
         try:
-            return Ncep.get_dict_of_date_modified()[filename]
+            # Last modified time according to http table on website
+            table_last_mod = Ncep.get_dict_of_date_modified()[filename]
         except KeyError:
             raise NarrData.FileMissing
+
+#        # Last modified time according to the response headers
+#        header_last_mod = (Ncep.get_session()
+#                           .get_last_modified(Ncep.get_url(filename),
+#                                              filename))
+#        logger = logging.getLogger(__name__)
+#        logger.debug('Two "last modified" artibutes are available.'
+#                     ' The table\'s value is:{0}. The response header\'s'
+#                     ' value is:{1}'.format(table_last_mod,
+#                                            header_last_mod))
+
+        return table_last_mod
 
     def need_to_update(self):
         '''Returns boolean of whether file neads to be donwloaded
@@ -885,7 +904,6 @@ def main(start_date, end_date):
 
     logger = logging.getLogger(__name__)
 
-
     # Determine the data that exists within the date range
     data = NarrData.get_next_narr_data_gen(start_date, end_date)
 
@@ -898,4 +916,3 @@ def main(start_date, end_date):
 if __name__ == '__main__':
     args = parse_arguments()
     main(args.start_date, args.end_date)
-
