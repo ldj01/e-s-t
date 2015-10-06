@@ -165,34 +165,10 @@ int convert_sh_rh
     double mh20 = 18.01534;
     double mdry = 28.9644;
 
-    double a0w = 6.107799961;
-    double a1w = 4.436518521e-1;
-    double a2w = 1.428945805e-2;
-    double a3w = 2.650648471e-4;
-    double a4w = 3.0312403963e-6;
-    double a5w = 2.034080948e-8;
-    double a6w = 6.136820929e-11;
-
-    double **temp_c;
-    double **ewater;
     double **goff;
     double **ph20;
 
     /* Allocate memory */
-    temp_c = (double **) allocate_2d_array (P_LAYER, num_points,
-                                           sizeof (double));
-    if (temp_c == NULL)
-    {
-        RETURN_ERROR ("Allocating temp_c memory", FUNC_NAME, FAILURE);
-    }
-
-    ewater = (double **) allocate_2d_array (P_LAYER, num_points,
-                                           sizeof (double));
-    if (ewater == NULL)
-    {
-        RETURN_ERROR ("Allocating ewater memory", FUNC_NAME, FAILURE);
-    }
-
     goff = (double **) allocate_2d_array (P_LAYER, num_points, sizeof (double));
     if (goff == NULL)
     {
@@ -209,56 +185,37 @@ int convert_sh_rh
     {
         for (point = 0; point < num_points; point++)
         {
-            /* Convert temperature to C */
-            temp_c[layer][point] = temp_k[layer][point] - 273.15;
-
             /* calculate vapor pressure at given temperature - hpa */
-            ewater[layer][point] = a0w + temp_c[layer][point]
-                           * (a1w + temp_c[layer][point]
-                              * (a2w + temp_c[layer][point]
-                                 * (a3w + temp_c[layer][point]
-                                    * (a4w + temp_c[layer][point]
-                                       * (a5w + temp_c[layer][point]
-                                          * (a6w * temp_c[layer][point]))))));
-
             goff[layer][point] = -7.90298 * (373.16 / temp_k[layer][point]
                                              - 1.0)
                                  + 5.02808 * log10 (373.16
                                                     / temp_k[layer][point])
                                  - 1.3816e-7
-                                 * pow (10.0, (11.344
-                                               * (1.0 - (temp_k[layer][point]
-                                                         / 373.16)))
-                                        - 1.0)
+                                 * (pow (10.0, (11.344
+                                                * (1.0 - (temp_k[layer][point]
+                                                          / 373.16))))
+                                    - 1.0)
                                  + 8.1328e-3
-                                 * pow (10.0, (-3.49149
+                                 * (pow (10.0, (-3.49149
                                                * (373.16 / temp_k[layer][point]
-                                                  - 1.0))
+                                                  - 1.0)))
                                         - 1.0)
                                  + log10 (1013.246); /* hPa */
 
+            /* calculate partial pressure */
             ph20[layer][point] = (spec_hum[layer][point]
                                   * pressure[layer][point] * mdry)
                                  / (mh20
                                     - spec_hum[layer][point] * mh20
                                     + spec_hum[layer][point] * mdry);
 
+            /* calculate relative humidity */
             rh[layer][point] = (ph20[layer][point]
                                 / pow (10.0, goff[layer][point])) * 100.0;
         }
     }
 
     /* Free allocated memory */
-    if (free_2d_array ((void **) temp_c) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: temp_c\n", FUNC_NAME, FAILURE);
-    }
-
-    if (free_2d_array ((void **) ewater) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: ewater\n", FUNC_NAME, FAILURE);
-    }
-
     if (free_2d_array ((void **) goff) != SUCCESS)
     {
         RETURN_ERROR ("Freeing memory: goff\n", FUNC_NAME, FAILURE);
