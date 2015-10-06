@@ -1223,7 +1223,7 @@ int build_modtran_input
                            * ((stan_temp[counter[2]]
                                - temp_temp[curr_layer - 1])
                               * inv_height_diff);
-                new_rh = temp_rh[counter[2]]
+                new_rh = temp_rh[curr_layer - 1]
                          + (new_height - temp_height[curr_layer - 1])
                          * ((stan_rh[counter[2]] - temp_rh[curr_layer - 1])
                             * inv_height_diff);
