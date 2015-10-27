@@ -1,8 +1,8 @@
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 # Makefile
 #
 # For building land-surface-temperature.
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 .PHONY: all install clean
 
 # Inherit from upper-level make.config
@@ -14,7 +14,8 @@ bin_install_path = $(l57_algorithm_dir)/bin
 # Set up compile options
 CC = gcc
 RM = rm -f
-EXTRA = $(build_type) -Wall -g -O2
+EXTRA_OPTIONS = $(static_option) $(threading_options) $(profiling_options)
+EXTRA = -Wall -g -O2 $(EXTRA_OPTIONS)
 
 # Define the include files
 INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h \
@@ -42,7 +43,9 @@ OBJ = $(SRC:.c=.o)
 # Define the object libraries
 EXLIB = -L$(ESPALIB) -l_espa_raw_binary -l_espa_common \
         -l_espa_format_conversion \
-        -L$(XML2LIB) -lxml2 -L$(LZMALIB) -llzma -L$(ZLIBLIB) -lz
+        -L$(XML2LIB) -lxml2 \
+        -L$(LZMALIB) -llzma \
+        -L$(ZLIBLIB) -lz
 MATHLIB = -lm
 LOADLIB = $(EXLIB) $(MATHLIB)
 
