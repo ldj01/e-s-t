@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+
 '''
     PURPOSE: Retrieves archived NARR files from the NCEP for the dates
              requested.  Extracts the variables LST requires (HGT, TMP, SPFH)
@@ -25,6 +26,7 @@
           UCAR     - University Corporation for Atmospheric Research
                      http://www2.ucar.edu
 '''
+
 import os
 import sys
 import shutil
@@ -32,12 +34,7 @@ import logging
 import errno
 import commands
 import requests
-import calendar
-import itertools
-import multiprocessing as mp
-from cStringIO import StringIO
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from osgeo import gdal, osr
 from time import sleep
 from datetime import datetime, timedelta, date
 from contextlib import closing
@@ -193,21 +190,8 @@ class Web(object):
             return status_code
 
         # --------------------------------------------------------------------
-        def get_last_modified(self, download_url, destination_file,
-                              headers=None):
-            '''
-            Notes: Downloading this way streams 'block_size' of data at a
-                   time.
-            '''
-            with closing(self.session.get(url=download_url,
-                                          timeout=self.timeout,
-                                          stream=self.stream,
-                                          headers=headers)) as req:
-                last_modified = req.headers['last-modified']
-            return last_modified
-
-        # --------------------------------------------------------------------
         def get_lines_from_url(self, download_url):
+            '''retrieve lines from a url'''
             data = []
             with closing(self.session.get(url=download_url,
                                           timeout=self.timeout,
@@ -295,11 +279,14 @@ class Config(object):
     Beware: read_config will overwrite the contents of the configuration file
     '''
     config = None  # Stores result of reading json object from file.
-    default_config = {'ncep_url_format': 'http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive/{0}',
-                      'remote_name_format': 'rcdas.{0:03}{1:02}{2:02}{3:02}.awip32.merged',
-                      'archive_directory_format': '{0}/{1:0>4}/{2:0>2}/{3:0>2}',
-                      'archive_name_format': 'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'
-                     }
+    default_config = {'ncep_url_format': ('http://ftp.cpc.ncep.noaa.gov/'
+                                          'wd51we/NARR_archive/{0}'),
+                      'remote_name_format':
+                          'rcdas.{0:03}{1:02}{2:02}{3:02}.awip32.merged',
+                      'archive_directory_format':
+                          '{0}/{1:0>4}/{2:0>2}/{3:0>2}',
+                      'archive_name_format':
+                          'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'}
 
     @classmethod
     def read_config(cls, cfg_file='lst_auxillary.config'):
@@ -316,9 +303,9 @@ class Config(object):
             Config.config is stored as a class variable
             Raises Exception if json object can't be parsed
         '''
-        with open(cfg_file, 'r') as fd:
+        with open(cfg_file, 'r') as cfg_fd:
             lines = list()
-            for line in fd:
+            for line in cfg_fd:
                 # Skip rudimentary comments
                 if line.strip().startswith('#'):
                     continue
@@ -344,7 +331,7 @@ class Config(object):
         value = None
         logger = logging.getLogger(__name__)
         try:
-            if(cls.config is None):
+            if cls.config is None:
                 cls.config = cls.read_config()
             if attr in cls.config:
                 value = cls.config[attr]
@@ -358,7 +345,6 @@ class Config(object):
         except IOError:
             # If no config is read then use defaults
             value = cls.default_config[attr]
-            pass
 
         return value
 
@@ -378,15 +364,17 @@ class Ncep(object):
 
     @staticmethod
     def get_url(filename):
+        '''TODO TODO TODO'''
         return Config.get('ncep_url_format').format(filename)
 
     @staticmethod
     def get_filename(year, month, day, hour):
+        '''TODO TODO TODO'''
         fmt = Config.get('remote_name_format')
         return fmt.format(year, month, day, hour)
 
     @staticmethod
-    def get_datetime_from_filename(self, filename):
+    def get_datetime_from_filename(filename):
         '''Extracts tuple (year, month, day, hour) from filename
 
         Precondition:
@@ -435,9 +423,8 @@ class Ncep(object):
         <td align="right">08-Jan-2015 10:12  </td>
         <td align="right">1.3M</td></tr>\n'
         '''
-        logger = logging.getLogger(__name__)
-        ArchiveData = collections.namedtuple('ArchiveData',
-                                             ['name', 'mtime', 'size'])
+        archive_data = collections.namedtuple('ArchiveData',
+                                              ['name', 'mtime', 'size'])
 
         lines_thrown = 0
         data_list = []
@@ -446,7 +433,7 @@ class Ncep(object):
         data = custom_session.get_lines_from_url(Ncep.get_url(''))
 
         for line in data:
-            if('awip' not in line):
+            if 'awip' not in line:
                 lines_thrown = lines_thrown + 1
                 continue  # go to next line
             (garbage, partial_line) = line.split('">', 1)
@@ -457,14 +444,14 @@ class Ncep(object):
             (size, partial_line) = partial_line.split('</td>', 1)
 
             mtime = mtime.strip()  # Remove extra space
-            data_list.append(ArchiveData(name=name, mtime=mtime, size=size))
+            data_list.append(archive_data(name=name, mtime=mtime, size=size))
 
         return data_list
 
     @classmethod
     def get_session(cls):
         '''Obtains and then retains session used for downloading'''
-        if(cls.session is None):
+        if cls.session is None:
             # Establish a logged in session
             cls.session = Web.Session()
         return cls.session
@@ -481,7 +468,7 @@ class Ncep(object):
         Postcondition: Returns a dictionary
             filename as key, external last modified time as value
         '''
-        if(cls.mtime_by_name is None):
+        if cls.mtime_by_name is None:
             data_list = Ncep.get_list_of_external_data()
             cls.mtime_by_name = {}
             for item in data_list:
@@ -493,6 +480,7 @@ class Ncep(object):
 
 
 class NarrData(object):
+    '''TODO TODO TODO'''
     variables = ['HGT', 'TMP', 'SPFH']  # Variables that will be extracted
 
     class FileMissing(Exception):
@@ -541,14 +529,16 @@ class NarrData(object):
         current = NarrData(year=start_time.year, month=start_time.month,
                            day=start_time.day, hour=start_time.hour)
         while current.dt <= end_time:
-            yield(current)
+            yield current
             current = current.get_next(interval)
 
     def get_internal_drectory(self):
+        '''TODO TODO TODO'''
         return NarrArchive.get_arch_dir(self.dt.year, self.dt.month,
                                         self.dt.day)
 
     def get_internal_filename(self, variable, ext):
+        '''TODO TODO TODO'''
         return NarrArchive.get_arch_filename(variable, self.dt.year,
                                              self.dt.month, self.dt.day,
                                              self.dt.hour, ext)
@@ -595,16 +585,6 @@ class NarrData(object):
         except KeyError:
             raise NarrData.FileMissing
 
-#        # Last modified time according to the response headers
-#        header_last_mod = (Ncep.get_session()
-#                           .get_last_modified(Ncep.get_url(filename),
-#                                              filename))
-#        logger = logging.getLogger(__name__)
-#        logger.debug('Two "last modified" artibutes are available.'
-#                     ' The table\'s value is:{0}. The response header\'s'
-#                     ' value is:{1}'.format(table_last_mod,
-#                                            header_last_mod))
-
         return table_last_mod
 
     def need_to_update(self):
@@ -632,11 +612,12 @@ class NarrData(object):
 
         try:
             # Check if existing data is stale
-            return (self.get_internal_last_modified() < ext_mtime)
+            return self.get_internal_last_modified() < ext_mtime
         except NarrData.FileMissing:  # Expecting 'No such file or directory'
             return True  # The file does not exist internally.
 
     def get_grib_file(self):
+        '''TODO TODO TODO'''
         Ncep.get_grib_file(self.get_external_filename())
 
     def extract_vars_from_grib(self):
@@ -650,17 +631,19 @@ class NarrData(object):
             self.move_to_archive(var)
 
     def remove_grib_file(self):
+        '''removes the grib file'''
         logger = logging.getLogger(__name__)
         logger.debug('ExternalFile(Exists:{0}, Name:{1})'
                      .format(os.path.exists(self.get_external_filename()),
-                            self.get_external_filename()))
+                             self.get_external_filename()))
         if os.path.exists(self.get_external_filename()):
             os.unlink(self.get_external_filename())
 
     def get_next(self, time_increment=timedelta(hours=3)):
-        dt = self.dt + time_increment
-        return NarrData(year=dt.year, month=dt.month,
-                        day=dt.day, hour=dt.hour)
+        '''returns the next NarrData object'''
+        next_date = self.dt + time_increment
+        return NarrData(year=next_date.year, month=next_date.month,
+                        day=next_date.day, hour=next_date.hour)
 
     def process_grib_for_variable(self, variable, verbose=False):
         '''Extract the specified variable from the grib file and archive it.
@@ -679,7 +662,7 @@ class NarrData(object):
         hdr_name = self.get_internal_filename(variable, 'hdr')
         grb_name = self.get_internal_filename(variable, 'grb')
 
-        if(os.path.isfile(grb_name) and os.path.isfile(hdr_name)):
+        if os.path.isfile(grb_name) and os.path.isfile(hdr_name):
             logger.warning('{0} and {1} already exist. Skipping extraction.'
                            .format(hdr_name, grb_name))
             return
@@ -704,7 +687,7 @@ class NarrData(object):
             output = ''
             logger.info('Executing [{0}]'.format(cmd))
             output = System.execute_cmd(cmd)
-            if(verbose):
+            if verbose:
                 if len(output) > 0:
                     logger.info(output)
 
@@ -742,20 +725,24 @@ class NarrData(object):
 
 
 class NarrArchive(object):
+    '''TODO TODO TODO'''
     _base_aux_dir = None
 
     @classmethod
     def get_arch_filename(cls, variable, year, month, day, hour, ext):
+        '''TODO TODO TODO'''
         return (Config.get('archive_name_format')
-                      .format(variable, year, month, day, hour*100, ext))
+                .format(variable, year, month, day, hour*100, ext))
 
     @classmethod
     def get_arch_dir(cls, year, month, day):
+        '''TODO TODO TODO'''
         return (Config.get('archive_directory_format')
-                      .format(cls.get_base_aux_dir(), year, month, day))
+                .format(cls.get_base_aux_dir(), year, month, day))
 
     @classmethod
     def get_base_aux_dir(cls):
+        '''TODO TODO TODO'''
         if cls._base_aux_dir is None:  # Check if its not already stored
             cls._base_aux_dir = os.environ.get('LST_AUX_DIR')
 
@@ -789,7 +776,8 @@ def update(data_to_be_updated):
 
 
 def report(data_to_report):
-    '''Provides measured time, internal mtime and external mtime of data passed in
+    '''Provides measured time, internal mtime and external mtime of data
+       passed in
 
     Note:
         Reports number of files to be downloaded
@@ -801,8 +789,8 @@ def report(data_to_report):
     logger.debug('\n'.join(Ncep.get_list_of_external_data()))
     logger.debug(Ncep.get_dict_of_date_modified())
 
-    report = []
-    report.append('Measured, UpdatedLocally, UpdatedOnline')  # Header
+    report_msg = []
+    report_msg.append('Measured, UpdatedLocally, UpdatedOnline')  # Header
 
     for data in data_to_report:
         line = []
@@ -818,17 +806,19 @@ def report(data_to_report):
         except NarrData.FileMissing:
             line.append('-')
 
-        report.append(', '.join(line))
+        report_msg.append(', '.join(line))
 
-    return '\n'.join(report)
+    return '\n'.join(report_msg)
 
 
 def report_between_dates(start_date, end_date):
+    '''TODO TODO TODO'''
     data = NarrData.get_next_narr_data_gen(start_date, end_date)
     return report(list(data))
 
 
 def YYYYMMDD_date(datestring):
+    '''TODO TODO TODO'''
     try:
         return datetime.strptime(datestring, '%Y%m%d').date()
     except ValueError:
@@ -838,6 +828,8 @@ def YYYYMMDD_date(datestring):
 
 
 def parse_arguments():
+    '''TODO TODO TODO'''
+
     # Create a command line arugment parser
     description = ('Downloads LST auxillary inputs, then archives them for'
                    ' future use. Dates must be the in the format: "YYYYMMDD"')
@@ -914,5 +906,5 @@ def main(start_date, end_date):
 
 
 if __name__ == '__main__':
-    args = parse_arguments()
-    main(args.start_date, args.end_date)
+    cmd_args = parse_arguments()
+    main(cmd_args.start_date, cmd_args.end_date)
