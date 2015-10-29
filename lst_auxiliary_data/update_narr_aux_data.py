@@ -66,6 +66,7 @@ class Web(object):
 
             self.timeout = timeout
             self.max_retries = max_retries
+            self.status_code = requests.codes['ok']
 
             # Determine if we are streaming or not based on block_size
             self.block_size = block_size
@@ -94,20 +95,21 @@ class Web(object):
                    memory before dumping to the local file.
             '''
 
-            req = self.session.get(url=download_url, timeout=self.timeout,
-                                   headers=headers)
+            with closing(self.session.get(url=download_url,
+                                          timeout=self.timeout,
+                                          headers=headers)) as req:
 
-            if not req.ok:
-                self.logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                  .format(download_url))
-                # The raise_for_status gets caught by this try's except block
-                req.raise_for_status()
+                self.status_code = req.status_code
 
-            # Write the downloaded data to the destination file
-            with open(destination_file, 'wb') as local_fd:
-                local_fd.write(req.content)
+                if not req.ok:
+                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
+                                      .format(download_url))
+                    # The raise_for_status generates an exception to be caught
+                    req.raise_for_status()
 
-                return True
+                # Write the downloaded data to the destination file
+                with open(destination_file, 'wb') as local_fd:
+                    local_fd.write(req.content)
 
         # --------------------------------------------------------------------
         def _stream_file(self, download_url, destination_file, headers=None):
@@ -121,6 +123,14 @@ class Web(object):
                                           timeout=self.timeout,
                                           stream=True,
                                           headers=headers)) as req:
+                self.status_code = req.status_code
+
+                if not req.ok:
+                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
+                                      .format(download_url))
+                    # The raise_for_status generates an exception to be caught
+                    req.raise_for_status()
+
                 file_size = int(req.headers['content-length'])
 
                 # Set block size based on streaming
@@ -139,8 +149,6 @@ class Web(object):
                     raise Exception('Transfer Failed - HTTP -'
                                     ' Retrieved {0} out of {1} bytes'
                                     .format(retrieved_bytes, file_size))
-                else:
-                    return True
 
         # --------------------------------------------------------------------
         def http_transfer_file(self, download_url, destination_file):
@@ -163,19 +171,20 @@ class Web(object):
             retry_attempt = 0
             done = False
             while not done:
-                status_code = requests.codes['ok']
+                self.status_code = requests.codes['ok']
                 try:
 
-                    done = self._stream_file(download_url,
-                                             destination_file)
+                    self._stream_file(download_url, destination_file)
 
-                    if done:
-                        self.logger.info("Transfer Complete - HTTP")
+                    self.logger.info("Transfer Complete - HTTP")
+                    done = True
 
                 except Exception:
                     self.logger.exception('HTTP - Transfer Issue')
 
-                    if status_code != requests.codes['not_found']:
+                    if self.status_code not in (requests.codes['not_found'],
+                                                requests.codes['forbidden']):
+
                         if retry_attempt > self.max_retries:
                             self.logger.info('HTTP - Transfer Failed'
                                              ' - exceeded retry limit')
@@ -187,15 +196,26 @@ class Web(object):
                         # Not Found - So break the looping because we are done
                         done = True
 
-            return status_code
+            return self.status_code
 
         # --------------------------------------------------------------------
         def get_lines_from_url(self, download_url):
             '''retrieve lines from a url'''
+
             data = []
+            self.status_code = requests.codes['ok']
+
             with closing(self.session.get(url=download_url,
                                           timeout=self.timeout,
                                           stream=self.stream)) as req:
+                self.status_code = req.status_code
+
+                if not req.ok:
+                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
+                                      .format(download_url))
+                    # The raise_for_status generates an exception to be caught
+                    req.raise_for_status()
+
                 for line in req.iter_lines():
                     data.append(line)
 
@@ -277,10 +297,12 @@ class Config(object):
             key/value pairs.
         3.Settings can be defined in the default_config.
     Beware: read_config will overwrite the contents of the configuration file
+ ftp://ftp.cpc.ncep.noaa.gov/NARR/archive/rotating_3hour/{0}
+'http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive/{0}'),
     '''
     config = None  # Stores result of reading json object from file.
-    default_config = {'ncep_url_format': ('http://ftp.cpc.ncep.noaa.gov/'
-                                          'wd51we/NARR_archive/{0}'),
+    default_config = {'ncep_url_format':
+                      'http://broken/broken/broken/{0}',
                       'remote_name_format':
                           'rcdas.{0:03}{1:02}{2:02}{3:02}.awip32.merged',
                       'archive_directory_format':
@@ -295,7 +317,7 @@ class Config(object):
         Note: By default the function will read a file but otherwise
             another file could be indicated via parameter cfg_file
         Precondition:
-            Assumes a JSON data object, this is defined by xjjson module.
+            Assumes a JSON data object, this is defined by json module.
                 json.loads is able to parse the contents of the file
             Any line that starts with '#' will be ignored.
         Postcondition:
@@ -430,21 +452,26 @@ class Ncep(object):
         data_list = []
 
         custom_session = cls.get_session()
-        data = custom_session.get_lines_from_url(Ncep.get_url(''))
+        try:
+            data = custom_session.get_lines_from_url(Ncep.get_url(''))
 
-        for line in data:
-            if 'awip' not in line:
-                lines_thrown = lines_thrown + 1
-                continue  # go to next line
-            (garbage, partial_line) = line.split('">', 1)
-            (name, partial_line) = partial_line.split('</a>', 1)
-            (garbage, partial_line) = partial_line.split('">', 1)
-            (mtime, partial_line) = partial_line.split('</td>', 1)
-            (garbage, partial_line) = partial_line.split('">', 1)
-            (size, partial_line) = partial_line.split('</td>', 1)
+            for line in data:
+                if 'awip' not in line:
+                    lines_thrown = lines_thrown + 1
+                    continue  # go to next line
+
+                (garbage, partial_line) = line.split('">', 1)
+                (name, partial_line) = partial_line.split('</a>', 1)
+                (garbage, partial_line) = partial_line.split('">', 1)
+                (mtime, partial_line) = partial_line.split('</td>', 1)
+                (garbage, partial_line) = partial_line.split('">', 1)
+                (size, partial_line) = partial_line.split('</td>', 1)
 
             mtime = mtime.strip()  # Remove extra space
             data_list.append(archive_data(name=name, mtime=mtime, size=size))
+
+        except Exception:
+            raise
 
         return data_list
 
@@ -490,6 +517,8 @@ class NarrData(object):
     def __init__(self, year, month, day, hour=00):
         hour = hour/3*3  # Ensures it is a multiple of 3
         self.dt = datetime(year, month, day, hour=hour)
+        logger = logging.getLogger(__name__)
+        logger.info('---- {0} {1} {2} {3}'.format(year, month, day, hour))
 
     @staticmethod
     def from_external_name(external_name):
@@ -859,6 +888,11 @@ def parse_arguments():
                         help='Sets both start and end date to this date.'
                              ' Overrides start-date and end-date arguments.')
 
+    parser.add_argument('--debug',
+                        action='store_true', dest='debug',
+                        default=False,
+                        help='Turn debug logging on.')
+
     parser.add_argument('--version',
                         action='version',
                         version='%(prog)s 0.0.1',
@@ -882,18 +916,6 @@ def main(start_date, end_date):
         start_date and end_date are of type datetime.datetime
         start_date and end_date can also be of type datetime.date
     '''
-    # Setup the default logger format and level. log to STDOUT
-    logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
-                                ' %(levelname)-8s'
-                                ' %(filename)s:%(lineno)d:'
-                                '%(funcName)s -- %(message)s'),
-                        datefmt='%Y-%m-%d %H:%M:%S',
-                        level=logging.INFO,
-                        stream=sys.stdout)
-    # Turn down the requests and urllib3 logging
-    logging.getLogger("requests").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-
     logger = logging.getLogger(__name__)
 
     # Determine the data that exists within the date range
@@ -907,4 +929,22 @@ def main(start_date, end_date):
 
 if __name__ == '__main__':
     cmd_args = parse_arguments()
+
+    log_level = logging.INFO
+    if cmd_args.debug:
+        log_level = logging.DEBUG
+
+    # Setup the default logger format and level. log to STDOUT
+    logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
+                                ' %(levelname)-8s'
+                                ' %(filename)s:%(lineno)d:'
+                                '%(funcName)s -- %(message)s'),
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        level=log_level,
+                        stream=sys.stdout)
+
+    # Turn down the requests and urllib3 logging
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
     main(cmd_args.start_date, cmd_args.end_date)
