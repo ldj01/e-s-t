@@ -53,13 +53,13 @@ class Ncep(object):
 
     @staticmethod
     def get_url(filename):
-        '''TODO TODO TODO'''
+        '''Return the URL for external retrieval of the file'''
         return Config.get('ncep.url_format').format(filename)
 
     @staticmethod
     def get_filename(year, month, day, hour):
-        '''TODO TODO TODO'''
-        fmt = Config.get('ncep.remote_name_format')
+        '''Return the filename to grab on the external system'''
+        fmt = Config.get('ncep.name_format')
         return fmt.format(year, month, day, hour)
 
     @staticmethod
@@ -78,7 +78,7 @@ class Ncep(object):
 
     @classmethod
     def get_grib_file(cls, filename):
-        '''
+        '''Retrieves the grib file from the external system
 
         Precondition:
             File with "filename" exists on the NCEP website.
@@ -317,7 +317,7 @@ class NarrData(object):
             return True  # The file does not exist internally.
 
     def get_grib_file(self):
-        '''TODO TODO TODO'''
+        '''retrieves the grib file'''
         Ncep.get_grib_file(self.get_external_filename())
 
     def extract_vars_from_grib(self):
