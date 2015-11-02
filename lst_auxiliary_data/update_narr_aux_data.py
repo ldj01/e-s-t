@@ -31,344 +31,11 @@ import os
 import sys
 import shutil
 import logging
-import errno
-import commands
-import requests
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from time import sleep
 from datetime import datetime, timedelta, date
-from contextlib import closing
 import collections
-import json
 
-
-# ============================================================================
-class Web(object):
-    '''
-    Description:
-        Provides methods for interfacing with web resources.
-    '''
-
-    # ------------------------------------------------------------------------
-    class Session(object):
-        '''
-        Description:
-            Manages an http(s) session.
-        '''
-
-        # --------------------------------------------------------------------
-        def __init__(self, max_retries=3, block_size=None, timeout=300.0):
-            super(Web.Session, self).__init__()
-
-            self.logger = logging.getLogger(__name__)
-
-            self.session = requests.Session()
-
-            self.timeout = timeout
-            self.max_retries = max_retries
-            self.status_code = requests.codes['ok']
-
-            # Determine if we are streaming or not based on block_size
-            self.block_size = block_size
-            self.stream = False
-            if self.block_size is not None:
-                self.stream = True
-
-            adapter = requests.adapters.HTTPAdapter(max_retries=max_retries)
-            self.session.mount('http://', adapter)
-            self.session.mount('https://', adapter)
-
-        # --------------------------------------------------------------------
-        def login(self, login_url, login_data):
-            '''
-            Description:
-                Provides for establishing a logged in session.
-            '''
-
-            # Login to the site
-            self.session.post(url=login_url, data=login_data)
-
-        # --------------------------------------------------------------------
-        def _get_file(self, download_url, destination_file, headers=None):
-            '''
-            Notes: Downloading this way will place the whole source file into
-                   memory before dumping to the local file.
-            '''
-
-            with closing(self.session.get(url=download_url,
-                                          timeout=self.timeout,
-                                          headers=headers)) as req:
-
-                self.status_code = req.status_code
-
-                if not req.ok:
-                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                      .format(download_url))
-                    # The raise_for_status generates an exception to be caught
-                    req.raise_for_status()
-
-                # Write the downloaded data to the destination file
-                with open(destination_file, 'wb') as local_fd:
-                    local_fd.write(req.content)
-
-        # --------------------------------------------------------------------
-        def _stream_file(self, download_url, destination_file, headers=None):
-            '''
-            Notes: Downloading this way streams 'block_size' of data at a
-                   time.
-            '''
-
-            retrieved_bytes = 0
-            with closing(self.session.get(url=download_url,
-                                          timeout=self.timeout,
-                                          stream=True,
-                                          headers=headers)) as req:
-                self.status_code = req.status_code
-
-                if not req.ok:
-                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                      .format(download_url))
-                    # The raise_for_status generates an exception to be caught
-                    req.raise_for_status()
-
-                file_size = int(req.headers['content-length'])
-
-                # Set block size based on streaming
-                if self.stream:
-                    block_size = self.block_size
-                else:
-                    block_size = file_size
-
-                # Write the downloaded data to the destination file
-                with open(destination_file, 'wb') as local_fd:
-                    for data_chunk in req.iter_content(block_size):
-                        local_fd.write(data_chunk)
-                        retrieved_bytes += len(data_chunk)
-
-                if retrieved_bytes != file_size:
-                    raise Exception('Transfer Failed - HTTP -'
-                                    ' Retrieved {0} out of {1} bytes'
-                                    .format(retrieved_bytes, file_size))
-
-        # --------------------------------------------------------------------
-        def http_transfer_file(self, download_url, destination_file):
-            '''
-            Description:
-                Use http to transfer a file from a source location to a
-                destination file on the localhost.
-            Returns:
-                status_code - One of the following
-                            - 200, requests.codes['ok']
-                            - 404, requests.codes['not_found']:
-                            - 503, requests.codes['service_unavailable']:
-            Notes:
-                If a 503 is returned, the logged exception should be reviewed
-                to determine the real cause of the error.
-            '''
-
-            self.logger.info(download_url)
-
-            retry_attempt = 0
-            done = False
-            while not done:
-                self.status_code = requests.codes['ok']
-                try:
-
-                    self._stream_file(download_url, destination_file)
-
-                    self.logger.info("Transfer Complete - HTTP")
-                    done = True
-
-                except Exception:
-                    self.logger.exception('HTTP - Transfer Issue')
-
-                    if self.status_code not in (requests.codes['not_found'],
-                                                requests.codes['forbidden']):
-
-                        if retry_attempt > self.max_retries:
-                            self.logger.info('HTTP - Transfer Failed'
-                                             ' - exceeded retry limit')
-                            done = True
-                        else:
-                            retry_attempt += 1
-                            sleep(int(1.5 * retry_attempt))
-                    else:
-                        # Not Found - So break the looping because we are done
-                        done = True
-
-            return self.status_code
-
-        # --------------------------------------------------------------------
-        def get_lines_from_url(self, download_url):
-            '''retrieve lines from a url'''
-
-            data = []
-            self.status_code = requests.codes['ok']
-
-            with closing(self.session.get(url=download_url,
-                                          timeout=self.timeout,
-                                          stream=self.stream)) as req:
-                self.status_code = req.status_code
-
-                if not req.ok:
-                    self.logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                      .format(download_url))
-                    # The raise_for_status generates an exception to be caught
-                    req.raise_for_status()
-
-                for line in req.iter_lines():
-                    data.append(line)
-
-            return data
-
-
-# ============================================================================
-class System(object):
-    '''
-    Description:
-        Provides methods for interfacing with the host server.
-    '''
-
-    # ------------------------------------------------------------------------
-    @staticmethod
-    def execute_cmd(cmd):
-        '''
-        Description:
-            Execute a command line and return the terminal output or raise an
-            exception
-
-        Returns:
-            output - The stdout and/or stderr from the executed command.
-        '''
-
-        logger = logging.getLogger(__name__)
-
-        output = ''
-
-        logger.info('Executing [{0}]'.format(cmd))
-        (status, output) = commands.getstatusoutput(cmd)
-
-        if status < 0:
-            message = 'Application terminated by signal [{0}]'.format(cmd)
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        if status != 0:
-            message = 'Application failed to execute [{0}]'.format(cmd)
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        if os.WEXITSTATUS(status) != 0:
-            message = ('Application [{0}] returned error code [{1}]'
-                       .format(cmd, os.WEXITSTATUS(status)))
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        return output
-
-    # ------------------------------------------------------------------------
-    @staticmethod
-    def create_directory(directory):
-        '''
-        Description:
-            Create the specified directory with some error checking.
-        '''
-
-        # Create/Make sure the directory exists
-        try:
-            os.makedirs(directory, mode=0755)
-        except OSError as ose:
-            if ose.errno == errno.EEXIST and os.path.isdir(directory):
-                pass
-            else:
-                raise
-
-
-class Config(object):
-    '''Provides access to configurable attributes of script
-
-    Provides transparent access to settings from configuration
-        1.Settings can specified as a json object stored in a file.
-            read_config will be used to insert these into Config.config dict.
-        2.Settings can be defined in the dictionary, Config.config, as
-            key/value pairs.
-        3.Settings can be defined in the default_config.
-    Beware: read_config will overwrite the contents of the configuration file
- ftp://ftp.cpc.ncep.noaa.gov/NARR/archive/rotating_3hour/{0}
-'http://ftp.cpc.ncep.noaa.gov/wd51we/NARR_archive/{0}'),
-    '''
-    config = None  # Stores result of reading json object from file.
-    default_config = {'ncep_url_format':
-                      'http://broken/broken/broken/{0}',
-                      'remote_name_format':
-                          'rcdas.{0:03}{1:02}{2:02}{3:02}.awip32.merged',
-                      'archive_directory_format':
-                          '{0}/{1:0>4}/{2:0>2}/{3:0>2}',
-                      'archive_name_format':
-                          'NARR_3D.{0}.{1:04}{2:02}{3:02}.{4:04}.{5}'}
-
-    @classmethod
-    def read_config(cls, cfg_file='lst_auxillary.config'):
-        '''Reads configurable options from a file in current directory
-
-        Note: By default the function will read a file but otherwise
-            another file could be indicated via parameter cfg_file
-        Precondition:
-            Assumes a JSON data object, this is defined by json module.
-                json.loads is able to parse the contents of the file
-            Any line that starts with '#' will be ignored.
-        Postcondition:
-            dictionary representing the JSON object is stored in memeory
-            Config.config is stored as a class variable
-            Raises Exception if json object can't be parsed
-        '''
-        with open(cfg_file, 'r') as cfg_fd:
-            lines = list()
-            for line in cfg_fd:
-                # Skip rudimentary comments
-                if line.strip().startswith('#'):
-                    continue
-
-                lines.append(line)
-
-            cls.config = json.loads(' '.join(lines))
-
-        if cls.config is None:
-            raise Exception('Failed loading configuration')
-
-        return cls.config
-
-    @classmethod
-    def get(cls, attr):
-        '''Get value of configurable setting from a file or default
-
-            First it will try to read json data from the config file.
-            If file does not exist then onfig will be from default values.
-            If Key/value pair doesn't exist in JSON-like object stored in the
-                file then default values will be used.
-        '''
-        value = None
-        logger = logging.getLogger(__name__)
-        try:
-            if cls.config is None:
-                cls.config = cls.read_config()
-            if attr in cls.config:
-                value = cls.config[attr]
-                logger.info('Using value({0}) from config file for {1}.'
-                            .format(value, attr))
-                value = cls.config[attr]
-            else:
-                logger.warn('Using default value({0}) for {1}.'.format(value,
-                                                                       attr))
-                value = cls.default_config[attr]
-        except IOError:
-            # If no config is read then use defaults
-            value = cls.default_config[attr]
-
-        return value
+from lst_auxiliary_utilities import Config, Web, System
 
 
 class Ncep(object):
@@ -387,12 +54,12 @@ class Ncep(object):
     @staticmethod
     def get_url(filename):
         '''TODO TODO TODO'''
-        return Config.get('ncep_url_format').format(filename)
+        return Config.get('ncep.url_format').format(filename)
 
     @staticmethod
     def get_filename(year, month, day, hour):
         '''TODO TODO TODO'''
-        fmt = Config.get('remote_name_format')
+        fmt = Config.get('ncep.remote_name_format')
         return fmt.format(year, month, day, hour)
 
     @staticmethod
@@ -449,7 +116,7 @@ class Ncep(object):
                                               ['name', 'mtime', 'size'])
 
         lines_thrown = 0
-        data_list = []
+        data_list = list()
 
         custom_session = cls.get_session()
         try:
@@ -460,15 +127,16 @@ class Ncep(object):
                     lines_thrown = lines_thrown + 1
                     continue  # go to next line
 
-                (garbage, partial_line) = line.split('">', 1)
-                (name, partial_line) = partial_line.split('</a>', 1)
-                (garbage, partial_line) = partial_line.split('">', 1)
-                (mtime, partial_line) = partial_line.split('</td>', 1)
-                (garbage, partial_line) = partial_line.split('">', 1)
-                (size, partial_line) = partial_line.split('</td>', 1)
+                line_parts = line.split('">')
+                name = line_parts[0].split('="')[1]
+                mtime = line_parts[2].split('<')[0]
+                size = line_parts[3].split('<')[0]
 
-            mtime = mtime.strip()  # Remove extra space
-            data_list.append(archive_data(name=name, mtime=mtime, size=size))
+                mtime = mtime.strip()  # Remove extra space
+                size = size.strip()  # Remove extra space
+                data_list.append(archive_data(name=name,
+                                              mtime=mtime,
+                                              size=size))
 
         except Exception:
             raise
@@ -478,6 +146,7 @@ class Ncep(object):
     @classmethod
     def get_session(cls):
         '''Obtains and then retains session used for downloading'''
+
         if cls.session is None:
             # Establish a logged in session
             cls.session = Web.Session()
@@ -495,6 +164,7 @@ class Ncep(object):
         Postcondition: Returns a dictionary
             filename as key, external last modified time as value
         '''
+
         if cls.mtime_by_name is None:
             data_list = Ncep.get_list_of_external_data()
             cls.mtime_by_name = {}
@@ -508,6 +178,7 @@ class Ncep(object):
 
 class NarrData(object):
     '''TODO TODO TODO'''
+
     variables = ['HGT', 'TMP', 'SPFH']  # Variables that will be extracted
 
     class FileMissing(Exception):
@@ -517,12 +188,11 @@ class NarrData(object):
     def __init__(self, year, month, day, hour=00):
         hour = hour/3*3  # Ensures it is a multiple of 3
         self.dt = datetime(year, month, day, hour=hour)
-        logger = logging.getLogger(__name__)
-        logger.info('---- {0} {1} {2} {3}'.format(year, month, day, hour))
 
     @staticmethod
     def from_external_name(external_name):
         '''Creates NarrData object from name of external file'''
+
         date_measured = Ncep.get_datetime_from_filename(external_name)
 
         return NarrData(year=date_measured.year, month=date_measured.month,
@@ -544,6 +214,7 @@ class NarrData(object):
                 next values of iterator. The following statement will be true:
                 narr[i-1].dt + interval == narr[i].dt == narr[i].dt - interval
         '''
+
         try:  # Handles if datetime objects are passed in.
             start_time = datetime.combine(s_date.date(), datetime.min.time())
             end_time = datetime.combine(e_date.date(), datetime.max.time())
@@ -562,12 +233,12 @@ class NarrData(object):
             current = current.get_next(interval)
 
     def get_internal_drectory(self):
-        '''TODO TODO TODO'''
+        '''Returns the internal path to the archive'''
         return NarrArchive.get_arch_dir(self.dt.year, self.dt.month,
                                         self.dt.day)
 
     def get_internal_filename(self, variable, ext):
-        '''TODO TODO TODO'''
+        '''Returns an internally formatted archive filename'''
         return NarrArchive.get_arch_filename(variable, self.dt.year,
                                              self.dt.month, self.dt.day,
                                              self.dt.hour, ext)
@@ -888,6 +559,11 @@ def parse_arguments():
                         help='Sets both start and end date to this date.'
                              ' Overrides start-date and end-date arguments.')
 
+    parser.add_argument('--verbose',
+                        action='store_true', dest='verbose',
+                        default=False,
+                        help='Turn verbose logging on.')
+
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
                         default=False,
@@ -923,16 +599,21 @@ def main(start_date, end_date):
 
     # Determine which files are stale or missing internally.
     data_to_be_updated = filter(lambda x: x.need_to_update(), data)
-    logger.info('Will download {0} files'.format(len(data_to_be_updated)))
+    if len(data_to_be_updated) == 0:
+        logger.warning('No data found for updating archive')
+    else:
+        logger.info('Will download {0} files'.format(len(data_to_be_updated)))
     update(data_to_be_updated)
 
 
 if __name__ == '__main__':
     cmd_args = parse_arguments()
 
-    log_level = logging.INFO
+    log_level = logging.WARN
     if cmd_args.debug:
         log_level = logging.DEBUG
+    elif cmd_args.verbose:
+        log_level = logging.INFO
 
     # Setup the default logger format and level. log to STDOUT
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
