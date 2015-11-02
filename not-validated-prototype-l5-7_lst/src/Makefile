@@ -42,7 +42,6 @@ OBJ = $(SRC:.c=.o)
 
 # Define the object libraries
 EXLIB = -L$(ESPALIB) -l_espa_raw_binary -l_espa_common \
-        -l_espa_format_conversion \
         -L$(XML2LIB) -lxml2 \
         -L$(LZMALIB) -llzma \
         -L$(ZLIBLIB) -lz
