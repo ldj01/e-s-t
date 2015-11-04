@@ -3,15 +3,13 @@
 #
 # Simple makefile for installing the scripts.
 #-----------------------------------------------------------------------------
-.PHONY: all install clean
+.PHONY: all install clean check
 
 # Inherit from upper-level make.config
 TOP = ../..
 include $(TOP)/make.config
 
-script_install_path = $(l57_algorithm_dir)/bin
-
-SCRIPT_EXECUTABLES = \
+SCRIPTS = \
     lst_core_processing.py \
     extract_modtran_results.py
 
@@ -22,24 +20,28 @@ SCRIPT_IMPORTS = \
     lst_environment.py \
     lst_utilities.py
 
+#-----------------------------------------------------------------------------
 all:
 
+#-----------------------------------------------------------------------------
 install:
 	install -d $(link_path)
-	install -d $(script_install_path)
-	@for file in $(SCRIPT_EXECUTABLES); do \
+	install -d $(l57_install_path)
+	@for file in $(SCRIPTS); do \
             echo "  installing $$file"; \
-            install -m 755 $$file $(script_install_path); \
-            ln -sf ../$(project_name)/$(l57_algorithm)/bin/$$file $(link_path)/$$file; \
+            install -m 755 $$file $(l57_install_path); \
+            ln -sf $(l57_link_source_path)/$$file $(link_path)/$$file; \
         done;
 	@for file in $(SCRIPT_IMPORTS); do \
             echo "  installing $$file"; \
-            install -m 644 $$file $(script_install_path); \
-            ln -sf ../$(project_name)/$(l57_algorithm)/bin/$$file $(link_path)/$$file; \
+            install -m 644 $$file $(l57_install_path); \
+            ln -sf $(l57_link_source_path)/$$file $(link_path)/$$file; \
         done;
 
+#-----------------------------------------------------------------------------
 clean:
 
+#-----------------------------------------------------------------------------
 check:
 	@cd unit-tests; python unit-tests.py
 

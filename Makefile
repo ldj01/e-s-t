@@ -4,7 +4,7 @@
 # Simple makefile for building and installing land-surface-temperature
 # applications.
 #-----------------------------------------------------------------------------
-.PHONY: check-environment all install clean all-script install-script clean-script all-l5-7 install-l5-7 clean-l5-7 install-aux
+.PHONY: check-environment all install clean all-script install-script clean-script all-l5-7 install-l5-7 clean-l5-7 all-aux install-aux
 
 include make.config
 
@@ -15,9 +15,9 @@ all: all-script all-l5-7
 
 install: check-environment install-script install-l5-7
 
-clean: clean-script clean-l5-7
+clean: clean-script clean-l5-7 clean-aux
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 all-script:
 	echo "make all in scripts"; \
         (cd scripts; $(MAKE) all);
@@ -30,7 +30,7 @@ clean-script:
 	echo "make clean in scripts"; \
         (cd scripts; $(MAKE) clean);
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
 all-l5-7: all-script
 	echo "make all in not-validated-prototype-l5-7_lst"; \
         (cd $(DIR_L5-7); $(MAKE) all);
@@ -43,11 +43,20 @@ clean-l5-7: clean-script
 	echo "make clean in not-validated-prototype-l5-7_lst"; \
         (cd $(DIR_L5-7); $(MAKE) clean);
 
-#------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+all-aux:
+	echo "make install in lst_auxiliary_data"; \
+        (cd $(DIR_AUX); $(MAKE));
+
 install-aux:
 	echo "make install in lst_auxiliary_data"; \
         (cd $(DIR_AUX); $(MAKE) install);
 
+clean-aux:
+	echo "make install in lst_auxiliary_data"; \
+        (cd $(DIR_AUX); $(MAKE) clean);
+
+#-----------------------------------------------------------------------------
 check-environment:
 ifndef PREFIX
     $(error Environment variable PREFIX is not defined)

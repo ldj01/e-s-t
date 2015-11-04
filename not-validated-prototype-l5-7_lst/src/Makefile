@@ -9,13 +9,10 @@
 TOP = ../..
 include $(TOP)/make.config
 
-bin_install_path = $(l57_algorithm_dir)/bin
-
 # Set up compile options
 CC = gcc
-RM = rm -f
-EXTRA_OPTIONS = $(static_option) $(threading_options) $(profiling_options)
-EXTRA = -Wall -g -O2 $(EXTRA_OPTIONS)
+RM = rm
+EXTRA = -Wall $(EXTRA_OPTIONS)
 
 # Define the include files
 INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h \
@@ -59,12 +56,12 @@ $(EXE): $(OBJ) $(INC)
 
 install:
 	install -d $(link_path)
-	install -d $(bin_install_path)
-	install -m 755 $(EXE) $(bin_install_path)
-	ln -sf ../$(project_name)/$(l57_algorithm)/bin/$(EXE) $(link_path)/$(EXE)
+	install -d $(l57_install_path)
+	install -m 755 $(EXE) $(l57_install_path)
+	ln -sf $(l57_link_source_path)/$(EXE) $(link_path)/$(EXE)
 
 clean:
-	$(RM) *.o $(EXE)
+	$(RM) -f *.o $(EXE)
 
 $(OBJ): $(INC)
 
