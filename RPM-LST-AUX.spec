@@ -30,7 +30,7 @@ BuildArch:	x86_64
 Packager:	USGS EROS LSRD
 
 BuildRequires:	espa-common
-Requires:	espa-common >= 1.4.0
+Requires:	espa-common >= 1.5.0
 
 # ----------------------------------------------------------------------------
 %description
@@ -58,7 +58,7 @@ git clone --depth 1 --branch %{tagname} %{url} %{clonedname}
 # Build the applications
 # Currently nothing to build for this auxiliary data
 # cd %{clonedname}
-# make BUILD_TYPE=-static
+# make all-aux BUILD_STATIC=yes
 
 
 # ----------------------------------------------------------------------------
@@ -87,6 +87,6 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
-* Wed Sep 03 2015 Ronald D Dilley <rdilley@usgs.gov>
-- Build for Oct 2015 release
+* Wed Nov 04 2015 Ronald D Dilley <rdilley@usgs.gov>
+- Build for Dec 2015 release
 - Initial implementation
