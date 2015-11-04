@@ -82,7 +82,10 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 # All sub-directories are automatically included
 /usr/local/bin/*
-/usr/local/%{name}
+/usr/local/%{name}/lst_auxiliary/bin/build_narr_aux_archive_from_CISL_RDA.py
+/usr/local/%{name}/lst_auxiliary/bin/example-lst_auxiliary.config
+/usr/local/%{name}/lst_auxiliary/bin/lst_auxiliary_utilities.py
+/usr/local/%{name}/lst_auxiliary/bin/update_narr_aux_data.py
 
 
 # ----------------------------------------------------------------------------
