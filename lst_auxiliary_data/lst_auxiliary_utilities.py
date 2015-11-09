@@ -362,10 +362,10 @@ class Config(object):
         logger.debug('Searching Config For - {0}'.format(attribute_path))
 
         config = cls.config
-        for attribute in attribute_path.split('.'):
-            logger.debug('Searching Config For Attribute - {0}'.format(attribute))
-            if attribute in config:
-                config = config[attribute]
+        for attr in attribute_path.split('.'):
+            logger.debug('Searching Config For Attribute - {0}'.format(attr))
+            if attr in config:
+                config = config[attr]
             else:
                 raise IOError('Configuration Item - {0} - Not Found'
                               .format(attribute_path))
