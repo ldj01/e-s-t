@@ -25,12 +25,6 @@
 
           UCAR     - University Corporation for Atmospheric Research
                      http://www2.ucar.edu
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    July/2015         Initial implementation
 '''
 
 
@@ -38,230 +32,11 @@ import os
 import sys
 import shutil
 import logging
-import errno
-import commands
-import requests
 import calendar
-import json
 from argparse import ArgumentParser
-from time import sleep
 from datetime import datetime, timedelta
-from contextlib import closing
 
-
-# ============================================================================
-class Web(object):
-    '''
-    Description:
-        Provides methods for interfacing with web resources.
-    '''
-
-    # ------------------------------------------------------------------------
-    class Session(object):
-        '''
-        Description:
-            Manages an http(s) session.
-        '''
-
-        # --------------------------------------------------------------------
-        def __init__(self, max_retries=3, block_size=None, timeout=300.0):
-            super(Web.Session, self).__init__()
-
-            self.logger = logging.getLogger(__name__)
-
-            self.session = requests.Session()
-
-            self.timeout = timeout
-            self.max_retries = max_retries
-
-            # Determine if we are streaming or not based on block_size
-            self.block_size = block_size
-            self.stream = False
-            if self.block_size is not None:
-                self.stream = True
-
-            adapter = requests.adapters.HTTPAdapter(max_retries=max_retries)
-            self.session.mount('http://', adapter)
-            self.session.mount('https://', adapter)
-
-        # --------------------------------------------------------------------
-        def login(self, login_url, login_data):
-            '''
-            Description:
-                Provides for establishing a logged in session.
-            '''
-
-            # Login to the site
-            self.session.post(url=login_url, data=login_data)
-
-        # --------------------------------------------------------------------
-        def _get_file(self, download_url, destination_file, headers=None):
-            '''
-            Notes: Downloading this way will place the whole source file into
-                   memory before dumping to the local file.
-            '''
-
-            req = self.session.get(url=download_url, timeout=self.timeout,
-                                   headers=headers)
-
-            if not req.ok:
-                self.logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                  .format(download_url))
-                # The raise_for_status gets caught by this try's except block
-                req.raise_for_status()
-
-            # Write the downloaded data to the destination file
-            with open(destination_file, 'wb') as local_fd:
-                local_fd.write(req.content)
-
-                return True
-
-        # --------------------------------------------------------------------
-        def _stream_file(self, download_url, destination_file, headers=None):
-            '''
-            Notes: Downloading this way streams 'block_size' of data at a
-                   time.
-            '''
-
-            retrieved_bytes = 0
-            with closing(self.session.get(url=download_url,
-                                          timeout=self.timeout,
-                                          stream=self.stream,
-                                          headers=headers)) as req:
-                file_size = int(req.headers['content-length'])
-
-                # Set block size based on streaming
-                if self.stream:
-                    block_size = self.block_size
-                else:
-                    block_size = file_size
-
-                # Write the downloaded data to the destination file
-                with open(destination_file, 'wb') as local_fd:
-                    for data_chunk in req.iter_content(block_size):
-                        local_fd.write(data_chunk)
-                        retrieved_bytes += len(data_chunk)
-
-                if retrieved_bytes != file_size:
-                    raise Exception('Transfer Failed - HTTP -'
-                                    ' Retrieved {0} out of {1} bytes'
-                                    .format(retrieved_bytes, file_size))
-                else:
-                    return True
-
-        # --------------------------------------------------------------------
-        def http_transfer_file(self, download_url, destination_file):
-            '''
-            Description:
-                Use http to transfer a file from a source location to a
-                destination file on the localhost.
-
-            Returns:
-                status_code - One of the following
-                            - 200, requests.codes['ok']
-                            - 404, requests.codes['not_found']:
-                            - 503, requests.codes['service_unavailable']:
-
-            Notes:
-                If a 503 is returned, the logged exception should be reviewed
-                to determine the real cause of the error.
-            '''
-
-            self.logger.info(download_url)
-
-            retry_attempt = 0
-            done = False
-            while not done:
-                status_code = requests.codes['ok']
-                try:
-
-                    done = self._stream_file(download_url,
-                                             destination_file)
-
-                    if done:
-                        self.logger.info("Transfer Complete - HTTP")
-
-                except Exception:
-                    self.logger.exception('HTTP - Transfer Issue')
-
-                    if status_code != requests.codes['not_found']:
-                        if retry_attempt > self.max_retries:
-                            self.logger.info('HTTP - Transfer Failed'
-                                             ' - exceeded retry limit')
-                            done = True
-                        else:
-                            retry_attempt += 1
-                            sleep(int(1.5 * retry_attempt))
-                    else:
-                        # Not Found - So break the looping because we are done
-                        done = True
-
-            return status_code
-
-
-# ============================================================================
-class System(object):
-    '''
-    Description:
-        Provides methods for interfacing with the local system.
-    '''
-
-    # ------------------------------------------------------------------------
-    @staticmethod
-    def execute_cmd(cmd):
-        '''
-        Description:
-            Execute a command line and return the terminal output or raise an
-            exception
-
-        Returns:
-            output - The stdout and/or stderr from the executed command.
-        '''
-
-        logger = logging.getLogger(__name__)
-
-        output = ''
-
-        logger.info('Executing [{0}]'.format(cmd))
-        (status, output) = commands.getstatusoutput(cmd)
-
-        if status < 0:
-            message = 'Application terminated by signal [{0}]'.format(cmd)
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        if status != 0:
-            message = 'Application failed to execute [{0}]'.format(cmd)
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        if os.WEXITSTATUS(status) != 0:
-            message = ('Application [{0}] returned error code [{1}]'
-                       .format(cmd, os.WEXITSTATUS(status)))
-            if len(output) > 0:
-                message = ' Stdout/Stderr is: '.join([message, output])
-            raise Exception(message)
-
-        return output
-
-    # ------------------------------------------------------------------------
-    @staticmethod
-    def create_directory(directory):
-        '''
-        Description:
-            Create the specified directory with some error checking.
-        '''
-
-        # Create/Make sure the directory exists
-        try:
-            os.makedirs(directory, mode=0755)
-        except OSError as ose:
-            if ose.errno == errno.EEXIST and os.path.isdir(directory):
-                pass
-            else:
-                raise
+from lst_auxiliary_utilities import Version, Config, Web, System
 
 
 # ============================================================================
@@ -291,46 +66,9 @@ class NARR_AuxProcessor(object):
         if not os.path.isdir(self.base_aux_dir):
             raise Exception('LST_AUX_DIR directory does not exist')
 
-        self.config = None
-        self.load_configuration()
-
         # Keep local copies of these
         self.s_date = s_date
         self.e_date = e_date
-
-    # ------------------------------------------------------------------------
-    def load_configuration(self):
-        '''
-        Description:
-            Loads the configuration defined in the config file and by the
-            environment.
-       '''
-
-        # The config file is located in the same place as the executable
-        cfg_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Add the filename to the path
-        cfg_file = os.path.join(cfg_dir, self.lst_aux_config_filename)
-
-        # Check if it exists
-        if not os.path.exists(cfg_file):
-            raise Exception('Configuration file [{0}] does not exist.'
-                            '  Please generate one.'.format(cfg_file))
-
-        # Load the file
-        with open(cfg_file, 'r') as fd:
-            lines = list()
-            for line in fd:
-                # Skip rudimentary comments
-                if line.strip().startswith('#'):
-                    continue
-
-                lines.append(line)
-
-            self.config = json.loads(' '.join(lines))
-
-        if self.config is None:
-            raise Exception('Failed loading configuration')
 
     # ------------------------------------------------------------------------
     def get_name_list(self):
@@ -345,14 +83,14 @@ class NARR_AuxProcessor(object):
             may have 1, 2, 3, or 4 days ... depending on the month and year.
         '''
 
-        name_format = self.config['remote_name_format']
+        name_format = Config.get('ucar.remote_name_format')
 
         days_3 = timedelta(days=3)
         c_date = self.s_date
 
         while c_date <= self.e_date:
             if c_date.day == 28:
-                (x, days) = calendar.monthrange(c_date.year, c_date.month)
+                days = calendar.monthrange(c_date.year, c_date.month)[1]
                 yield(name_format.format(c_date.year, c_date.month,
                                          c_date.day, days))
                 delta = timedelta(days=(days - 28 + 1))
@@ -379,9 +117,9 @@ class NARR_AuxProcessor(object):
         hour = int(parts[1][8:])
 
         # Figure out the filenames to create
-        hdr_name = (self.config['archive_name_format']
+        hdr_name = (Config.get('archive_name_format')
                     .format(variable, year, month, day, hour*100, 'hdr'))
-        grb_name = (self.config['archive_name_format']
+        grb_name = (Config.get('archive_name_format')
                     .format(variable, year, month, day, hour*100, 'grb'))
 
         # Create inventory/header file to extract the variable data
@@ -412,7 +150,7 @@ class NARR_AuxProcessor(object):
 
         # Determine the directory to place the data and create it if it does
         # not exist
-        dest_path = (self.config['archive_directory_format']
+        dest_path = (Config.get('archive_directory_format')
                      .format(self.base_aux_dir, year, month, day))
         System.create_directory(dest_path)
 
@@ -443,11 +181,11 @@ class NARR_AuxProcessor(object):
 
         # Establish a logged in session
         session = Web.Session(
-            block_size=self.config['http_transfer_block_size'])
+            block_size=Config.get('http_transfer_block_size'))
 
         # Log in
-        session.login(self.config['ucar_login_credentials']['login_url'],
-                      self.config['ucar_login_credentials']['login_data'])
+        session.login(Config.get('ucar.login_credentials.login_url'),
+                      Config.get('ucar.login_credentials.login_data'))
 
         for name in names:
             filename = '{0}.tar'.format(name)
@@ -455,7 +193,7 @@ class NARR_AuxProcessor(object):
 
             year = name[7:11]
 
-            url = self.config['ucar_url_format'].format(year, filename)
+            url = Config.get('ucar.url_format').format(year, filename)
 
             session.http_transfer_file(url, filename)
 
@@ -467,7 +205,7 @@ class NARR_AuxProcessor(object):
                 self.logger.info(grib_files)
 
             # For each parameter we need
-            for variable in self.config['narr_variables']:
+            for variable in Config.get('narr_variables'):
                 self.logger.info('Processing Variable [{0}]'.format(variable))
                 for grib_file in grib_files.split():
                     self.process_grib_for_variable(variable, grib_file)
@@ -489,6 +227,8 @@ def parse_commandline():
         Provide the command line definition and parsing.  Make sure the date
         information is good.
     '''
+
+    version_number = Version.version_number()
 
     # Create a command line arugment parser
     description = ('Downloads NARR data and extracts the required parameters'
@@ -527,7 +267,7 @@ def parse_commandline():
 
     parser.add_argument('--version',
                         action='version',
-                        version='%(prog)s 0.0.1',
+                        version='%(prog)s {0}'.format(version_number),
                         help='Displays the version of the software.')
 
     # Parse the command line parameters
@@ -565,6 +305,10 @@ def parse_commandline():
 
 # ============================================================================
 def main():
+    '''
+    Description:
+        Provides the setup and executaion of the processor for the application.
+    '''
 
     # Setup the default logger format and level. log to STDOUT
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
