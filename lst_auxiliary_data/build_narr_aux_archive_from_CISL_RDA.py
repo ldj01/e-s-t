@@ -36,7 +36,8 @@ import calendar
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 
-from lst_auxiliary_utilities import Version, Config, Web, System
+from lst_auxiliary_utilities import (Version, Config, Web, System,
+                                     input_date_validation)
 
 
 # ============================================================================
@@ -242,26 +243,23 @@ def parse_commandline():
 
     # ---- Add parameters ----
     parser.add_argument('--start-date',
-                        action='store',
-                        dest='start_date',
-                        metavar='DATE',
+                        action='store', dest='start_date',
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
                         help=('The start date YYYYMMDD(inclusive)'
                               ' if specifying a range.'
                               '  Defaults to --end-date if not specified.'))
 
     parser.add_argument('--end-date',
-                        action='store',
-                        dest='end_date',
-                        metavar='DATE',
+                        action='store', dest='end_date',
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
                         help=('The end date YYYYMMDD(inclusive)'
                               ' if specifying a range.'))
 
     parser.add_argument('--date',
-                        action='store',
-                        dest='date',
-                        metavar='DATE',
+                        action='store', dest='date',
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
                         help='The date YYYYMMDD for a specific date.')
 
@@ -278,14 +276,14 @@ def parse_commandline():
 
     # Check if dates were given
     if args.date is not None:
-        s_date = datetime.strptime(args.date, '%Y%m%d')
-        e_date = datetime.strptime(args.date, '%Y%m%d')
+        s_date = args.date
+        e_date = args.date
 
     elif args.end_date is not None:
-        e_date = datetime.strptime(args.end_date, '%Y%m%d')
+        e_date = args.end_date
 
         if args.start_date is not None:
-            s_date = datetime.strptime(args.start_date, '%Y%m%d')
+            s_date = args.start_date
 
         else:
             s_date = e_date
