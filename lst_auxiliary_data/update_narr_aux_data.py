@@ -35,7 +35,8 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from datetime import datetime, timedelta, date
 import collections
 
-from lst_auxiliary_utilities import Config, Web, System
+from lst_auxiliary_utilities import (Version, Config, Web, System,
+                                     input_date_validation)
 
 
 class Ncep(object):
@@ -466,6 +467,7 @@ def update(data_to_be_updated):
             data_to_be_updated exist in archive directory
         No temporary files exist in the working directory
     '''
+
     for data in data_to_be_updated:
         try:
             data.get_grib_file()
@@ -484,13 +486,12 @@ def report(data_to_report):
         Includes header to describe data being output.
         Reports [measured time, internal mtime, external mtime] as csv
     '''
+
     # Statements helpful for debugging
     logger = logging.getLogger(__name__)
-    logger.debug('\n'.join(Ncep.get_list_of_external_data()))
-    logger.debug(Ncep.get_dict_of_date_modified())
 
     report_msg = []
-    report_msg.append('Measured, UpdatedLocally, UpdatedOnline')  # Header
+    report_msg.append('Measured, Local TimeStamp, Remote TimeStamp')  # Header
 
     for data in data_to_report:
         line = []
@@ -508,27 +509,16 @@ def report(data_to_report):
 
         report_msg.append(', '.join(line))
 
-    return '\n'.join(report_msg)
-
-
-def report_between_dates(start_date, end_date):
-    '''TODO TODO TODO'''
-    data = NarrData.get_next_narr_data_gen(start_date, end_date)
-    return report(list(data))
-
-
-def YYYYMMDD_date(datestring):
-    '''TODO TODO TODO'''
-    try:
-        return datetime.strptime(datestring, '%Y%m%d').date()
-    except ValueError:
-        logger = logging.getLogger(__name__)
-        logger.error('Dates must be the in the format: "YYYYMMDD"')
-        raise
+    print ('\n'.join(report_msg))
 
 
 def parse_arguments():
-    '''TODO TODO TODO'''
+    '''
+    Description:
+        Parses arguments from the command line.
+    '''
+
+    version_number = Version.version_number()
 
     # Create a command line arugment parser
     description = ('Downloads LST auxillary inputs, then archives them for'
@@ -539,7 +529,7 @@ def parse_arguments():
     # ---- Add parameters ----
     parser.add_argument('--start-date',
                         action='store', dest='start_date',
-                        metavar='YYYYMMDD', type=YYYYMMDD_date,
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
                         default=date.today()-timedelta(days=10),
                         help='The start date of the date range of auxiliary'
@@ -547,17 +537,22 @@ def parse_arguments():
 
     parser.add_argument('--end-date',
                         action='store', dest='end_date',
-                        metavar='YYYYMMDD', type=YYYYMMDD_date,
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False, default=date.today(),
                         help='The end date of the date range of auxiliary'
                              ' data to download.')
 
     parser.add_argument('--date',
                         action='store', dest='date',
-                        metavar='YYYYMMDD', type=YYYYMMDD_date,
+                        metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
                         help='Sets both start and end date to this date.'
                              ' Overrides start-date and end-date arguments.')
+
+    parser.add_argument('--report',
+                        action='store_true', dest='report',
+                        default=False,
+                        help='Only report what will happen.')
 
     parser.add_argument('--verbose',
                         action='store_true', dest='verbose',
@@ -571,7 +566,7 @@ def parse_arguments():
 
     parser.add_argument('--version',
                         action='version',
-                        version='%(prog)s 0.0.1',
+                        version='%(prog)s {0}'.format(version_number),
                         help='Displays the version of the software.')
 
     # Parse the command line parameters
@@ -585,34 +580,17 @@ def parse_arguments():
     return args
 
 
-def main(start_date, end_date):
-    '''Ensures all data between start_date and end_date are up to date.
-
-    Precondition:
-        start_date and end_date are of type datetime.datetime
-        start_date and end_date can also be of type datetime.date
+def setup_logging(debug_logging, verbose_logging):
     '''
-    logger = logging.getLogger(__name__)
-
-    # Determine the data that exists within the date range
-    data = NarrData.get_next_narr_data_gen(start_date, end_date)
-
-    # Determine which files are stale or missing internally.
-    data_to_be_updated = filter(lambda x: x.need_to_update(), data)
-    if len(data_to_be_updated) == 0:
-        logger.warning('No data found for updating archive')
-    else:
-        logger.info('Will download {0} files'.format(len(data_to_be_updated)))
-    update(data_to_be_updated)
-
-
-if __name__ == '__main__':
-    cmd_args = parse_arguments()
+    Description:
+        Configures the logging for this script based on some command line
+        parameters.
+    '''
 
     log_level = logging.WARN
-    if cmd_args.debug:
+    if debug_logging:
         log_level = logging.DEBUG
-    elif cmd_args.verbose:
+    elif verbose_logging:
         log_level = logging.INFO
 
     # Setup the default logger format and level. log to STDOUT
@@ -628,4 +606,44 @@ if __name__ == '__main__':
     logging.getLogger("requests").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-    main(cmd_args.start_date, cmd_args.end_date)
+
+def main():
+    '''
+    Description:
+        Ensures all data between start_date and end_date are up to date.
+
+    Precondition:
+        start_date and end_date are of type datetime.datetime
+        start_date and end_date can also be of type datetime.date
+    '''
+
+    cmd_args = parse_arguments()
+
+    setup_logging(cmd_args.debug, cmd_args.verbose)
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Determine the data that exists within the date range
+        data = NarrData.get_next_narr_data_gen(cmd_args.start_date,
+                                               cmd_args.end_date)
+
+        # Determine which files are stale or missing internally.
+        data_to_be_updated = filter(lambda x: x.need_to_update(), data)
+        if len(data_to_be_updated) == 0:
+            logger.warning('No data found for updating archive')
+        else:
+            logger.info('Will download {0} files'.format(len(data_to_be_updated)))
+        if cmd_args.report:
+            report(list(data_to_be_updated))
+        else:
+            update(data_to_be_updated)
+
+    except Exception:
+        logger.exception('Processing Failed')
+        sys.exit(1)  # EXIT FAILURE
+
+    sys.exit(0)  # EXIT SUCCESS
+
+if __name__ == '__main__':
+    main()
