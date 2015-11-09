@@ -17,8 +17,21 @@ import errno
 import commands
 import requests
 from time import sleep
+from datetime import datetime
 from contextlib import closing
 import json
+
+
+# ============================================================================
+def input_date_validation(datestring):
+    '''Validates the input date string to be a specified format'''
+
+    try:
+        return datetime.strptime(datestring, '%Y%m%d').date()
+    except ValueError:
+        logger = logging.getLogger(__name__)
+        logger.error('Dates must be the in the format: "YYYYMMDD"')
+        raise
 
 
 # ============================================================================
