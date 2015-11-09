@@ -29,3 +29,13 @@ if [ -z "$XML2INC" ]; then
     export XML2LIB=${base_path}/libxml2/lib
 fi
 
+if [ -z "$LZMALIB" ]; then
+    export LZMAINC=${base_path}/xz/include
+    export LZMALIB=${base_path}/xz/lib
+fi
+
+if [ -z "$ZLIBLIB" ]; then
+    export ZLIBINC=${base_path}/zlib/include
+    export ZLIBLIB=${base_path}/zlib/lib
+fi
+
