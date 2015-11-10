@@ -519,6 +519,7 @@ def parse_arguments():
     '''
 
     version_number = Version.version_number()
+    default_date_range = int(Config.get('default_date_range'))
 
     # Create a command line arugment parser
     description = ('Downloads LST auxillary inputs, then archives them for'
@@ -531,14 +532,16 @@ def parse_arguments():
                         action='store', dest='start_date',
                         metavar='YYYYMMDD', type=input_date_validation,
                         required=False,
-                        default=date.today()-timedelta(days=10),
+                        default=(date.today() -
+                                 timedelta(days=default_date_range)),
                         help='The start date of the date range of auxiliary'
                              ' data to download.')
 
     parser.add_argument('--end-date',
                         action='store', dest='end_date',
                         metavar='YYYYMMDD', type=input_date_validation,
-                        required=False, default=date.today(),
+                        required=False,
+                        default=date.today(),
                         help='The end date of the date range of auxiliary'
                              ' data to download.')
 
@@ -633,7 +636,8 @@ def main():
         if len(data_to_be_updated) == 0:
             logger.warning('No data found for updating archive')
         else:
-            logger.info('Will download {0} files'.format(len(data_to_be_updated)))
+            logger.info('Will download {0} files'.
+                        format(len(data_to_be_updated)))
         if cmd_args.report:
             report(list(data_to_be_updated))
         else:
