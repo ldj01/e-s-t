@@ -34,7 +34,7 @@ import shutil
 import logging
 import calendar
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from lst_auxiliary_utilities import (Version, Config, Web, System,
                                      input_date_validation)
@@ -307,6 +307,9 @@ def main():
     Description:
         Provides the setup and executaion of the processor for the application.
     '''
+
+    # The config file is located in the same place as this script
+    Config.read_config(os.path.dirname(__file__))
 
     # Setup the default logger format and level. log to STDOUT
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'

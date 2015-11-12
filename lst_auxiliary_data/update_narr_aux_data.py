@@ -620,6 +620,9 @@ def main():
         start_date and end_date can also be of type datetime.date
     '''
 
+    # The config file is located in the same place as this script
+    Config.read_config(os.path.dirname(__file__))
+
     cmd_args = parse_arguments()
 
     setup_logging(cmd_args.debug, cmd_args.verbose)

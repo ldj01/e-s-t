@@ -312,15 +312,11 @@ class System(object):
 
 
 class Config(object):
-    '''Provides access to configurable attributes of the script
+    '''
+    Description:
+        Provides access to configurable attributes of the script
 
-    Provides transparent access to settings from configuration
-        1.Settings are specified as a json object stored in a file.
-            read_config will be used to insert these into Config.config dict.
-        2.Settings can be defined in the dictionary, Config.config, as
-            key/value pairs.
-
-    Beware: read_config will overwrite the contents of the configuration file
+        Configuration items are specified as a json objects stored in a file.
     '''
 
     config_directory = None
@@ -329,12 +325,12 @@ class Config(object):
     config = None  # Holds result of reading json object from file.
 
     @classmethod
-    def read_config(cls):
+    def read_config(cls, config_directory):
         '''Reads configurable options from a file'''
 
         # The config file is located in the same place as the executable
         if cls.config_directory is None:
-            cls.config_directory = os.path.dirname(os.path.abspath(__file__))
+            cls.config_directory = config_directory
 
         # Add the filename to the path
         if cls.config_path is None:
@@ -353,13 +349,15 @@ class Config(object):
             cls.config = json.loads(' '.join(lines))
 
         if cls.config is None:
-            raise Exception('Failed loading configuration')
+            raise RuntimeError('Failed loading configuration')
 
         return cls.config
 
     @classmethod
     def get(cls, attribute_path):
-        '''Get the value of a configurable setting
+        '''
+        Description:
+            Get the value of a configurable setting.
 
             First it will try to read json data from the config file.
             If file does not exist then onfig will be from default values.
@@ -370,7 +368,7 @@ class Config(object):
         logger = logging.getLogger(__name__)
 
         if cls.config is None:
-            cls.config = cls.read_config()
+            raise RuntimeError('Configuration Not Initialized')
 
         logger.debug('Searching Config For - {0}'.format(attribute_path))
 
