@@ -364,8 +364,8 @@ class NarrData(object):
         grb_name = self.get_internal_filename(variable, 'grb')
 
         if os.path.isfile(grb_name) and os.path.isfile(hdr_name):
-            logger.warning('{0} and {1} already exist. Skipping extraction.'
-                           .format(hdr_name, grb_name))
+            logger.info('{0} and {1} already exist. Skipping extraction.'
+                        .format(hdr_name, grb_name))
             return
         logger.info("Processing [{0}]".format(grib_file))
 
@@ -486,9 +486,6 @@ def report(data_to_report):
         Includes header to describe data being output.
         Reports [measured time, internal mtime, external mtime] as csv
     '''
-
-    # Statements helpful for debugging
-    logger = logging.getLogger(__name__)
 
     report_msg = []
     report_msg.append('Measured, Local TimeStamp, Remote TimeStamp')  # Header
@@ -637,7 +634,7 @@ def main():
         # Determine which files are stale or missing internally.
         data_to_be_updated = filter(lambda x: x.need_to_update(), data)
         if len(data_to_be_updated) == 0:
-            logger.warning('No data found for updating archive')
+            logger.info('No data found for updating archive')
         else:
             logger.info('Will download {0} files'.
                         format(len(data_to_be_updated)))
