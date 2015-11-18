@@ -55,7 +55,7 @@ rm -rf %{clonedname}
 git clone --depth 1 --branch %{tagname} %{url} %{clonedname}
 # Build the applications
 cd %{clonedname}
-make BUILD_TYPE=-static
+make BUILD_STATIC=yes
 
 
 # ----------------------------------------------------------------------------
