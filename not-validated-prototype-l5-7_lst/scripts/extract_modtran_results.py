@@ -52,12 +52,15 @@ class ExtractModtranResults(object):
 
         target_pixel_surface_temp = None
 
-        # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
+        # Search for the AREA-AVERAGED GROUND TEMPERATURE [K]
+        # Also called IMAGED-PIXEL (H2ALT) SURFACE TEMPERATURES [K]
+        # We are only performing the MODTRAN operation on one pixel and the
+        # AREA-AVERAGED is easier to extract
         for line in tape6_fd:
             # Remove all whitespace and newlines
             line = ' '.join(line.strip().split())
 
-            if line.startswith('TARGET-PIXEL (H2) SURFACE TEMPERATURE [K]'):
+            if line.startswith('AREA-AVERAGED GROUND TEMPERATURE [K]'):
                 target_pixel_surface_temp = (
                     float(list(reversed(line.split()))[0]))
                 break
@@ -177,7 +180,10 @@ class ExtractModtranResults(object):
                     records.write(line)
                     record_count += 1
 
-        # Search for the TARGET-PIXEL (H2) SURFACE TEMPERATURE
+        # Search for the AREA-AVERAGED GROUND TEMPERATURE [K]
+        # Also called IMAGED-PIXEL (H2ALT) SURFACE TEMPERATURES [K]
+        # We are only performing the MODTRAN operation on one pixel and the
+        # AREA-AVERAGED is easier to extract
         with open(tape6_filename, 'r') as tape6_fd:
             # Retreive the value from the tape6 file
             target_pixel_surface_temp = self._extract_tpst(tape6_fd)
