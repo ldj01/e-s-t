@@ -14,8 +14,8 @@
 
 # ----------------------------------------------------------------------------
 Name:		espa-land-surface-temperature
-Version:	0.0.1
-Release:	3%{?dist}
+Version:	0.0.2
+Release:	1%{?dist}
 Summary:	ESPA Land Surface Temperature Software
 
 Group:		ESPA
@@ -26,8 +26,8 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch:	x86_64
 Packager:	USGS EROS LSRD
 
-BuildRequires:	espa-common
-Requires:	espa-common >= 1.5.0
+BuildRequires:	espa-product-formatter
+Requires:	espa-product-formatter >= 1.6.0
 
 
 # ----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ Provides science application executables for generating land surface temperature
 
 # ----------------------------------------------------------------------------
 # Specify the repository tag/branch to clone and build from
-%define tagname dev_v0.0.1
+%define tagname dev_v0.0.2
 # Specify the name of the directory to clone into
 %define clonedname %{name}-%{tagname}
 
@@ -84,9 +84,11 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
+* Mon Jan 25 2016 Ronald D Dilley <rdilley@usgs.gov>
+- Updated for Mar 2016 release
+
 * Wed Dec 02 2015 Ronald D Dilley <rdilley@usgs.gov>
 - Changed release number for a recompile against the product formatter for Dec 2015 release
-
 * Thu Nov 19 2015 Ronald D Dilley <rdilley@usgs.gov>
 - Build for Dec 2015 release
 - Initial implementation
