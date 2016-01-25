@@ -36,7 +36,7 @@ class Version(object):
         Provides methods for retrieving version information.
     '''
 
-    version = '0.0.1'
+    version = '0.0.2'
 
     # ------------------------------------------------------------------------
     @staticmethod
