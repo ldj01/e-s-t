@@ -1,7 +1,7 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.0.1 Release Notes
-Release Date: Dec XX, 2015
+## Land Surface Temperature 0.0.2 Release Notes
+Release Date: Mar XX, 2016
 
 This application produces Land Surface Temperature products for Landsats 5, and 7.
 
@@ -9,7 +9,7 @@ This application produces Land Surface Temperature products for Landsats 5, and 
 See the [PLACE HOLDER](butter) product guide for information about the Land Surface Temeprature products.
 
 ## Release Notes
-* Initial implementation
+* Version Change
 
 ## Installation
 
