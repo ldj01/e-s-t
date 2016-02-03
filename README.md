@@ -1,7 +1,7 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
 ## Land Surface Temperature 0.0.2 Release Notes
-Release Date: Mar XX, 2016
+Release Date: March 2016
 
 This application produces Land Surface Temperature products for Landsats 5, and 7.
 
