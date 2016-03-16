@@ -29,6 +29,7 @@
 typedef enum
 {
     SAT_NULL = -1,
+    SAT_LANDSAT_4,
     SAT_LANDSAT_5,
     SAT_LANDSAT_7,
     SAT_LANDSAT_8,

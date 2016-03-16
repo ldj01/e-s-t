@@ -310,7 +310,11 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     input->thermal.fill_value = INPUT_FILL;
 
     /* Determine satellite */
-    if (strcmp (global->satellite, "LANDSAT_5") == 0)
+    if (strcmp (global->satellite, "LANDSAT_4") == 0)
+    {
+        input->meta.satellite = SAT_LANDSAT_4;
+    }
+    else if (strcmp (global->satellite, "LANDSAT_5") == 0)
     {
         input->meta.satellite = SAT_LANDSAT_5;
     }
@@ -352,7 +356,8 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     /* Check satellite/instrument combination */
     if (input->meta.instrument == INST_TM)
     {
-        if (input->meta.satellite != SAT_LANDSAT_5)
+        if (input->meta.satellite != SAT_LANDSAT_4 &&
+            input->meta.satellite != SAT_LANDSAT_5)
         {
             RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
         }
