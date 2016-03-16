@@ -6,7 +6,7 @@
 #include <math.h>
 
 
-#define LST_VERSION "0.0.2"
+#define LST_VERSION "0.0.3"
 #define LST_NO_DATA_VALUE (-9999.0)
 
 

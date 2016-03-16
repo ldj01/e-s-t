@@ -29,7 +29,7 @@ class Version(object):
         Provides methods for retrieving version information.
     '''
 
-    version = '0.0.2'
+    version = '0.0.3'
 
     @staticmethod
     def version_number():
@@ -47,8 +47,7 @@ class Version(object):
             Returns the version information as a spelled out string.
         '''
 
-        msg = ('Landsat 5 and 7 - Land Surface Temperature - Version {0}'
-               .format(Version.version))
+        msg = 'Land Surface Temperature - Version {0}'.format(Version.version)
         return msg
 
     @staticmethod
@@ -58,7 +57,7 @@ class Version(object):
             Returns the version information.
         '''
 
-        version_text = 'l5-7_lst_{0}'.format(Version.version)
+        version_text = 'lst_{0}'.format(Version.version)
         return version_text
 
 

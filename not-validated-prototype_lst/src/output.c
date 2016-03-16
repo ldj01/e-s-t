@@ -137,7 +137,7 @@ add_lst_band_product
     bmeta[0].pixel_size[1] = in_meta.band[src_index].pixel_size[1];
     snprintf (bmeta[0].pixel_units, sizeof (bmeta[0].pixel_units), "meters");
     snprintf (bmeta[0].app_version, sizeof (bmeta[0].app_version),
-              "l5-7_lst_%s", LST_VERSION);
+              "lst_%s", LST_VERSION);
     snprintf (bmeta[0].production_date, sizeof (bmeta[0].production_date),
               production_date);
     bmeta[0].data_type = ESPA_FLOAT32;
