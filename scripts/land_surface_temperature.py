@@ -12,12 +12,14 @@
     AUTHOR: ngenetzky@usgs.gov
 
     NOTES:
-        This script does not have its own help message and will just return the
-            help from underlying executables where appropriate.
+        This script does not have its own help message and will just return
+        the help from underlying executables where appropriate.
+
         If this script has a required argument then only the usage for that
-            argument will be shown if that argument is not included.
-        All output from the underlying script will be given to the logger as an
-            info message.
+        argument will be shown if that argument is not included.
+
+        All output from the underlying script will be given to the logger as
+        an info message.
 '''
 
 import os
@@ -75,11 +77,12 @@ def parse_cmd_line():
 
     Precondition:
         '--xml FILENAME' exists in command line arguments
+
     Postcondition:
         returns xml_filename
 
-    Note: Help is not included because the program will return
-          the help from the underlying program.
+    Note: Help is not included because the program will return the help from
+          the underlying program.
     '''
 
     # Try to parse out the XML so the application can be determined
