@@ -10,12 +10,6 @@
              (LSRD) at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    Sep/2015          Initial implementation
 '''
 
 import os
@@ -32,7 +26,6 @@ import lst_utilities as util
 from lst_environment import Environment
 
 
-# ----------------------------------------------------------------------------
 class AuxNARRGribProcessor(object):
     '''
     Description:
@@ -63,7 +56,6 @@ class AuxNARRGribProcessor(object):
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
-    # ------------------------------------------------------------------------
     def extract_grib_data(self, hdr_path, grb_path, output_dir):
         '''
         Description:
@@ -104,7 +96,6 @@ class AuxNARRGribProcessor(object):
                     if len(output) > 0:
                         self.logger.info(output)
 
-    # ------------------------------------------------------------------------
     def extract_aux_data(self):
         '''
         Description:
@@ -198,7 +189,6 @@ class AuxNARRGribProcessor(object):
             self.extract_grib_data(hdr_2_path, grb_2_path, output_dir)
 
 
-# ----------------------------------------------------------------------------
 def main():
     '''
     Description:
@@ -279,7 +269,6 @@ def main():
     logger.info('Completed extraction of auxiliary NARR data')
 
 
-# ----------------------------------------------------------------------------
 if __name__ == '__main__':
     '''
     Description:

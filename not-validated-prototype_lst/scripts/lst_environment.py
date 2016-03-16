@@ -8,19 +8,12 @@
              (LSRD) at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    Sept/2015          Initial implementation
 '''
 
 
 import os
 
 
-# ----------------------------------------------------------------------------
 class Environment(object):
     '''
     Description:

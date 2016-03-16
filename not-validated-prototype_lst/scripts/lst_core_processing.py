@@ -9,12 +9,6 @@
              (LSRD) at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    Jan/2015          Initial implementation
 '''
 
 import os
@@ -32,7 +26,6 @@ import estimate_landsat_emissivity
 import build_lst_data
 
 
-# ============================================================================
 def generate_lst(xml_filename,
                  only_extract_aux_data=False,
                  keep_lst_temp_data=False,
@@ -46,7 +39,6 @@ def generate_lst(xml_filename,
     # Get the logger
     logger = logging.getLogger(__name__)
 
-    # ------------------------------------------------------------------------
     # Retrieval and initial processing of the required AUX data
     try:
         logger.info('Extracting LST AUX data')
@@ -67,7 +59,6 @@ def generate_lst(xml_filename,
     # ESPA creates the DEM for us
     dem_filename = '{0}_dem.img'.format(input_id)
 
-    # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
     # the atmospheric transmittance band
     cmd = ['lst_intermediate_data',
@@ -89,7 +80,6 @@ def generate_lst(xml_filename,
         if len(output) > 0:
             logger.info(output)
 
-    # ------------------------------------------------------------------------
     # Generate Estimated Landsat Emissivity band
     try:
         current_processor = (
@@ -100,7 +90,6 @@ def generate_lst(xml_filename,
         logger.error('Failed creating Estimated Landsat Emissivity data')
         raise
 
-    # ------------------------------------------------------------------------
     # Generate Land Surface Temperature band
     try:
         current_processor = build_lst_data.BuildLSTData(xml_filename)
@@ -109,7 +98,6 @@ def generate_lst(xml_filename,
         logger.error('Failed processing Land Surface Temperature')
         raise
 
-    # ------------------------------------------------------------------------
     # Cleanup
     if not keep_intermediate_data:
 
@@ -138,7 +126,6 @@ def generate_lst(xml_filename,
         util.Metadata.remove_products(xml_filename, ['lst_temp'])
 
 
-# ============================================================================
 if __name__ == '__main__':
     '''
     Description:

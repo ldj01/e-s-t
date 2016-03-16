@@ -10,12 +10,6 @@
              (LSRD) at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    Jan/2015          Initial implementation
 '''
 
 import os
@@ -41,7 +35,6 @@ class ExtractModtranResults(object):
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
-    # ------------------------------------------------------------------------
     @classmethod
     def _extract_tpst(cls, tape6_fd):
         '''
@@ -67,7 +60,6 @@ class ExtractModtranResults(object):
 
         return target_pixel_surface_temp
 
-    # ------------------------------------------------------------------------
     def _create_output(self, target_pixel_surface_temp, record_count, records):
         '''
         Description:
@@ -88,7 +80,6 @@ class ExtractModtranResults(object):
             radiance_info_fd.write('RADIANCE_RECORD_COUNT {0}\n'
                                    .format(record_count))
 
-    # ------------------------------------------------------------------------
     def process_tape6_results(self):
         '''
         Description:
@@ -148,7 +139,6 @@ class ExtractModtranResults(object):
 
         records.close()
 
-    # ------------------------------------------------------------------------
     def process_pltout_results(self):
         '''
         Description:
@@ -193,7 +183,6 @@ class ExtractModtranResults(object):
         records.close()
 
 
-# ============================================================================
 if __name__ == '__main__':
     '''
     Description:

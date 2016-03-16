@@ -23,10 +23,6 @@
         Research Scientist
         NASA Jet Propulsion Laboratory
         email: Simon.J.Hook@jpl.nasa.gov
-
-    Date              Programmer               Reason
-    ----------------  ------------------------ -------------------------------
-    June/2015         Ron Dilley               Initial implementation
 '''
 
 import os
@@ -48,7 +44,6 @@ import metadata_api
 import lst_utilities as util
 
 
-# ============================================================================
 class EstimateLandsatEmissivity(object):
     '''
     Description:
@@ -56,7 +51,6 @@ class EstimateLandsatEmissivity(object):
         product.
     '''
 
-    # ------------------------------------------------------------------------
     class LandsatSourceInfo(object):
         '''
         Description:
@@ -78,7 +72,6 @@ class EstimateLandsatEmissivity(object):
             self.max_y_extent = None
             self.dest_proj4 = None
 
-    # ------------------------------------------------------------------------
     def __init__(self, xml_filename, keep_intermediate_data=False):
         super(EstimateLandsatEmissivity, self).__init__()
 
@@ -138,7 +131,6 @@ class EstimateLandsatEmissivity(object):
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
-    # ------------------------------------------------------------------------
     def extract_aster_data(self, emis_ds_name, ndvi_ds_name,
                            lat_ds_name, lon_ds_name):
         '''
@@ -217,7 +209,6 @@ class EstimateLandsatEmissivity(object):
         return (aster_b13_data, aster_b14_data, aster_ndvi_data,
                 aster_lat_data, aster_lon_data, x_dim, y_dim)
 
-    # ------------------------------------------------------------------------
     def warp_raster_to_match_ls_data(self, src_name, dest_name):
         '''
         Description:
@@ -254,7 +245,6 @@ class EstimateLandsatEmissivity(object):
             if len(output) > 0:
                 self.logger.info(output)
 
-    # ------------------------------------------------------------------------
     def build_ls_emis_data(self, driver):
         '''
         Description:
@@ -525,7 +515,6 @@ class EstimateLandsatEmissivity(object):
 
         return (ls_emis_warped_name, aster_ndvi_warped_name)
 
-    # ------------------------------------------------------------------------
     def retrieve_metadata_information(self):
         '''
         Description:
@@ -622,7 +611,6 @@ class EstimateLandsatEmissivity(object):
         del gm
         del espa_xml
 
-    # ------------------------------------------------------------------------
     def determine_sensor_specific_coefficients(self):
         if self.satellite == 'LANDSAT_5':
             self.estimated_coeff_1 = 0.305
@@ -857,7 +845,6 @@ class EstimateLandsatEmissivity(object):
                                           self.no_data_value,
                                           gdal.GDT_Float32)
 
-
         # Soil - From prototype code variable name
         ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
                          (1.0 - aster_ndvi_data))
@@ -979,7 +966,6 @@ class EstimateLandsatEmissivity(object):
         self.logger.info('Completed - Estimate Landsat Emissivity')
 
 
-# ============================================================================
 if __name__ == '__main__':
     '''
     Description:

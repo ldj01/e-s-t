@@ -8,12 +8,6 @@
              (LSRD) at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
-
-    HISTORY:
-
-    Date              Reason
-    ----------------  --------------------------------------------------------
-    July/2015         Initial implementation
 '''
 
 import os
@@ -29,7 +23,6 @@ from time import sleep
 import metadata_api
 
 
-# ============================================================================
 class Version(object):
     '''
     Description:
@@ -38,7 +31,6 @@ class Version(object):
 
     version = '0.0.2'
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def version_number():
         '''
@@ -48,7 +40,6 @@ class Version(object):
 
         return Version.version
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def version_text():
         '''
@@ -60,7 +51,6 @@ class Version(object):
                .format(Version.version))
         return msg
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def app_version():
         '''
@@ -72,14 +62,12 @@ class Version(object):
         return version_text
 
 
-# ============================================================================
 class System(object):
     '''
     Description:
         Provides methods for interfacing with the host server.
     '''
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def execute_cmd(cmd):
         '''
@@ -119,7 +107,6 @@ class System(object):
 
         return output
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def create_directory(directory):
         '''
@@ -137,14 +124,12 @@ class System(object):
                 raise
 
 
-# ============================================================================
 class Metadata(object):
     '''
     Description:
         Provides methods for interfacing with our metadata XML file.
     '''
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def remove_products(xml_filename, product_list):
         '''
@@ -195,14 +180,12 @@ class Metadata(object):
         del espa_xml
 
 
-# ============================================================================
 class Web(object):
     '''
     Description:
         Provides methods for interfacing with web resources.
     '''
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def http_transfer_file(download_url, destination_file, headers=None):
         '''
@@ -296,7 +279,6 @@ class Warp(object):
     y_pixel_min = 0.5
     y_pixel_max = 1000.0
 
-    # ------------------------------------------------------------------------
     def __init__(self):
         self.base_cmd = ['gdalwarp', '-wm', '2048', '-multi']
 
@@ -318,7 +300,6 @@ class Warp(object):
         self.source_files = None
         self.target_file = None
 
-    # ------------------------------------------------------------------------
     def set_output_pixel_size(x_pixel_size, y_pixel_size):
         if x_pixel_size < 0.5 or x_pixel_size > 1000.0:
             raise Exception('X pixel_size out of range [{0} - {1}]'
@@ -331,27 +312,21 @@ class Warp(object):
         self.x_pixel_size = x_pixel_size
         self.y_pixel_size = y_pixel_size
 
-    # ------------------------------------------------------------------------
     def set_source_proj4(source_proj4):
         self.source_proj4 = source_proj4
 
-    # ------------------------------------------------------------------------
     def set_target_proj4(target_proj4):
         self.target_proj4 = target_proj4
 
-    # ------------------------------------------------------------------------
     def set_source_no_data_value(no_data_value):
         self.source_no_data_value = float(no_data_value)
 
-    # ------------------------------------------------------------------------
     def set_target_no_data_value(no_data_value):
         self.target_no_data_value = float(no_data_value)
 
-    # ------------------------------------------------------------------------
     def overwrite_target(true_false):
         self.overwrite_target = true_false
 
-    # ------------------------------------------------------------------------
     def set_output_format(format):
 
         if format not in self.supported_output_formats:
@@ -360,15 +335,12 @@ class Warp(object):
 
         self.output_format = format
 
-    # ------------------------------------------------------------------------
     def set_source_files(source_files):
         self.source_files = source_files
 
-    # ------------------------------------------------------------------------
     def set_target_file(target_file):
         self.target_file = target_file
 
-    # ------------------------------------------------------------------------
     def execute(self):
         if self.source_files is None:
             raise Exception('Source file(s) not specified')
@@ -389,14 +361,12 @@ class Warp(object):
         print ' '.join(cmd)
 
 
-# ============================================================================
 class Geo(object):
     '''
     Description:
         Provides methods for interfacing with geographic projections.
     '''
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def get_proj4_projection_string(img_filename):
         '''
@@ -422,7 +392,6 @@ class Geo(object):
 
         return proj4
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def update_envi_header(hdr_file_path, no_data_value):
         '''
@@ -463,7 +432,6 @@ class Geo(object):
         with open(hdr_file_path, 'w') as tmp_fd:
             tmp_fd.write(hdr_text.getvalue())
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def generate_raster_file(driver, filename, data, x_dim, y_dim,
                              geo_transform, proj_wkt,
@@ -496,7 +464,6 @@ class Geo(object):
         except Exception:
             raise
 
-    # ------------------------------------------------------------------------
     @staticmethod
     def mosaic_tiles_into_one_raster(src_names, dest_name, no_data_value):
         '''
