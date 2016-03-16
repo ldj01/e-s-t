@@ -258,13 +258,21 @@ class BuildLSTData(object):
 
         # Use Brightness Temperature LUT to get skin temperature
         # Read the correct one for what we are processing
-        if self.satellite == 'LANDSAT_7':
+        if self.satellite == 'LANDSAT_8':
+            self.logger.info('Using Landsat 8 Brightness Temperature LUT')
+            bt_name = 'L8_Brightness_Temperature_LUT.txt'
+
+        elif self.satellite == 'LANDSAT_7':
             self.logger.info('Using Landsat 7 Brightness Temperature LUT')
             bt_name = 'L7_Brightness_Temperature_LUT.txt'
 
         elif self.satellite == 'LANDSAT_5':
             self.logger.info('Using Landsat 5 Brightness Temperature LUT')
             bt_name = 'L5_Brightness_Temperature_LUT.txt'
+
+        elif self.satellite == 'LANDSAT_4':
+            self.logger.info('Using Landsat 4 Brightness Temperature LUT')
+            bt_name = 'L4_Brightness_Temperature_LUT.txt'
 
         bt_data = np.loadtxt(os.path.join(self.lst_data_dir, bt_name),
                              dtype=float, delimiter=' ')
