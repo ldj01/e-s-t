@@ -716,10 +716,11 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
 *****************************************************************************/
+#define L4_TM_SRS_COUNT (171)
 #define L5_TM_SRS_COUNT (171)
-#define L7_TM_SRS_COUNT (47)
+#define L7_TM_SRS_COUNT (172)
 #define L8_OLITIRS_SRS_COUNT (101)
-#define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
+#define MAX_SRS_COUNT (L7_TM_SRS_COUNT)
 /* This emissivity/albedo is for water */
 #define WATER_ALBEDO (0.1)
 #define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
@@ -728,7 +729,7 @@ int calculate_point_atmospheric_parameters
 (
     Input_t *input,            /* I: Input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
-    double **modtran_results,  /* O: Atmospheric parameters from modtran runs */
+    double **modtran_results,  /* O: Atmospheric parameters from modtran */
     bool verbose               /* I: Value to indicate if intermediate
                                      messages should be printed */
 )
@@ -798,6 +799,14 @@ int calculate_point_atmospheric_parameters
 
     /* Determine the spectral response file to read */
     if (input->meta.instrument == INST_TM
+        && input->meta.satellite == SAT_LANDSAT_4)
+    {
+        num_srs = L4_TM_SRS_COUNT;
+
+        snprintf (srs_file_path, sizeof (srs_file_path),
+                  "%s/%s", lst_data_dir, "L4_Spectral_Response.txt");
+    }
+    else if (input->meta.instrument == INST_TM
         && input->meta.satellite == SAT_LANDSAT_5)
     {
         num_srs = L5_TM_SRS_COUNT;
