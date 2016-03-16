@@ -4,18 +4,18 @@
 # Simple makefile for building and installing land-surface-temperature
 # applications.
 #-----------------------------------------------------------------------------
-.PHONY: check-environment all install clean all-script install-script clean-script all-l5-7 install-l5-7 clean-l5-7 all-aux install-aux
+.PHONY: check-environment all install clean all-script install-script clean-script all-lst install-lst clean-lst all-aux install-aux
 
 include make.config
 
-DIR_L5-7 = not-validated-prototype-l5-7_lst
+DIR_LST = not-validated-prototype_lst
 DIR_AUX = lst_auxiliary_data
 
-all: all-script all-l5-7
+all: all-script all-lst
 
-install: check-environment install-script install-l5-7
+install: check-environment install-script install-lst
 
-clean: clean-script clean-l5-7 clean-aux
+clean: clean-script clean-lst clean-aux
 
 #-----------------------------------------------------------------------------
 all-script:
@@ -31,17 +31,17 @@ clean-script:
         (cd scripts; $(MAKE) clean);
 
 #-----------------------------------------------------------------------------
-all-l5-7: all-script
-	echo "make all in not-validated-prototype-l5-7_lst"; \
-        (cd $(DIR_L5-7); $(MAKE) all);
+all-lst: all-script
+	echo "make all in not-validated-prototype_lst"; \
+        (cd $(DIR_LST); $(MAKE) all);
 
-install-l5-7: check-environment install-script
-	echo "make install in not-validated-prototype-l5-7_lst"; \
-        (cd $(DIR_L5-7); $(MAKE) install);
+install-lst: check-environment install-script
+	echo "make install in not-validated-prototype_lst"; \
+        (cd $(DIR_LST); $(MAKE) install);
 
-clean-l5-7: clean-script
-	echo "make clean in not-validated-prototype-l5-7_lst"; \
-        (cd $(DIR_L5-7); $(MAKE) clean);
+clean-lst: clean-script
+	echo "make clean in not-validated-prototype_lst"; \
+        (cd $(DIR_LST); $(MAKE) clean);
 
 #-----------------------------------------------------------------------------
 all-aux:

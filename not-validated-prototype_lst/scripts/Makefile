@@ -26,16 +26,16 @@ all:
 #-----------------------------------------------------------------------------
 install:
 	install -d $(link_path)
-	install -d $(l57_install_path)
+	install -d $(lst_install_path)
 	@for file in $(SCRIPTS); do \
             echo "  installing $$file"; \
-            install -m 755 $$file $(l57_install_path); \
-            ln -sf $(l57_link_source_path)/$$file $(link_path)/$$file; \
+            install -m 755 $$file $(lst_install_path); \
+            ln -sf $(lst_link_source_path)/$$file $(link_path)/$$file; \
         done;
 	@for file in $(SCRIPT_IMPORTS); do \
             echo "  installing $$file"; \
-            install -m 644 $$file $(l57_install_path); \
-            ln -sf $(l57_link_source_path)/$$file $(link_path)/$$file; \
+            install -m 644 $$file $(lst_install_path); \
+            ln -sf $(lst_link_source_path)/$$file $(link_path)/$$file; \
         done;
 
 #-----------------------------------------------------------------------------

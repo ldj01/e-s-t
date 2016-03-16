@@ -70,7 +70,7 @@ def generate_lst(xml_filename,
     # ------------------------------------------------------------------------
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
     # the atmospheric transmittance band
-    cmd = ['l5_7_intermediate_data',
+    cmd = ['lst_intermediate_data',
            '--xml', xml_filename,
            '--dem', dem_filename,
            '--verbose']

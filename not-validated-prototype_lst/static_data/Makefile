@@ -9,7 +9,7 @@
 TOP = ../..
 include $(TOP)/make.config
 
-static_install_path = $(l57_algorithm_dir)/static_data
+static_install_path = $(lst_algorithm_dir)/static_data
 
 STATIC_DATA_FILES = \
     modtran_head.txt                  \

@@ -46,7 +46,7 @@ MATHLIB = -lm
 LOADLIB = $(EXLIB) $(MATHLIB)
 
 # Define the executable
-EXE = l5_7_intermediate_data
+EXE = lst_intermediate_data
 
 # Target for the executable
 all: $(EXE)
@@ -56,9 +56,9 @@ $(EXE): $(OBJ) $(INC)
 
 install:
 	install -d $(link_path)
-	install -d $(l57_install_path)
-	install -m 755 $(EXE) $(l57_install_path)
-	ln -sf $(l57_link_source_path)/$(EXE) $(link_path)/$(EXE)
+	install -d $(lst_install_path)
+	install -m 755 $(EXE) $(lst_install_path)
+	ln -sf $(lst_link_source_path)/$(EXE) $(link_path)/$(EXE)
 
 clean:
 	$(RM) -f *.o $(EXE)
