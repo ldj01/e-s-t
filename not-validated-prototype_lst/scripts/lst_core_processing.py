@@ -53,17 +53,10 @@ def generate_lst(xml_filename,
                     ' LST AUX data')
         return
 
-    # Extract the input ID from the xml filename and build some other
-    # filenames
-    input_id = os.path.splitext(xml_filename)[0]
-    # ESPA creates the DEM for us
-    dem_filename = '{0}_dem.img'.format(input_id)
-
     # Generate the thermal, upwelled, and downwelled radiance bands as well as
     # the atmospheric transmittance band
     cmd = ['lst_intermediate_data',
            '--xml', xml_filename,
-           '--dem', dem_filename,
            '--verbose']
     if debug:
         cmd.append('--debug')
