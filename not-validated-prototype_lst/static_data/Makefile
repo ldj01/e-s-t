@@ -16,10 +16,13 @@ STATIC_DATA_FILES = \
     modtran_tail.txt                  \
     narr_coordinates.txt              \
     std_mid_lat_summer_atmos.txt      \
+    L4_Brightness_Temperature_LUT.txt \
+    L4_Spectral_Response.txt          \
     L5_Brightness_Temperature_LUT.txt \
     L5_Spectral_Response.txt          \
     L7_Brightness_Temperature_LUT.txt \
     L7_Spectral_Response.txt          \
+    L8_Brightness_Temperature_LUT.txt \
     L8_Spectral_Response.txt
 
 all:
