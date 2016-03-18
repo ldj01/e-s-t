@@ -1,4 +1,12 @@
 
+/*****************************************************************************
+  DESCRIPTION:  Allocates and provides access to 2 dimensional arrays.
+
+  HISTORY:  This has derived and modified from the original implementation
+            found in Landsat 8 IAS source.
+*****************************************************************************/
+
+
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -43,19 +51,14 @@ typedef struct ias_2d_array
 
 
 /*************************************************************************
-NAME: allocate_2d_array
+  NAME: allocate_2d_array
 
-PURPOSE: Allocate memory for 2D array.
+  PURPOSE: Allocate memory for 2D array.
 
-RETURNS: A pointer to a 2D array, or NULL if the routine fails. A pointer
-         to an array of void pointers to the storage for each row of the
-         array is returned. The returned pointer must be freed by the
-         free_2d_array routine.
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-3/15/2013   Song Guo         Modified from LDCM IAS library
+  RETURNS: A pointer to a 2D array, or NULL if the routine fails. A pointer
+           to an array of void pointers to the storage for each row of the
+           array is returned. The returned pointer must be freed by the
+           free_2d_array routine.
 **************************************************************************/
 void **allocate_2d_array
 (
@@ -116,16 +119,11 @@ void **allocate_2d_array
 
 
 /*************************************************************************
-NAME: free_2d_array
+  NAME: free_2d_array
 
-PURPOSE: Free memory for a 2D array allocated by allocate_2d_array
+  PURPOSE: Free memory for a 2D array allocated by allocate_2d_array
 
-RETURNS: SUCCESS or FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-3/15/2013   Song Guo         Modified from LDCM IAS library
+  RETURNS: SUCCESS or FAILURE
 **************************************************************************/
 int free_2d_array
 (
