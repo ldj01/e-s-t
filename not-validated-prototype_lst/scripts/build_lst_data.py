@@ -169,19 +169,22 @@ class BuildLSTData(object):
         # Read the bands into memory
 
         # Landsat Radiance at sensor for thermal band
-        self.logger.info('Loading intermediate thermal band data')
+        self.logger.info('Loading intermediate thermal band data [{0}]'
+                         .format(self.thermal_name))
         ds = gdal.Open(self.thermal_name)
         x_dim = ds.RasterXSize  # They are all the same size
         y_dim = ds.RasterYSize
         thermal_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric transmittance
-        self.logger.info('Loading intermediate transmittance band data')
+        self.logger.info('Loading intermediate transmittance band data [{0}]'
+                         .format(self.transmittance_name))
         ds = gdal.Open(self.transmittance_name)
         trans_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric path radiance - upwelled radiance
-        self.logger.info('Loading intermediate upwelled band data')
+        self.logger.info('Loading intermediate upwelled band data [{0}]'
+                         .format(self.upwelled_name))
         ds = gdal.Open(self.upwelled_name)
         upwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
@@ -206,12 +209,14 @@ class BuildLSTData(object):
         del no_data_locations
 
         # Downwelling sky irradiance
-        self.logger.info('Loading intermediate downwelled band data')
+        self.logger.info('Loading intermediate downwelled band data [{0}]'
+                         .format(self.downwelled_name))
         ds = gdal.Open(self.downwelled_name)
         downwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Landsat emissivity estimated from ASTER GED data
-        self.logger.info('Loading intermediate emissivity band data')
+        self.logger.info('Loading intermediate emissivity band data [{0}]'
+                         .format(self.emissivity_name))
         ds = gdal.Open(self.emissivity_name)
         emissivity_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
@@ -230,7 +235,8 @@ class BuildLSTData(object):
 
         # Account for surface emissivity to get Plank emitted radiance
         self.logger.info('Calculating Plank emitted radiance')
-        radiance_emitted = radiance / emissivity_data
+        with np.errstate(invalid='ignore'):
+            radiance_emitted = radiance / emissivity_data
 
         # Fix the no data locations
         no_data_locations = np.where(surface_radiance == self.no_data_value)

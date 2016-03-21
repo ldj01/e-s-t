@@ -612,13 +612,29 @@ class EstimateLandsatEmissivity(object):
         del espa_xml
 
     def determine_sensor_specific_coefficients(self):
-        if self.satellite == 'LANDSAT_5':
+        if self.satellite == 'LANDSAT_4':
+            # TODO TODO TODO - These are bad, need the correct ones
+            # USING L5 VALUES FOR NOW
+            self.estimated_coeff_1 = 0.305
+            self.estimated_coeff_2 = 0.468
+            self.estimated_coeff_3 = 0.223
+            self.snow_emis_value = 0.9851
+            self.vegetation_coeff = 0.9851
+        elif self.satellite == 'LANDSAT_5':
             self.estimated_coeff_1 = 0.305
             self.estimated_coeff_2 = 0.468
             self.estimated_coeff_3 = 0.223
             self.snow_emis_value = 0.9851
             self.vegetation_coeff = 0.9851
         elif self.satellite == 'LANDSAT_7':
+            self.estimated_coeff_1 = 0.440
+            self.estimated_coeff_2 = 0.400
+            self.estimated_coeff_3 = 0.156
+            self.snow_emis_value = 0.9869
+            self.vegetation_coeff = 0.9848
+        elif self.satellite == 'LANDSAT_8':
+            # TODO TODO TODO - These are bad, need the correct ones
+            # USING L7 VALUES FOR NOW
             self.estimated_coeff_1 = 0.440
             self.estimated_coeff_2 = 0.400
             self.estimated_coeff_3 = 0.156
@@ -846,8 +862,9 @@ class EstimateLandsatEmissivity(object):
                                           gdal.GDT_Float32)
 
         # Soil - From prototype code variable name
-        ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
-                         (1.0 - aster_ndvi_data))
+        with np.errstate(divide='ignore'):
+            ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
+                             (1.0 - aster_ndvi_data))
 
         # Memory cleanup
         del aster_ndvi_data
