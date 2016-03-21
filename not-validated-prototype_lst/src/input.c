@@ -9,6 +9,42 @@
 
 
 /*****************************************************************************
+  NAME:  open_band
+
+  PURPOSE:  Open the specified file and allocate the memory for the filename.
+
+  RETURN VALUE:  None
+*****************************************************************************/
+int
+open_band
+(
+    char *filename,          /* I: input filename */
+    Input_Data_t *input,     /* IO: updated with information from XML */
+    Input_Bands_e band_index /* I: index to place the band into */
+)
+{
+    char FUNC_NAME[] = "open_band";
+    char msg[256];
+
+    /* Grab the name from the input */
+    input->band_name[band_index] = strdup(filename);
+
+    /* Open a file descriptor for the band */
+    input->band_fd[band_index] =
+        fopen(input->band_name[band_index], "rb");
+
+    if (input->band_fd[band_index] == NULL)
+    {
+        snprintf(msg, sizeof(msg), "Failed to open (%s)",
+                 input->band_name[band_index]);
+        RETURN_ERROR(msg, FUNC_NAME, FAILURE);
+    }
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
 
 Description: 'OpenInput' sets up the 'input' data structure, opens the
              input raw binary files for read access.
@@ -20,244 +56,225 @@ Output Parameters:
     (returns)      'input' data structure or NULL when an error occurs
 
 *****************************************************************************/
-Input_t *
-OpenInput
+Input_Data_t *
+open_input
 (
     Espa_internal_meta_t *metadata
 )
 {
     char FUNC_NAME[] = "OpenInput";
-    Input_t *input = NULL;
+    Input_Data_t *input = NULL;
+    int index;
 
     /* Create the Input data structure */
-    input = malloc (sizeof (Input_t));
+    input = malloc(sizeof(Input_Data_t));
     if (input == NULL)
     {
-        RETURN_ERROR ("allocating Input data structure", FUNC_NAME, NULL);
+        RETURN_ERROR("allocating Input data structure", FUNC_NAME, NULL);
     }
 
-    /* Initialize and get input from header file */
-    if (!GetXMLInput (input, metadata))
+    /* Initialize the band fields */
+    for (index = 0; index < MAX_INPUT_BANDS; index++)
     {
-        free (input);
-        input = NULL;
-        RETURN_ERROR ("getting input from header file", FUNC_NAME, NULL);
+        input->band_name[index] = NULL;
+        input->band_fd[index] = NULL;
     }
 
-    /* Open file for access */
-    input->thermal.fd = fopen (input->thermal.filename, "r");
-    if (input->thermal.fd == NULL)
+    input->lines = 0;
+    input->samples = 0;
+
+    /* Open the input images from the XML file */
+    if (!GetXMLInput(input, metadata))
     {
-        free (input->thermal.filename);
-        input->thermal.filename = NULL;
-
-        fclose (input->thermal.fd);
-
-        free (input);
+        free(input);
         input = NULL;
-
-        RETURN_ERROR ("opening thermal file", FUNC_NAME, NULL);
+        RETURN_ERROR("getting input from header file", FUNC_NAME, NULL);
     }
-    else
-        input->thermal.is_open = true;
 
     return input;
 }
 
 
-bool
-GetInputThermLine
+/*****************************************************************************
+  NAME:  close_input
+
+  PURPOSE:  Close all the input files and free associated memory that resides
+            in the data structure.
+
+  RETURN VALUE:  Type = int
+      Value    Description
+      -------  ---------------------------------------------------------------
+      SUCCESS  No errors were encountered.
+      ERROR    An error was encountered.
+*****************************************************************************/
+int
+close_input (Input_Data_t *input)
+{
+    char FUNC_NAME[] = "close_input";
+    int index;
+    int status;
+    bool had_issue;
+    char msg[256];
+
+    had_issue = false;
+    for (index = 0; index < MAX_INPUT_BANDS; index++)
+    {
+        if (input->band_fd[index] == NULL &&
+            input->band_name[index] == NULL)
+        {
+            status = fclose (input->band_fd[index]);
+            if (status != 0)
+            {
+                snprintf (msg, sizeof (msg),
+                          "Failed to close (%s)",
+                          input->band_name[index]);
+                WARNING_MESSAGE (msg, FUNC_NAME);
+
+                had_issue = true;
+            }
+
+            free (input->band_name[index]);
+        }
+        else
+        {
+            fclose (input->band_fd[index]);
+            free (input->band_name[index]);
+        }
+    }
+
+    if (had_issue)
+        return ERROR;
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+  NAME: read_input
+
+  PURPOSE: To read the specified input bands into memory for later processing.
+
+  RETURN VALUE:  Type = bool
+      Value    Description
+      -------  ---------------------------------------------------------------
+      true     Success with reading all of the bands into memory.
+      false    Failed to read a band into memory.
+*****************************************************************************/
+int
+read_input
 (
-    Input_t *input,
-    int iline,
-    float *thermal_data
+    Input_Data_t *input,
+    float *band_thermal,
+    int16_t *band_elevation,
+    int pixel_count
 )
 {
-    char FUNC_NAME[] = "GetInputThermLine";
-    void *buf = NULL;
-    long loc;         /* pointer location in the raw binary file */
-    int sample;
-    uint8_t *line_uint8 = NULL;
-    int16_t *line_int16 = NULL;
+    char FUNC_NAME[] = "read_bands_into_memory";
+    int count;
+    int index;
+    uint8_t *thermal_uint8 = NULL;
+    int16_t *thermal_int16 = NULL;
 
-    /* Check the parameters */
-    if (input == NULL)
-    {
-        RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
-    }
-
-    if (!input->thermal.is_open)
-    {
-        RETURN_ERROR ("file not open", FUNC_NAME, false);
-    }
-
-    if (iline < 0 || iline >= input->thermal.size.l)
-    {
-        RETURN_ERROR ("invalid line number", FUNC_NAME, false);
-    }
-
-    /* Read the data */
     if (input->meta.instrument == INST_OLI_TIRS
         && input->meta.satellite == SAT_LANDSAT_8)
     {
-        line_int16 = malloc (input->thermal.size.s * sizeof (int16_t));
-        if (line_int16 == NULL)
+        thermal_int16 = malloc(sizeof(int16_t) * pixel_count);
+        if (thermal_int16 == NULL)
         {
-            RETURN_ERROR ("error allocating memory", FUNC_NAME, false);
+            RETURN_ERROR("error allocating thermal memory",
+                         FUNC_NAME, FAILURE);
         }
 
-        buf = (void *) thermal_data;
-        loc = (long) (iline * input->thermal.size.s * sizeof (int16_t));
-        if (fseek (input->thermal.fd, loc, SEEK_SET))
+        count = fread(thermal_int16, sizeof(int16_t), pixel_count,
+                      input->band_fd[I_BAND_THERMAL]);
+        if (count != pixel_count)
         {
-            RETURN_ERROR ("error seeking thermal line (binary)",
-                          FUNC_NAME, false);
-        }
+            free(thermal_int16);
 
-        if (read_raw_binary (input->thermal.fd, 1, input->thermal.size.s,
-                             sizeof (int16_t), buf)
-            != SUCCESS)
-        {
-            RETURN_ERROR ("error reading thermal line (binary)",
-                          FUNC_NAME, false);
+            RETURN_ERROR("Failed reading thermal band data",
+                         FUNC_NAME, FAILURE);
         }
 
         /* Copy the data to the output buffer manually while converting to
            radiance and float */
-        for (sample = 0; sample < input->thermal.size.s; sample++)
+        for (index = 0; index < pixel_count; index++)
         {
-            if (line_int16[sample] == input->thermal.fill_value)
+            if (thermal_int16[index] == input->fill_value[I_BAND_THERMAL])
             {
-                thermal_data[sample] = LST_NO_DATA_VALUE;
+                band_thermal[index] = LST_NO_DATA_VALUE;
             }
             else
             {
-                thermal_data[sample] =
-                    (float) ((input->thermal.rad_gain * line_int16[sample])
-                             + input->thermal.rad_bias);
+                band_thermal[index] =
+                    (float)((input->thermal_rad_gain * thermal_int16[index])
+                            + input->thermal_rad_bias);
             }
         }
 
-        free (line_int16);
+        free(thermal_int16);
     }
     else
     {
-        line_uint8 = malloc (input->thermal.size.s * sizeof (uint8_t));
-        if (line_uint8 == NULL)
+        float adjustment = 0.0;
+
+        /* If L5 data, it needs some adjustment.
+           TODO - Whenever CALVAL gets around to fixing the CPF, then
+                  we will no longer need to perform this operation
+                  since the CPF will take care of it.  */
+        if (input->meta.instrument == INST_TM
+            && input->meta.satellite == SAT_LANDSAT_5)
         {
-            RETURN_ERROR ("error allocating memory", FUNC_NAME, false);
+            adjustment = 0.044;
         }
 
-        buf = (void *) line_uint8;
-        loc = (long) (iline * input->thermal.size.s * sizeof (uint8_t));
-        if (fseek (input->thermal.fd, loc, SEEK_SET))
+        thermal_uint8 = malloc(sizeof(uint8_t) * pixel_count);
+        if (thermal_uint8 == NULL)
         {
-            RETURN_ERROR ("error seeking thermal line (binary)",
-                          FUNC_NAME, false);
+            RETURN_ERROR("error allocating thermal memory",
+                         FUNC_NAME, FAILURE);
         }
 
-        if (read_raw_binary (input->thermal.fd, 1, input->thermal.size.s,
-                             sizeof (uint8_t), buf)
-            != SUCCESS)
+        count = fread(thermal_uint8, sizeof(uint8_t), pixel_count,
+                      input->band_fd[I_BAND_THERMAL]);
+        if (count != pixel_count)
         {
-            RETURN_ERROR ("error reading thermal line (binary)",
-                          FUNC_NAME, false);
+            free(thermal_uint8);
+
+            RETURN_ERROR("Failed reading thermal band data",
+                         FUNC_NAME, FAILURE);
         }
 
         /* Copy the data to the output buffer manually while converting to
            radiance and float */
-        for (sample = 0; sample < input->thermal.size.s; sample++)
+        for (index = 0; index < pixel_count; index++)
         {
-            if (line_uint8[sample] == input->thermal.fill_value)
+            if (thermal_uint8[index] == input->fill_value[I_BAND_THERMAL])
             {
-                thermal_data[sample] = LST_NO_DATA_VALUE;
+                band_thermal[index] = LST_NO_DATA_VALUE;
             }
             else
             {
-                thermal_data[sample] =
-                    (float) ((input->thermal.rad_gain * line_uint8[sample])
-                             + input->thermal.rad_bias);
+                band_thermal[index] =
+                    (float)((input->thermal_rad_gain * thermal_uint8[index])
+                            + input->thermal_rad_bias);
 
-                /* If L5 data, it needs some adjustment.
-                   TODO - Whenever CALVAL gets around to fixing the CPF, then
-                          we will no longer need to perform this operation
-                          since the CPF will take care of it.  */
-                if (input->meta.instrument == INST_TM
-                    && input->meta.satellite == SAT_LANDSAT_5)
-                {
-                    thermal_data[sample] += 0.044;
-                }
+                /* Adjustment from above for L5 or 0.0 */
+                band_thermal[index] += adjustment;
             }
         }
 
-        free (line_uint8);
+        free(thermal_uint8);
     }
 
-    return true;
-}
-
-
-/*****************************************************************************
-
-Description: 'CloseInput' ends SDS access and closes the input file.
-
-Input Parameters:
-     input     'input' data structure
-
-Output Parameters:
-     input     'input' data structure; the following fields are modified:
-               open
-     (returns) status:
-               'true' = okay
-               'false' = error return
-
-*****************************************************************************/
-bool
-CloseInput (Input_t *input)
-{
-    char FUNC_NAME[] = "CloseInput";
-
-    if (input == NULL)
+    count = fread(band_elevation, sizeof(int16_t), pixel_count,
+                  input->band_fd[I_BAND_ELEVATION]);
+    if (count != pixel_count)
     {
-        RETURN_ERROR ("invalid input structure", FUNC_NAME, false);
+        RETURN_ERROR("Failed reading elevation band data",
+                     FUNC_NAME, FAILURE);
     }
 
-    /*** now close the thermal file ***/
-    if (input->thermal.is_open)
-    {
-        fclose (input->thermal.fd);
-        input->thermal.is_open = false;
-    }
-
-    return true;
-}
-
-
-/*****************************************************************************
-
-Description: 'FreeInput' frees the 'input' data structure memory.
-
-Input Parameters:
-    input          'input' data structure
-
-Output Parameters:
-    (returns)      status:
-                  'true' = okay (always returned)
-
-*****************************************************************************/
-bool
-FreeInput (Input_t *input)
-{
-    free (input->thermal.filename);
-    input->thermal.filename = NULL;
-
-    free (input->thermal.band_name);
-    input->thermal.band_name = NULL;
-
-    free (input);
-    input = NULL;
-
-    return true;
+    return SUCCESS;
 }
 
 
@@ -267,7 +284,6 @@ FreeInput (Input_t *input)
 
 
 /*****************************************************************************
-
 Description: 'GetXMLInput' pulls input values from the XML structure.
 
 Input Parameters:
@@ -284,7 +300,7 @@ Design Notes:
        from the XML file instead of the HDF and MTL files.
 *****************************************************************************/
 bool
-GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
+GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
 {
     char FUNC_NAME[] = "GetXMLInput";
     char acq_date[DATE_STRING_LEN + 1];
@@ -299,15 +315,8 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     input->meta.satellite = SAT_NULL;
     input->meta.instrument = INST_NULL;
     input->meta.acq_date.fill = true;
-    input->thermal.filename = NULL;
-    input->thermal.fd = NULL;
-    input->thermal.is_open = false;
-    input->thermal.band_name = NULL;
-    input->thermal.size.s = -1;
-    input->thermal.size.l = -1;
-    input->thermal.rad_gain = GAIN_BIAS_FILL;
-    input->thermal.rad_bias = GAIN_BIAS_FILL;
-    input->thermal.fill_value = INPUT_FILL;
+    input->thermal_rad_gain = GAIN_BIAS_FILL;
+    input->thermal_rad_bias = GAIN_BIAS_FILL;
 
     /* Determine satellite */
     if (strcmp (global->satellite, "LANDSAT_4") == 0)
@@ -350,7 +359,7 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
     {
         snprintf (msg, sizeof (msg),
                   "(Sensor not supported with LST processing)");
-        RETURN_ERROR (msg, FUNC_NAME, true);
+        RETURN_ERROR (msg, FUNC_NAME, false);
     }
 
     /* Check satellite/instrument combination */
@@ -359,31 +368,34 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
         if (input->meta.satellite != SAT_LANDSAT_4 &&
             input->meta.satellite != SAT_LANDSAT_5)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, false);
         }
 
         /* Specify the band name for the thermal band to use */
-        input->thermal.band_name = strdup ("band6");
+        snprintf (input->reference_band_name,
+                  sizeof (input->reference_band_name), "band6");
     }
     else if (input->meta.instrument == INST_ETM)
     {
         if (input->meta.satellite != SAT_LANDSAT_7)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, false);
         }
 
         /* Specify the band name for the thermal band to use */
-        input->thermal.band_name = strdup ("band61");
+        snprintf (input->reference_band_name,
+                  sizeof (input->reference_band_name), "band61");
     }
     else if (input->meta.instrument == INST_OLI_TIRS)
     {
         if (input->meta.satellite != SAT_LANDSAT_8)
         {
-            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, true);
+            RETURN_ERROR (INVALID_INSTRUMENT_COMBO, FUNC_NAME, false);
         }
 
         /* Specify the band name for the thermal band to use */
-        input->thermal.band_name = strdup ("band10");
+        snprintf (input->reference_band_name,
+                  sizeof (input->reference_band_name), "band10");
     }
 
     input->meta.zone = global->proj_info.utm_zone;
@@ -394,28 +406,53 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
         if (strcmp (metadata->band[index].product, "L1T") == 0)
         {
             if (strcmp (metadata->band[index].name,
-                        input->thermal.band_name) == 0)
+                        input->reference_band_name) == 0)
             {
-                input->thermal.filename =
-                    strdup (metadata->band[index].file_name);
+                if (open_band(metadata->band[index].file_name,
+                              input, I_BAND_THERMAL) != SUCCESS)
+                {
+                    RETURN_ERROR("Error opening thermal", FUNC_NAME, false);
+                }
 
-                input->thermal.rad_gain = metadata->band[index].rad_gain;
-                input->thermal.rad_bias = metadata->band[index].rad_bias;
-
-                input->thermal.size.s = metadata->band[index].nsamps;
-                input->thermal.size.l = metadata->band[index].nlines;
-                input->thermal.pixel_size[0] =
+                /* Always use this one for the lines and samples since
+                   they will be the same for us, along with the pixel
+                   size values */
+                input->lines = metadata->band[index].nlines;
+                input->samples = metadata->band[index].nsamps;
+                input->x_pixel_size =
                     metadata->band[index].pixel_size[0];
-                input->thermal.pixel_size[1] =
+                input->y_pixel_size =
                     metadata->band[index].pixel_size[1];
 
-                input->thermal.band_index = index;
+                input->thermal_rad_gain = metadata->band[index].rad_gain;
+                input->thermal_rad_bias = metadata->band[index].rad_bias;
 
-                /* Only the one so break out */
-                break;
+                /* Grab the fill value for this band */
+                input->fill_value[I_BAND_THERMAL] =
+                    metadata->band[index].fill_value;
+            }
+        }
+
+        /* Only look at the ones with the product name we are looking for */
+        if (strcmp (metadata->band[index].product, "elevation") == 0)
+        {
+            if (strcmp (metadata->band[index].name, "elevation") == 0)
+            {
+                if (open_band(metadata->band[index].file_name,
+                              input, I_BAND_ELEVATION) != SUCCESS)
+                {
+                    RETURN_ERROR("Error opening elevation", FUNC_NAME, false);
+                }
+
+                /* Grab the fill value for this band */
+                input->fill_value[I_BAND_ELEVATION] =
+                    metadata->band[index].fill_value;
             }
         }
     }
+
+    /* Get the scene ID */
+    input->meta.scene_id = strdup(metadata->global.scene_id);
 
     /* Get the map projection coordinates */
     input->meta.ul_map_corner.x = metadata->global.proj_info.ul_corner[0];
@@ -444,8 +481,8 @@ GetXMLInput (Input_t *input, Espa_internal_meta_t *metadata)
         metadata->global.bounding_coords[ESPA_WEST];
 
     /* Convert the acquisition date/time values */
-    snprintf (acq_date, sizeof (acq_date), global->acquisition_date);
-    snprintf (acq_time, sizeof (acq_time), global->scene_center_time);
+    snprintf (acq_date, sizeof (acq_date), "%s", global->acquisition_date);
+    snprintf (acq_time, sizeof (acq_time), "%s", global->scene_center_time);
 
     /* Make sure the acquisition time is not too long (i.e. contains too
        many decimal points for the date/time routines).  The time should be

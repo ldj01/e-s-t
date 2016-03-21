@@ -11,14 +11,9 @@
 #include "utilities.h"
 #include "input.h"
 #include "output.h"
+#include "intermediate_data.h"
 #include "lst_types.h"
 #include "build_points.h"
-
-
-/* These are for compile time debugging logic.
-   Set them to 0 to turn them off.
-   They need to be set to 0 for production/standard processing. */
-#define OUTPUT_CELL_DESIGNATION_BAND 0
 
 
 /* Defines the index for the intermediate bands which are generated for the
@@ -446,10 +441,9 @@ RETURN: SUCCESS
 *****************************************************************************/
 int calculate_pixel_atmospheric_parameters
 (
-    Input_t *input,            /* I: input structure */
+    Input_Data_t *input,       /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     char *xml_filename,        /* I: XML filename */
-    char *dem_filename,        /* I: input DEM filename */
     double **modtran_results,  /* I: results from MODTRAN runs */
     bool verbose               /* I: value to indicate if intermediate
                                      messages be printed */
@@ -460,11 +454,12 @@ int calculate_pixel_atmospheric_parameters
     int line;
     int sample;
     int status;
-    int offset;                 /* offset in the raw binary DEM file to seek to
-                                   to begin reading the window in the DEM */
+
     bool first_sample;
+
     double easting;
     double northing;
+
     GRID_ITEM *grid_points = NULL;
 
     int vertex;
@@ -479,27 +474,9 @@ int calculate_pixel_atmospheric_parameters
     double avg_distance_ur;
     double avg_distance_lr;
 
-    char *tmp_char = NULL;
-    char scene_name[PATH_MAX];
+    Intermediate_Data_t inter;
 
-    char thermal_filename[PATH_MAX];
-    char upwelled_filename[PATH_MAX];
-    char downwelled_filename[PATH_MAX];
-    char transmittance_filename[PATH_MAX];
-    FILE *thermal_fd = NULL;
-    FILE *transmittance_fd = NULL;
-    FILE *upwelled_fd = NULL;
-    FILE *downwelled_fd = NULL;
-
-    FILE *dem_fd = NULL;
-    int16_t *dem = NULL;        /* input DEM data in meters */
-    float **intermediate_bands;
-
-#if OUTPUT_CELL_DESIGNATION_BAND
-    char cell_filename[PATH_MAX];
-    FILE *cell_fd = NULL;
-    uint8_t *cell_data;
-#endif
+    int16_t *elevation_data = NULL; /* input elevation data in meters */
 
     double current_height;
     char msg[MAX_STR_LEN];
@@ -509,6 +486,10 @@ int calculate_pixel_atmospheric_parameters
     int num_cols = points->num_cols;
     int num_points = points->num_points;
 
+    int pixel_count = input->lines * input->samples;
+    int pixel_line_loc;
+    int pixel_loc;
+
     /* Grab the environment path to the LST_DATA_DIR */
     lst_data_dir = getenv ("LST_DATA_DIR");
     if (lst_data_dir == NULL)
@@ -517,97 +498,24 @@ int calculate_pixel_atmospheric_parameters
                       FUNC_NAME, FAILURE);
     }
 
-    /* Open the DEM for reading raw binary */
-    dem_fd = fopen (dem_filename, "rb");
-    if (dem_fd == NULL)
+    /* Open the intermedate data files */
+    if (open_intermediate(input, &inter) != SUCCESS)
     {
-        RETURN_ERROR ("Error opening the DEM file", FUNC_NAME, FAILURE);
+        RETURN_ERROR("Opening intermediate data files", FUNC_NAME, FAILURE);
     }
 
-    /* Allocate memory for one line of the DEM */
-    dem = calloc (input->thermal.size.s, sizeof (int16_t));
-    if (dem == NULL)
+    /* Allocate memory for the intermedate data */
+    if (allocate_intermediate(&inter, pixel_count) != SUCCESS)
     {
-        RETURN_ERROR ("Error allocating memory for the DEM data",
-                      FUNC_NAME, FAILURE);
+        RETURN_ERROR("Allocating memory for intermediate data",
+                     FUNC_NAME, FAILURE);
     }
 
-#if OUTPUT_CELL_DESIGNATION_BAND
-    /* Allocate memory for one line of the CELL data */
-    cell_data = calloc (input->thermal.size.s, sizeof (uint8_t));
-    if (cell_data == NULL)
+    /* Allocate memory for elevation */
+    elevation_data = calloc(pixel_count, sizeof(int16_t));
+    if (elevation_data == NULL)
     {
-        RETURN_ERROR ("Error allocating memory for the CELL data",
-                      FUNC_NAME, FAILURE);
-    }
-#endif
-
-    /* Figure out the scene name to apply to the filenames */
-    snprintf (scene_name, sizeof (scene_name), input->thermal.filename);
-    tmp_char = strchr (scene_name, '_');
-    if (tmp_char != NULL)
-        *tmp_char = '\0';
-
-#if OUTPUT_CELL_DESIGNATION_BAND
-    snprintf (cell_filename, sizeof (cell_filename),
-              "%s_%s.img", scene_name, "cells");
-#endif
-
-    snprintf (thermal_filename, sizeof (thermal_filename),
-              "%s_%s.img", scene_name, LST_THERMAL_RADIANCE_BAND_NAME);
-    snprintf (upwelled_filename, sizeof (upwelled_filename),
-              "%s_%s.img", scene_name, LST_UPWELLED_RADIANCE_BAND_NAME);
-    snprintf (downwelled_filename, sizeof (downwelled_filename),
-              "%s_%s.img", scene_name, LST_DOWNWELLED_RADIANCE_BAND_NAME);
-    snprintf (transmittance_filename, sizeof (transmittance_filename),
-              "%s_%s.img", scene_name, LST_ATMOS_TRANS_BAND_NAME);
-
-    /* Open the intermediate binary files for writing */
-#if OUTPUT_CELL_DESIGNATION_BAND
-    cell_fd = fopen (cell_filename, "wb");
-    if (cell_fd == NULL)
-    {
-        sprintf (msg, "Opening report file: %s", thermal_filename);
-        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-    }
-#endif
-
-    thermal_fd = fopen (thermal_filename, "wb");
-    if (thermal_fd == NULL)
-    {
-        sprintf (msg, "Opening intermediate file: %s", thermal_filename);
-        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-    }
-
-    transmittance_fd = fopen (transmittance_filename, "wb");
-    if (transmittance_fd == NULL)
-    {
-        sprintf (msg, "Opening intermediate file: %s", transmittance_filename);
-        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-    }
-
-    upwelled_fd = fopen (upwelled_filename, "wb");
-    if (upwelled_fd == NULL)
-    {
-        sprintf (msg, "Opening intermediate file: %s", upwelled_filename);
-        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-    }
-
-    downwelled_fd = fopen (downwelled_filename, "wb");
-    if (downwelled_fd == NULL)
-    {
-        sprintf (msg, "Opening intermediate file: %s", downwelled_filename);
-        RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-    }
-
-    /* Allocate memory for intermediate_bands */
-    intermediate_bands =
-        (float **) allocate_2d_array (NUM_INTERMEDIATE_DATA_BANDS,
-                                      input->thermal.size.s, sizeof (float));
-    if (intermediate_bands == NULL)
-    {
-        RETURN_ERROR ("Allocating intermediate_bands memory", FUNC_NAME,
-                      FAILURE);
+        RETURN_ERROR("Allocating elevation_data memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory for at_height */
@@ -624,17 +532,25 @@ int calculate_pixel_atmospheric_parameters
     grid_points = malloc (num_points * sizeof (GRID_ITEM));
     if (grid_points == NULL)
     {
-        ERROR_MESSAGE ("Allocating grid_points memory", FUNC_NAME);
+        RETURN_ERROR ("Allocating grid_points memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Read thermal and elevation data into memory */
+    if (read_input(input, inter.band_thermal, elevation_data, pixel_count)
+        != SUCCESS)
+    {
+        RETURN_ERROR ("Reading thermal and elevation bands", FUNC_NAME,
+                      FAILURE);
     }
 
     if (verbose)
     {
-        LOG_MESSAGE ("Iterate through all lines in landsat scene\n",
+        LOG_MESSAGE ("Iterate through all pixels in Landsat scene\n",
                      FUNC_NAME);
     }
 
     /* Loop through each line in the image */
-    for (line = 0; line < input->thermal.size.l; line++)
+    for (line = 0; line < input->lines; line++)
     {
         /* Print status on every 1000 lines */
         if (!(line % 1000))
@@ -646,44 +562,29 @@ int calculate_pixel_atmospheric_parameters
             }
         }
 
-        /* Read the input thermal band data */
-        if (!GetInputThermLine (input, line,
-                                &intermediate_bands[BAND_THERMAL][0]))
-        {
-            sprintf (msg, "Reading input thermal data for line %d", line);
-            RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-        }
-
-        /* Can also read in one line of DEM data here */
-        /* Start reading DEM from the start_line */
-        offset = sizeof (int16_t) * line * input->thermal.size.s;
-        fseek (dem_fd, offset, SEEK_SET);
-        if (fread (dem, sizeof (int16_t), input->thermal.size.s, dem_fd)
-            != input->thermal.size.s)
-        {
-            sprintf (msg, "Error reading values from the DEM file "
-                             "starting at line %d.", line);
-            RETURN_ERROR (msg, FUNC_NAME, FAILURE);
-        }
+        pixel_line_loc = line * input->samples;
 
         /* Set first_sample to be true */
         first_sample = true;
-        for (sample = 0; sample < input->thermal.size.s; sample++)
+        for (sample = 0; sample < input->samples; sample++)
         {
-            if (intermediate_bands[BAND_THERMAL][sample] != LST_NO_DATA_VALUE)
+            pixel_loc = pixel_line_loc + sample;
+
+            if (inter.band_thermal[pixel_loc] != LST_NO_DATA_VALUE)
             {
                 /* Determine UTM coordinates for current line/sample */
                 easting = input->meta.ul_map_corner.x
-                    + (sample * input->thermal.pixel_size[0]);
+                    + (sample * input->x_pixel_size);
                 northing = input->meta.ul_map_corner.y
-                    - (line * input->thermal.pixel_size[1]);
+                    - (line * input->y_pixel_size);
 
                 if (first_sample)
                 {
                     /* Determine the first center point from all of the
                        available points */
                     center_point = determine_first_center_grid_point(
-                                       points, easting, northing, grid_points);
+                                       points, easting, northing,
+                                       grid_points);
 
                     /* Set first_sample to be false */
                     first_sample = false;
@@ -776,11 +677,11 @@ int calculate_pixel_atmospheric_parameters
                 cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
 
 #if OUTPUT_CELL_DESIGNATION_BAND
-                cell_data[sample] = cell_vertices[LL_POINT];
+                inter.band_cell[pixel_loc] = cell_vertices[LL_POINT];
 #endif
 
                 /* convert height from m to km -- Same as 1.0 / 1000.0 */
-                current_height = (double) dem[sample] * 0.001;
+                current_height = (double) elevation_data[pixel_loc] * 0.001;
 
                 /* interpolate three parameters to that height at each of the
                    four closest points */
@@ -790,144 +691,67 @@ int calculate_pixel_atmospheric_parameters
 
                     /* interpolate three atmospheric parameters to current
                        height */
-                    interpolate_to_height (&modtran_results[current_index],
-                                           current_height,
-                                           at_height[vertex]);
+                    interpolate_to_height(&modtran_results[current_index],
+                                          current_height,
+                                          at_height[vertex]);
                 }
 
                 /* interpolate parameters at appropriate height to location of
                    current pixel */
-                interpolate_to_location (points, cell_vertices, at_height,
-                                         easting, northing, &parameters[0]);
+                interpolate_to_location(points, cell_vertices, at_height,
+                                        easting, northing, &parameters[0]);
 
                 /* convert radiances to W*m^(-2)*sr(-1) */
-                intermediate_bands[BAND_TRANSMISSION][sample] =
-                    parameters[AHP_TRANSMISSION];
-                intermediate_bands[BAND_UPWELLED_RADIANCE][sample] =
+                inter.band_upwelled[pixel_loc] =
                     parameters[AHP_UPWELLED_RADIANCE] * 10000.0;
-                intermediate_bands[BAND_DOWNWELLED_RADIANCE][sample] =
+                inter.band_downwelled[pixel_loc] =
                     parameters[AHP_DOWNWELLED_RADIANCE] * 10000.0;
+                inter.band_transmittance[pixel_loc] =
+                    parameters[AHP_TRANSMISSION];
             } /* END - if not FILL */
             else
             {
+                inter.band_upwelled[pixel_loc] = LST_NO_DATA_VALUE;
+                inter.band_downwelled[pixel_loc] = LST_NO_DATA_VALUE;
+                inter.band_transmittance[pixel_loc] = LST_NO_DATA_VALUE;
+
 #if OUTPUT_CELL_DESIGNATION_BAND
-                cell_data[sample] = 0;
+                inter.band_cell[pixel_loc] = 0;
 #endif
-                intermediate_bands[BAND_TRANSMISSION][sample] =
-                    LST_NO_DATA_VALUE;
-                intermediate_bands[BAND_UPWELLED_RADIANCE][sample] =
-                    LST_NO_DATA_VALUE;
-                intermediate_bands[BAND_DOWNWELLED_RADIANCE][sample] =
-                    LST_NO_DATA_VALUE;
             }
         } /* END - for sample */
 
-        /* Write out the temporary binary output files */
-#if OUTPUT_CELL_DESIGNATION_BAND
-        status = fwrite (cell_data, sizeof (uint8_t),
-                         input->thermal.size.s, cell_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", thermal_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
-#endif
-
-        /* Write out the temporary intermediate output files */
-        status = fwrite (&intermediate_bands[BAND_TRANSMISSION][0],
-                         sizeof (float), input->thermal.size.s,
-                         transmittance_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", transmittance_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
-
-        status = fwrite (&intermediate_bands[BAND_UPWELLED_RADIANCE][0],
-                         sizeof (float), input->thermal.size.s, upwelled_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", upwelled_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
-
-        status = fwrite (&intermediate_bands[BAND_DOWNWELLED_RADIANCE][0],
-                         sizeof (float), input->thermal.size.s, downwelled_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", downwelled_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
-
-        status = fwrite (&intermediate_bands[BAND_THERMAL][0], sizeof (float),
-                         input->thermal.size.s, thermal_fd);
-        if (status != input->thermal.size.s)
-        {
-            sprintf (msg, "Writing to %s", thermal_filename);
-            ERROR_MESSAGE (msg, FUNC_NAME);
-        }
     } /* END - for line */
 
+    /* Write out the temporary intermediate output files */
+    if (write_intermediate(&inter, pixel_count) != SUCCESS)
+    {
+        sprintf (msg, "Writing to intermediate data files");
+        RETURN_ERROR(msg, FUNC_NAME, FAILURE);
+    }
+
     /* Free allocated memory */
-    free (grid_points);
-    free (dem);
-#if OUTPUT_CELL_DESIGNATION_BAND
-    free (cell_data);
-#endif
+    free(grid_points);
+    free(elevation_data);
 
-    status = free_2d_array ((void **) at_height);
+    status = free_2d_array((void **)at_height);
     if (status != SUCCESS)
     {
-        ERROR_MESSAGE ("Freeing memory: at_height\n", FUNC_NAME);
+        ERROR_MESSAGE("Freeing memory: at_height\n", FUNC_NAME);
     }
 
-    status = free_2d_array ((void **) intermediate_bands);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE ("Freeing memory: intermediate_bands\n", FUNC_NAME);
-    }
+    free_intermediate(&inter);
 
     /* Close the intermediate binary files */
-#if OUTPUT_CELL_DESIGNATION_BAND
-    status = fclose (cell_fd);
-    if (status)
+    if (close_intermediate(&inter) != SUCCESS)
     {
-        sprintf (msg, "Closing file %s", cell_filename);
-        ERROR_MESSAGE (msg, FUNC_NAME);
-    }
-#endif
-
-    status = fclose (thermal_fd);
-    if (status)
-    {
-        sprintf (msg, "Closing file %s", thermal_filename);
-        ERROR_MESSAGE (msg, FUNC_NAME);
-    }
-
-    status = fclose (transmittance_fd);
-    if (status)
-    {
-        sprintf (msg, "Closing file %s", transmittance_filename);
-        ERROR_MESSAGE (msg, FUNC_NAME);
-    }
-
-    status = fclose (upwelled_fd);
-    if (status)
-    {
-        sprintf (msg, "Closing file %s", upwelled_filename);
-        ERROR_MESSAGE (msg, FUNC_NAME);
-    }
-
-    status = fclose (downwelled_fd);
-    if (status)
-    {
-        sprintf (msg, "Closing file %s", downwelled_filename);
-        ERROR_MESSAGE (msg, FUNC_NAME);
+        sprintf (msg, "Closing file intermediate data files");
+        RETURN_ERROR(msg, FUNC_NAME, FAILURE);
     }
 
     if (add_lst_band_product(xml_filename,
-                             input->thermal.band_name,
-                             thermal_filename,
+                             input->reference_band_name,
+                             inter.thermal_filename,
                              LST_THERMAL_RADIANCE_PRODUCT_NAME,
                              LST_THERMAL_RADIANCE_BAND_NAME,
                              LST_THERMAL_RADIANCE_SHORT_NAME,
@@ -939,8 +763,8 @@ int calculate_pixel_atmospheric_parameters
     }
 
     if (add_lst_band_product(xml_filename,
-                             input->thermal.band_name,
-                             transmittance_filename,
+                             input->reference_band_name,
+                             inter.transmittance_filename,
                              LST_ATMOS_TRANS_PRODUCT_NAME,
                              LST_ATMOS_TRANS_BAND_NAME,
                              LST_ATMOS_TRANS_SHORT_NAME,
@@ -952,8 +776,8 @@ int calculate_pixel_atmospheric_parameters
     }
 
     if (add_lst_band_product(xml_filename,
-                             input->thermal.band_name,
-                             upwelled_filename,
+                             input->reference_band_name,
+                             inter.upwelled_filename,
                              LST_UPWELLED_RADIANCE_PRODUCT_NAME,
                              LST_UPWELLED_RADIANCE_BAND_NAME,
                              LST_UPWELLED_RADIANCE_SHORT_NAME,
@@ -965,8 +789,8 @@ int calculate_pixel_atmospheric_parameters
     }
 
     if (add_lst_band_product(xml_filename,
-                             input->thermal.band_name,
-                             downwelled_filename,
+                             input->reference_band_name,
+                             inter.downwelled_filename,
                              LST_DOWNWELLED_RADIANCE_PRODUCT_NAME,
                              LST_DOWNWELLED_RADIANCE_BAND_NAME,
                              LST_DOWNWELLED_RADIANCE_SHORT_NAME,

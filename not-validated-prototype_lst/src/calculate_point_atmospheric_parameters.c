@@ -727,7 +727,7 @@ Date        Programmer       Reason
 #define INV_WATER_ALBEDO (1.0 / WATER_ALBEDO)
 int calculate_point_atmospheric_parameters
 (
-    Input_t *input,            /* I: Input structure */
+    Input_Data_t *input,       /* I: Input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     double **modtran_results,  /* O: Atmospheric parameters from modtran */
     bool verbose               /* I: Value to indicate if intermediate

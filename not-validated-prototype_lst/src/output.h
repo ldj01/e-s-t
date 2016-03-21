@@ -7,7 +7,7 @@ int
 add_lst_band_product
 (
     char *xml_filename,
-    char *thermal_band_name,
+    char *reference_band_name,
     char *image_filename,
     char *product_name,
     char *band_name,

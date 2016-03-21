@@ -63,6 +63,7 @@ typedef struct
 {
     Satellite_t satellite;      /* Satellite */
     Instrument_t instrument;    /* Instrument */
+    char *scene_id;             /* SceneID */
     Date_t acq_date;            /* Acq. date/time (scene center) */
     int zone;                   /* UTM zone number */
     Map_coord_t ul_map_corner;  /* Map projection coordinates of the upper
@@ -81,44 +82,36 @@ typedef struct
 } Input_meta_t;
 
 
-/* Structure for the thermal band data */
-typedef struct
-{
-    char *filename;       /* Name of the image file */
-    FILE *fd;             /* File pointer for file */
-    bool is_open;         /* Has the file been opened flag */
-    int band_index;       /* Index in the metadata */
-    char *band_name;      /* Band name in the metadata */
-    Img_coord_int_t size; /* (line/sample) size */
-    float rad_gain;       /* Thermal radiance gain */
-    float rad_bias;       /* Thermal radiance bias */
-    int fill_value;       /* Fill value */
-    float pixel_size[2];  /* Pixel size (x,y) */
-} Input_band_t;
-
-
 /* Structure for the 'input' data type */
 typedef struct
 {
     Input_meta_t meta;          /* Input metadata */
-    Input_band_t thermal;       /* Input thermal band data */
-} Input_t;
+    int lines;
+    int samples;
+    float x_pixel_size;
+    float y_pixel_size;
+    char reference_band_name[30];
+    char *band_name[MAX_INPUT_BANDS];
+    FILE *band_fd[MAX_INPUT_BANDS];
+    float scale_factor[MAX_INPUT_BANDS];
+    int fill_value[MAX_INPUT_BANDS];
+    float thermal_rad_gain;       /* Thermal radiance gain */
+    float thermal_rad_bias;       /* Thermal radiance bias */
+} Input_Data_t;
 
 
 /* Prototypes */
-Input_t *OpenInput (Espa_internal_meta_t *metadata);
+Input_Data_t *open_input(Espa_internal_meta_t *metadata);
 
+int close_input(Input_Data_t *input);
 
-bool GetInputThermLine (Input_t *input, int iline, float *thermal_data);
+int read_input(Input_Data_t *input_data,
+               float *band_thermal,
+               int16_t *band_elevation,
+               int pixel_count);
 
-
-bool CloseInput (Input_t *input);
-
-
-bool FreeInput (Input_t *input);
-
-
-bool GetXMLInput (Input_t *input, Espa_internal_meta_t * metadata);
+bool GetXMLInput(Input_Data_t *input,
+                 Espa_internal_meta_t *metadata);
 
 
 #endif

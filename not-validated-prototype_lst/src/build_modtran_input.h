@@ -12,7 +12,7 @@
 
 int build_modtran_input
 (
-    Input_t *input,       /* I: input structure */
+    Input_Data_t *input,       /* I: input structure */
     REANALYSIS_POINTS *points, /* I/O: The coordinate points */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 will be printed */

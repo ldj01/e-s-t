@@ -100,4 +100,13 @@ typedef enum
 } GRID_POINT_INDEXES;
 
 
-#endif
+/* These are used in arrays, and they are position dependent */
+typedef enum
+{
+    I_BAND_THERMAL,
+    I_BAND_ELEVATION, /* This band and above are all from the XML */
+    MAX_INPUT_BANDS
+} Input_Bands_e;
+
+
+#endif /* CONST_H */

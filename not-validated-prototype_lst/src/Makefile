@@ -28,6 +28,7 @@ SRC = \
       2d_array.c                               \
       date.c                                   \
       input.c                                  \
+      intermediate_data.c                      \
       output.c                                 \
       get_args.c                               \
       build_points.c                           \

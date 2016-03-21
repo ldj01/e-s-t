@@ -341,7 +341,12 @@ int read_narr_parameter_values
         }
 
         /* Read the number of rows and columns and verify them */
-        fscanf (fd, "%d %d", &file_cols, &file_rows);
+        count = fscanf (fd, "%d %d", &file_cols, &file_rows);
+        if (count != 2)
+        {
+            RETURN_ERROR ("Failed reading columns and rows",
+                          FUNC_NAME, FAILURE);
+        }
         if (file_rows != NARR_ROWS || file_cols != NARR_COLS)
         {
             RETURN_ERROR ("Parameter file contains invalid number of rows and"
@@ -387,7 +392,7 @@ Date        Programmer       Reason
 ******************************************************************************/
 int build_modtran_input
 (
-    Input_t *input,       /* I: input structure */
+    Input_Data_t *input,       /* I: input structure */
     REANALYSIS_POINTS *points, /* I/O: The coordinate points */
     bool verbose,         /* I: value to indicate if intermediate messages
                                 should be printed */
@@ -953,7 +958,13 @@ int build_modtran_input
                       FUNC_NAME, FAILURE);
     }
 
-    getcwd (curr_path, PATH_MAX);
+    char *dummy = NULL;
+    dummy = getcwd (curr_path, PATH_MAX);
+    if (dummy == NULL)
+    {
+        RETURN_ERROR ("Retrieving current working directory",
+                      FUNC_NAME, FAILURE);
+    }
 
     /* Allocate some temp memory */
     temp_height = (double *) malloc (MAX_MODTRAN_LAYER * sizeof (double));

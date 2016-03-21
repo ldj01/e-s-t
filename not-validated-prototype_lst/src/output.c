@@ -37,7 +37,7 @@ int
 add_lst_band_product
 (
     char *xml_filename,
-    char *thermal_band_name,
+    char *reference_band_name,
     char *image_filename,
     char *product_name,
     char *band_name,
@@ -80,7 +80,7 @@ add_lst_band_product
     for (band_index = 0; band_index < in_meta.nbands; band_index++)
     {
         if ((strcmp (in_meta.band[band_index].product, "L1T") == 0)
-            && (strcmp (in_meta.band[band_index].name, thermal_band_name)
+            && (strcmp (in_meta.band[band_index].name, reference_band_name)
                 == 0))
         {
             /* this is the index we'll use for output band information */
@@ -125,10 +125,11 @@ add_lst_band_product
     bmeta = tmp_meta.band;
 
     snprintf (bmeta[0].short_name, sizeof (bmeta[0].short_name),
-              in_meta.band[src_index].short_name);
+              "%s", in_meta.band[src_index].short_name);
     bmeta[0].short_name[3] = '\0';
     strcat (bmeta[0].short_name, short_name);
-    snprintf (bmeta[0].product, sizeof (bmeta[0].product), product_name);
+    snprintf (bmeta[0].product, sizeof (bmeta[0].product), "%s",
+              product_name);
     snprintf (bmeta[0].source, sizeof (bmeta[0].source), "level1");
     snprintf (bmeta[0].category, sizeof (bmeta[0].category), "image");
     bmeta[0].nlines = in_meta.band[src_index].nlines;
@@ -139,17 +140,20 @@ add_lst_band_product
     snprintf (bmeta[0].app_version, sizeof (bmeta[0].app_version),
               "lst_%s", LST_VERSION);
     snprintf (bmeta[0].production_date, sizeof (bmeta[0].production_date),
-              production_date);
+              "%s", production_date);
     bmeta[0].data_type = ESPA_FLOAT32;
     bmeta[0].fill_value = LST_NO_DATA_VALUE;
     bmeta[0].valid_range[0] = min_range;
     bmeta[0].valid_range[1] = max_range;
-    snprintf (bmeta[0].name, sizeof (bmeta[0].name), band_name);
-    snprintf (bmeta[0].long_name, sizeof (bmeta[0].long_name), long_name);
-    snprintf (bmeta[0].data_units, sizeof (bmeta[0].data_units), data_units);
-    snprintf (bmeta[0].file_name, sizeof (bmeta[0].file_name), image_filename);
+    snprintf (bmeta[0].name, sizeof (bmeta[0].name), "%s", band_name);
+    snprintf (bmeta[0].long_name, sizeof (bmeta[0].long_name), "%s",
+              long_name);
+    snprintf (bmeta[0].data_units, sizeof (bmeta[0].data_units), "%s",
+              data_units);
+    snprintf (bmeta[0].file_name, sizeof (bmeta[0].file_name), "%s",
+              image_filename);
 
-    /* Create the ENVI header file this band */
+    /* Create the ENVI header file for this band */
     if (create_envi_struct (&bmeta[0], &in_meta.global, &envi_hdr) != SUCCESS)
     {
         RETURN_ERROR ("Failed to create ENVI header structure.", FUNC_NAME,
@@ -157,7 +161,7 @@ add_lst_band_product
     }
 
     /* Write the ENVI header */
-    snprintf (envi_file, sizeof(envi_file), bmeta[0].file_name);
+    snprintf (envi_file, sizeof(envi_file), "%s", bmeta[0].file_name);
     tmp_char = strchr (envi_file, '.');
     if (tmp_char == NULL)
     {

@@ -45,10 +45,9 @@ main (int argc, char *argv[])
 
     char msg_str[MAX_STR_LEN];
     char xml_filename[PATH_MAX];        /* input XML filename */
-    char dem_filename[PATH_MAX];        /* input DEM filename */
     char command[PATH_MAX];
 
-    Input_t *input = NULL;          /* input data and meta data */
+    Input_Data_t *input = NULL;          /* input data and meta data */
     //    Output_t *output = NULL; /* output structure and metadata */
 
     bool use_tape6;             /* Use the tape6 output */
@@ -66,102 +65,102 @@ main (int argc, char *argv[])
     time_t now;
 
     /* Display the starting time of the application */
-    time (&now);
-    snprintf (msg_str, sizeof(msg_str),
-              "LST start_time [%s]", ctime (&now));
-    LOG_MESSAGE (msg_str, FUNC_NAME);
+    time(&now);
+    snprintf(msg_str, sizeof(msg_str),
+             "LST start_time [%s]", ctime(&now));
+    LOG_MESSAGE(msg_str, FUNC_NAME);
 
     /* Read the command-line arguments, including the name of the input
        Landsat TOA reflectance product and the DEM */
-    if (get_args (argc, argv, xml_filename, dem_filename,
-                  &use_tape6, &verbose, &debug) != SUCCESS)
+    if (get_args(argc, argv, xml_filename, &use_tape6, &verbose, &debug)
+        != SUCCESS)
     {
-        RETURN_ERROR ("calling get_args", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("calling get_args", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Verify the existence of required environment variables */
     /* Grab the environment path to the LST_DATA_DIR */
-    tmp_env = getenv ("LST_DATA_DIR");
+    tmp_env = getenv("LST_DATA_DIR");
     if (tmp_env == NULL)
     {
-        RETURN_ERROR ("LST_DATA_DIR environment variable is not set",
-                      FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("LST_DATA_DIR environment variable is not set",
+                     FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Validate the input metadata file */
-    if (validate_xml_file (xml_filename) != SUCCESS)
+    if (validate_xml_file(xml_filename) != SUCCESS)
     {
         /* Error messages already written */
         return EXIT_FAILURE;
     }
 
     /* Initialize the metadata structure */
-    init_metadata_struct (&xml_metadata);
+    init_metadata_struct(&xml_metadata);
 
     /* Parse the metadata file into our internal metadata structure; also
        allocates space as needed for various pointers in the global and band
        metadata */
-    if (parse_metadata (xml_filename, &xml_metadata) != SUCCESS)
+    if (parse_metadata(xml_filename, &xml_metadata) != SUCCESS)
     {
         /* Error messages already written */
         return EXIT_FAILURE;
     }
 
     /* Open input file, read metadata, and set up buffers */
-    input = OpenInput (&xml_metadata);
+    input = open_input(&xml_metadata);
     if (input == NULL)
     {
-        RETURN_ERROR ("opening input files", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("opening input files", FUNC_NAME, EXIT_FAILURE);
     }
 
     if (verbose)
     {
         /* Print some info to show how the input metadata works */
-        printf ("Satellite: %d\n", input->meta.satellite);
-        printf ("Instrument: %d\n", input->meta.instrument);
+        printf("Satellite: %d\n", input->meta.satellite);
+        printf("Instrument: %d\n", input->meta.instrument);
 
-        printf ("Number of input lines: %d\n", input->thermal.size.l);
-        printf ("Number of input samples: %d\n", input->thermal.size.s);
+        printf("Number of input lines: %d\n", input->lines);
+        printf("Number of input samples: %d\n", input->samples);
 
-        printf ("Fill value is %d\n", input->thermal.fill_value);
+        printf("Fill value is %d\n", input->fill_value[I_BAND_THERMAL]);
 
-        printf ("Thermal Band -->\n");
-        printf ("  therm_gain: %f\n  therm_bias: %f\n",
-                input->thermal.rad_gain, input->thermal.rad_bias);
+        printf("Thermal Band -->\n");
+        printf("  therm_gain: %f\n  therm_bias: %f\n",
+               input->thermal_rad_gain, input->thermal_rad_bias);
 
-        printf ("Year, Month, Day, Hour, Minute, Second:"
-                " %d, %d, %d, %d, %d, %f\n",
-                input->meta.acq_date.year, input->meta.acq_date.month,
-                input->meta.acq_date.day, input->meta.acq_date.hour,
-                input->meta.acq_date.minute, input->meta.acq_date.second);
-        printf ("ACQUISITION_DATE.DOY is %d\n",
-                input->meta.acq_date.doy);
+        printf("Year, Month, Day, Hour, Minute, Second:"
+               " %d, %d, %d, %d, %d, %f\n",
+               input->meta.acq_date.year, input->meta.acq_date.month,
+               input->meta.acq_date.day, input->meta.acq_date.hour,
+               input->meta.acq_date.minute, input->meta.acq_date.second);
+        printf("ACQUISITION_DATE.DOY is %d\n",
+               input->meta.acq_date.doy);
 
-        printf ("UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
-                input->meta.ul_map_corner.y);
-        printf ("LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
-                input->meta.lr_map_corner.y);
-        printf ("UL_GEO_CORNER: %f, %f\n",
-                input->meta.ul_geo_corner.lat, input->meta.ul_geo_corner.lon);
-        printf ("LR_GEO_CORNER: %f, %f\n",
-                input->meta.lr_geo_corner.lat, input->meta.lr_geo_corner.lon);
+        printf("UL_MAP_CORNER: %f, %f\n", input->meta.ul_map_corner.x,
+               input->meta.ul_map_corner.y);
+        printf("LR_MAP_CORNER: %f, %f\n", input->meta.lr_map_corner.x,
+               input->meta.lr_map_corner.y);
+        printf("UL_GEO_CORNER: %f, %f\n",
+               input->meta.ul_geo_corner.lat, input->meta.ul_geo_corner.lon);
+        printf("LR_GEO_CORNER: %f, %f\n",
+               input->meta.lr_geo_corner.lat, input->meta.lr_geo_corner.lon);
     }
 
     /* Build the points that will be used */
-    if (build_points (input, &points) != SUCCESS)
+    if (build_points(input, &points) != SUCCESS)
     {
-        RETURN_ERROR ("Building POINTS input\n", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("Building POINTS input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
-    snprintf (msg_str, sizeof(msg_str),
+    snprintf(msg_str, sizeof(msg_str),
               "Number of Points: %d\n", points.num_points);
-    LOG_MESSAGE (msg_str, FUNC_NAME);
+    LOG_MESSAGE(msg_str, FUNC_NAME);
 
     /* Call build_modtran_input to generate the tape5 file input and
        the MODTRAN commands for each point and height */
-    if (build_modtran_input (input, &points, verbose, debug) != SUCCESS)
+    if (build_modtran_input(input, &points, verbose, debug) != SUCCESS)
     {
-        RETURN_ERROR ("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("Building MODTRAN input\n", FUNC_NAME, EXIT_FAILURE);
     }
 
     /* Perform MODTRAN runs by calling each command */
@@ -261,7 +260,6 @@ main (int argc, char *argv[])
     /* Generate parameters for each Landsat pixel */
     if (calculate_pixel_atmospheric_parameters (input, &points,
                                                 xml_filename,
-                                                dem_filename,
                                                 modtran_results, verbose)
         != SUCCESS)
     {
@@ -292,7 +290,7 @@ main (int argc, char *argv[])
         RETURN_ERROR ("closing output file", FUNC_NAME, EXIT_FAILURE);
     }
 
-    /* Create the ENVI header file this band */
+    /* Create the ENVI header data for this band */
     if (create_envi_struct (&output->metadata.band[0], &xml_metadata.global,
                             &envi_hdr) != SUCCESS)
     {
@@ -335,8 +333,7 @@ main (int argc, char *argv[])
     free_metadata (&xml_metadata);
 
     /* Close the input file and free the structure */
-    CloseInput (input);
-    FreeInput (input);
+    close_input (input);
 
     /* Free memory allocations */
     if (free_2d_array ((void **) modtran_results) != SUCCESS)

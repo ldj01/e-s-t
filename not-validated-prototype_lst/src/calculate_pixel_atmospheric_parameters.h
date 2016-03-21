@@ -12,10 +12,9 @@
 
 int calculate_pixel_atmospheric_parameters
 (
-    Input_t *input,            /* I: input structure */
+    Input_Data_t *input,       /* I: input structure */
     REANALYSIS_POINTS *points, /* I: The coordinate points */
     char *xml_filename,        /* I: XML filename */
-    char *dem_filename,        /* I: DEM filename */
     double **modtran_results,  /* I: atmospheric parameter for MODTRAN run */
     bool verbose               /* I: value to indicate if intermediate
                                      messages will be printed */

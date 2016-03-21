@@ -9,7 +9,7 @@
 
 int build_points
 (
-    Input_t *input,           /* I: input structure */
+    Input_Data_t *input,      /* I: input structure */
     REANALYSIS_POINTS *points /* O: The coordinate points to be used */
 );
 
