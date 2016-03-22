@@ -1029,14 +1029,14 @@ int build_modtran_input
            MODTRAN tape files are finicky about value locations and size,
            so the following adjusts for the values less than 100. */
         if (points->lat[point] < 100.0)
-            snprintf (lat_str, sizeof (lat_str), "%6.3f", points->lat[point]);
+            snprintf (lat_str, sizeof (lat_str), "%06.3f", points->lat[point]);
         else
-            snprintf (lat_str, sizeof (lat_str), "%6.2f", points->lat[point]);
+            snprintf (lat_str, sizeof (lat_str), "%06.2f", points->lat[point]);
 
         if (points->lon[point] < 100.0)
-            snprintf (lon_str, sizeof (lon_str), "%6.3f", points->lon[point]);
+            snprintf (lon_str, sizeof (lon_str), "%06.3f", points->lon[point]);
         else
-            snprintf (lon_str, sizeof (lon_str), "%6.2f", points->lon[point]);
+            snprintf (lon_str, sizeof (lon_str), "%06.2f", points->lon[point]);
 
         /* Create the name of the directory for the current NARR point */
         snprintf (current_point, sizeof (current_point),
