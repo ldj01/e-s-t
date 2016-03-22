@@ -280,7 +280,7 @@ read_input
 
 #define DATE_STRING_LEN (50)
 #define TIME_STRING_LEN (50)
-#define INVALID_INSTRUMENT_COMBO ("invalid insturment/satellite combination")
+#define INVALID_INSTRUMENT_COMBO ("invalid instrument/satellite combination")
 
 
 /*****************************************************************************
@@ -353,7 +353,7 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
     }
     else if (!strncmp (global->instrument, "OLI_TIRS", 8))
     {
-        input->meta.instrument = INST_ETM;
+        input->meta.instrument = INST_OLI_TIRS;
     }
     else
     {
