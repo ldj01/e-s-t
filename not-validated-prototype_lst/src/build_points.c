@@ -222,9 +222,6 @@ int build_points
     char FUNC_NAME[] = "build_points";
 
     char *lst_data_dir = NULL;
-#if 0
-    char msg[PATH_MAX];
-#endif
 
     double **lat;
     double **lon;
@@ -324,7 +321,14 @@ int build_points
     points->num_cols = max_col - min_col + 1;
     points->num_points = points->num_rows * points->num_cols;
 
+    if (min_row == 1000 || max_row == 0 || min_col == 1000 || max_col == 0)
+    {
+        RETURN_ERROR("Scene partially or completely outside NARR data bounds",
+                     FUNC_NAME, FAILURE);
+    }
+
 #if 0
+    char msg[512];
     snprintf (msg, sizeof (msg), "min_row = %d\n", points->min_row);
     LOG_MESSAGE (msg, FUNC_NAME);
 
