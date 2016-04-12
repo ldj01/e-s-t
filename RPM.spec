@@ -27,7 +27,7 @@ BuildArch:	x86_64
 Packager:	USGS EROS LSRD
 
 BuildRequires:	espa-product-formatter
-Requires:	espa-product-formatter >= 1.6.0
+Requires:	espa-product-formatter >= 201605
 
 
 # ----------------------------------------------------------------------------
