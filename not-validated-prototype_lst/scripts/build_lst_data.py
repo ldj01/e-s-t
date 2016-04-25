@@ -358,6 +358,8 @@ class BuildLSTData(object):
                                              base_band.pixel_size.units)
         lst_band.set_pixel_size(pixel_size)
 
+        lst_band.set_resample_method('none')
+
         valid_range = metadata_api.valid_range(min=1500, max=3730)
         lst_band.set_valid_range(valid_range)
 

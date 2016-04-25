@@ -954,6 +954,8 @@ class EstimateLandsatEmissivity(object):
                                              base_band.pixel_size.units)
         emis_band.set_pixel_size(pixel_size)
 
+        emis_band.set_resample_method('none')
+
         valid_range = metadata_api.valid_range(min=0.0, max=1.0)
         emis_band.set_valid_range(valid_range)
 
