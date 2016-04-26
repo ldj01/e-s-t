@@ -8,7 +8,7 @@
 /* This is for compile time debugging logic.
    Set it to 0 to turn it off.
    It needs to be set to 0 for production/standard processing. */
-#define OUTPUT_CELL_DESIGNATION_BAND 1
+#define OUTPUT_CELL_DESIGNATION_BAND 0
 
 
 /* Structure for the intermediate data */
