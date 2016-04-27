@@ -84,7 +84,7 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
-* Mon Apr 26 2016 Ronald D Dilley <rdilley@usgs.gov>
+* Wed Apr 27 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
 - Updated release number for a bug fix during testing
 
 * Mon Apr 25 2016 Ronald D Dilley <rdilley@usgs.gov>
