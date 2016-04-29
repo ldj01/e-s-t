@@ -403,7 +403,8 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
     for (index = 0; index < metadata->nbands; index++)
     {
         /* Only look at the ones with the product name we are looking for */
-        if (strcmp (metadata->band[index].product, "L1T") == 0)
+        if (strcmp (metadata->band[index].product, "L1T") == 0
+            || strcmp (metadata->band[index].product, "L1G") == 0)
         {
             if (strcmp (metadata->band[index].name,
                         input->reference_band_name) == 0)
