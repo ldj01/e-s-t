@@ -718,9 +718,9 @@ Date        Programmer       Reason
 *****************************************************************************/
 #define L4_TM_SRS_COUNT (171)
 #define L5_TM_SRS_COUNT (171)
-#define L7_TM_SRS_COUNT (172)
+#define L7_TM_SRS_COUNT (125)
 #define L8_OLITIRS_SRS_COUNT (101)
-#define MAX_SRS_COUNT (L7_TM_SRS_COUNT)
+#define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
 /* This emissivity/albedo is for water */
 #define WATER_ALBEDO (0.1)
 #define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
