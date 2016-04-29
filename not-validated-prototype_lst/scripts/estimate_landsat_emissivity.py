@@ -858,6 +858,7 @@ class EstimateLandsatEmissivity(object):
                                           gdal.GDT_Float32)
 
         # Soil - From prototype code variable name
+        self.logger.info('Calculating EMIS Final')
         with np.errstate(divide='ignore'):
             ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
                              (1.0 - aster_ndvi_data))
