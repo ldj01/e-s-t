@@ -15,7 +15,7 @@
 # ----------------------------------------------------------------------------
 Name:		espa-land-surface-temperature
 Version:	201605
-Release:	3%{?dist}
+Release:	4%{?dist}
 Summary:	ESPA Land Surface Temperature Software
 
 Group:		ESPA
@@ -84,9 +84,11 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
-* Wed Apr 27 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
+* Fri Apr 29 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
 - Updated release number for a bug fix during testing
 
+* Wed Apr 27 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
+- Updated release number for a bug fix during testing
 * Mon Apr 25 2016 Ronald D Dilley <rdilley@usgs.gov>
 - Updated release number for a bug fix during testing
 * Tue Apr 12 2016 Ronald D Dilley <rdilley@usgs.gov>
