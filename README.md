@@ -1,15 +1,16 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.0.2 Release Notes
-Release Date: March 2016
+## Land Surface Temperature 0.0.4 Release Notes
+Release Date: July 2016
 
-This application produces Land Surface Temperature products for Landsats 5, and 7.
+This application produces Land Surface Temperature products for Landsats 4, 5, 7 and 8.
 
 ## Product Descriptions
 See the [PLACE HOLDER](butter) product guide for information about the Land Surface Temeprature products.
 
 ## Release Notes
-* Version Change
+* Version change
+* Updated emissivity coefficients
 
 ## Installation
 
@@ -51,6 +52,14 @@ See `land_surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
+* LST_AUX_DIR - Points to our NARR data archive
+  - `export LST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
+* LST_DATA_DIR - Points to the installed static file
+  - `export LST_DATA_DIR="/usr/local/espa-land-surface-temperature/lst/static_data"`
+* MODTRAN_PATH - Points to the installed MODTRAN location
+  - `export MODTRAN_PATH="/usr/local/bin"`
+* MODTRAN_DATA_DIR - Points to the directory containing the MODTRAN "DATA" directory
+  - `export MODTRAN_DATA_DIR="/usr/local/auxiliaries/MODTRAN_DATA"`
 * ASTER_GED_SERVER_NAME
   - `export ASTER_GED_SERVER_NAME="e4ftl01.cr.usgs.gov"`
 * ASTER_GED_SERVER_PATH
