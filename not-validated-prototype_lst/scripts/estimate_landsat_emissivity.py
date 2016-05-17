@@ -616,26 +616,26 @@ class EstimateLandsatEmissivity(object):
             self.estimated_coeff_1 = 0.3222
             self.estimated_coeff_2 = 0.6498
             self.estimated_coeff_3 = 0.0272
-            self.snow_emis_value = 0.9894
-            self.vegetation_coeff = 0.9883
+            self.snow_emis_value = 0.9883
+            self.vegetation_coeff = 0.9894
         elif self.satellite == 'LANDSAT_5':
-            self.estimated_coeff_1 = -0.0724
+            self.estimated_coeff_1 = -0.0723
             self.estimated_coeff_2 = 1.0521
-            self.estimated_coeff_3 = 0.0197
-            self.snow_emis_value = 0.9899
-            self.vegetation_coeff = 0.9857
+            self.estimated_coeff_3 = 0.0195
+            self.snow_emis_value = 0.9856
+            self.vegetation_coeff = 0.9899
         elif self.satellite == 'LANDSAT_7':
-            self.estimated_coeff_1 = 0.2127
-            self.estimated_coeff_2 = 0.7811
-            self.estimated_coeff_3 = 0.0057
-            self.snow_emis_value = 0.9896
-            self.vegetation_coeff = 0.9876
+            self.estimated_coeff_1 = 0.2147
+            self.estimated_coeff_2 = 0.7789
+            self.estimated_coeff_3 = 0.0058
+            self.snow_emis_value = 0.9876
+            self.vegetation_coeff = 0.9896
         elif self.satellite == 'LANDSAT_8':
             self.estimated_coeff_1 = 0.6820
             self.estimated_coeff_2 = 0.2578
             self.estimated_coeff_3 = 0.0584
-            self.snow_emis_value = 0.9885
-            self.vegetation_coeff = 0.9904
+            self.snow_emis_value = 0.9904
+            self.vegetation_coeff = 0.9885
         else:
             raise Exception('Unsupported satellite sensor')
 
