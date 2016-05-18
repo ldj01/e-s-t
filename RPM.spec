@@ -14,7 +14,7 @@
 
 # ----------------------------------------------------------------------------
 Name:		espa-land-surface-temperature
-Version:	201607
+Version:	201608
 Release:	1%{?dist}
 Summary:	ESPA Land Surface Temperature Software
 
@@ -37,7 +37,7 @@ Provides science application executables for generating land surface temperature
 
 # ----------------------------------------------------------------------------
 # Specify the repository tag/branch to clone and build from
-%define tagname dev_v0.0.4
+%define tagname dev_v0.1.0
 # Specify the name of the directory to clone into
 %define clonedname %{name}-%{tagname}
 
