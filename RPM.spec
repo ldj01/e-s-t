@@ -14,8 +14,8 @@
 
 # ----------------------------------------------------------------------------
 Name:		espa-land-surface-temperature
-Version:	201605
-Release:	4%{?dist}
+Version:	201607
+Release:	1%{?dist}
 Summary:	ESPA Land Surface Temperature Software
 
 Group:		ESPA
@@ -37,7 +37,7 @@ Provides science application executables for generating land surface temperature
 
 # ----------------------------------------------------------------------------
 # Specify the repository tag/branch to clone and build from
-%define tagname dev_v0.0.3
+%define tagname dev_v0.0.4
 # Specify the name of the directory to clone into
 %define clonedname %{name}-%{tagname}
 
@@ -84,9 +84,11 @@ rm -rf %{buildroot}
 
 # ----------------------------------------------------------------------------
 %changelog
+* Wed May 18 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
+- Updated for July 2016 release
+
 * Fri Apr 29 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
 - Updated release number for a bug fix during testing
-
 * Wed Apr 27 2016 Ronald D Dilley <ronald.dilley.ctr@usgs.gov>
 - Updated release number for a bug fix during testing
 * Mon Apr 25 2016 Ronald D Dilley <rdilley@usgs.gov>
