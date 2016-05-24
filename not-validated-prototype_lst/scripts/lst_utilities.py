@@ -20,7 +20,7 @@ from osgeo import gdal, osr
 from time import sleep
 
 
-import metadata_api
+#import metadata_api
 
 
 class Version(object):
@@ -141,7 +141,7 @@ class Metadata(object):
             # We don't error, just nothing to do.
             return
 
-        espa_xml = metadata_api.parse(xml_filename, silence=True)
+#        espa_xml = metadata_api.parse(xml_filename, silence=True)
         bands = espa_xml.get_bands()
 
         # Gather all the filenames to be removed
@@ -167,13 +167,13 @@ class Metadata(object):
             bands.band[:] = [band for band in bands.band
                              if band.product not in product_list]
 
-            try:
-                # Export to the file with validation
-                with open(xml_filename, 'w') as xml_fd:
-                    metadata_api.export(xml_fd, espa_xml)
-
-            except Exception:
-                raise
+#            try:
+#                # Export to the file with validation
+#                with open(xml_filename, 'w') as xml_fd:
+#                    metadata_api.export(xml_fd, espa_xml)
+#
+#            except Exception:
+#                raise
 
         del bands
         del espa_xml
@@ -365,6 +365,35 @@ class Geo(object):
     Description:
         Provides methods for interfacing with geographic projections.
     '''
+
+    @staticmethod
+    def convert_imageXY_to_mapXY(image_x, image_y, transform):
+        """Translate image coordinates into map coordinates"""
+
+        map_x = (transform[0] +
+                 image_x * transform[1] +
+                 image_y * transform[2])
+        map_y = (transform[3] +
+                 image_x * transform[4] +
+                 image_y * transform[5])
+
+        return (map_x, map_y)
+
+    @staticmethod
+    def convert_mapXY_to_imageXY(map_x, map_y, transform):
+        """Translate map coordinates into image coordinates"""
+
+        # Convert the transform from image->map to map->image
+        (success, inv_transform) = gdal.InvGeoTransform(transform)
+
+        image_x = (inv_transform[0] +
+                   map_x * inv_transform[1] +
+                   map_y * inv_transform[2])
+        image_y = (inv_transform[3] +
+                   map_x * inv_transform[4] +
+                   map_y * inv_transform[5])
+
+        return (image_x, image_y)
 
     @staticmethod
     def get_proj4_projection_string(img_filename):
