@@ -11,14 +11,27 @@
 #include "input.h"
 
 
-/******************************************************************************
-MODULE:  read_narr_coordinates
+#define NARR_COORDINATES_FILENAME "narr_coordinates.txt"
 
-PURPOSE: Creates directories and writes tape5 file, caseList, and commandList
 
-RETURN: SUCCESS
+/*****************************************************************************
+Method:  load_narr_coordinates
+
+Purpose: Loads NARR coordinates from static auxilliary file.
+
+Return: SUCCESS
         FAILURE
-******************************************************************************/
+
+Notes: The file format contains lines of the following information.
+           'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
+       With the following format.
+           '%d %d %lf %lf'
+
+       Each line in the file represents for the purpose of this application a
+       (row, col) coodinate pair that coinsides with the rows and columns of
+       NARR data.
+
+*****************************************************************************/
 int read_narr_coordinates
 (
     char *lst_data_dir,
@@ -38,20 +51,19 @@ int read_narr_coordinates
     FILE *fd = NULL;
 
     /* Setup the string to be used to open the coordinates file */
-    count = snprintf (coord_file, sizeof (coord_file),
-                      "%s/%s", lst_data_dir, "narr_coordinates.txt");
+    count = snprintf(coord_file, sizeof(coord_file),
+                     "%s/%s", lst_data_dir, NARR_COORDINATES_FILENAME);
     if (count < 0 || count >= sizeof (coord_file))
     {
-        RETURN_ERROR ("Failed initializing coord_file variable for"
-                      " narr_coordinates.txt", FUNC_NAME, FAILURE);
+        RETURN_ERROR("Failed initializing coord_file", FUNC_NAME, FAILURE);
     }
 
     /* Open the NARR coordinates file */
-    fd = fopen (coord_file, "r");
+    fd = fopen(coord_file, "r");
     if (fd == NULL)
     {
-        RETURN_ERROR ("Can't open narr_coordinates.txt file", FUNC_NAME,
-                      FAILURE);
+        RETURN_ERROR("Unable to open narr_coordinates.txt file",
+                     FUNC_NAME, FAILURE);
     }
 
     /* Read each value from the file */
@@ -281,7 +293,7 @@ int build_points
     buffered_east_lon = input->meta.bounding_coords[ESPA_EAST] + 0.2;
     buffered_west_lon = input->meta.bounding_coords[ESPA_WEST] - 0.2;
 
-    /* determine what points in the NARR dataset fall within our buffered
+    /* Determine what points in the NARR dataset fall within our buffered
        Landsat area using logical operators lessThanLat and greaterThanLat
        are values where the NARR values are less than or greater than the
        edges of the Landsat corners values respectively pixels that are true
