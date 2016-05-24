@@ -12,7 +12,7 @@
 /******************************************************************************
 METHOD:  planck_eq
 
-PURPOSE: Using Planck's equaiton to calculate radiance at each wavelength for
+PURPOSE: Using Planck's equation to calculate radiance at each wavelength for
          current temperature.
 
 RETURN: SUCCESS
