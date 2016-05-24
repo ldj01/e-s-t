@@ -11,6 +11,7 @@ include $(TOP)/make.config
 
 SCRIPTS = \
     lst_core_processing.py \
+    lst_build_points.py \
     extract_modtran_results.py
 
 SCRIPT_IMPORTS = \
@@ -18,6 +19,7 @@ SCRIPT_IMPORTS = \
     estimate_landsat_emissivity.py \
     extract_auxiliary_narr_data.py \
     lst_environment.py \
+    lst_exceptions.py \
     lst_utilities.py
 
 #-----------------------------------------------------------------------------
