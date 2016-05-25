@@ -271,9 +271,9 @@ def convert_line_to_coordinate_info(gdal_objs, data_bounds, line):
     longitude = float(longitude)
 
     if longitude > 180.0:
-        longitude = 360.0 - longitude;
+        longitude = 360.0 - longitude
     else:
-        longitude = -longitude;
+        longitude = -longitude
 
     if not check_within_bounds(data_bounds, longitude, latitude):
         return None
@@ -317,9 +317,9 @@ def convert_line_to_point_info(gdal_objs, min_max, line):
             min_max.max_col >= col):
 
         if longitude > 180.0:
-            longitude = 360.0 - longitude;
+            longitude = 360.0 - longitude
         else:
-            longitude = -longitude;
+            longitude = -longitude
 
         (map_x, map_y, height) = gdal_objs.ll_to_data.TransformPoint(longitude,
                                                                      latitude)
@@ -335,16 +335,14 @@ def is_in_data(gdal_objs, point):
     """Determine if the point is located on valid data
     """
 
-    adjustment = int(32000/30.0/1.5 + 1.0)
-
     (data_x, data_y) = (util.Geo
-        .convert_mapXY_to_imageXY(point.map_x, point.map_y,
-                                  gdal_objs.data_transform))
+                        .convert_mapXY_to_imageXY(point.map_x, point.map_y,
+                                                  gdal_objs.data_transform))
 
-    if data_x < -adjustment or data_x >= gdal_objs.nsamps + adjustment:
+    if data_x < 0 or data_x >= gdal_objs.nsamps:
         return False
 
-    if data_y < -adjustment or data_y >= gdal_objs.nlines + adjustment:
+    if data_y < 0 or data_y >= gdal_objs.nlines:
         return False
 
     return True
@@ -388,8 +386,8 @@ def closest_points(gdal_objs, dpoints, samp, line):
     """
 
     (map_x, map_y) = (util.Geo
-        .convert_imageXY_to_mapXY(samp, line,
-                                  gdal_objs.data_transform))
+                      .convert_imageXY_to_mapXY(samp, line,
+                                                gdal_objs.data_transform))
 
     (longitude, latitude, height) = gdal_objs.data_to_ll.TransformPoint(map_x,
                                                                         map_y)
@@ -405,7 +403,24 @@ def closest_points(gdal_objs, dpoints, samp, line):
         index += 1
 
     sorted_points = sorted(dlist)
-    return sorted_points[:4]
+    return (sorted_points[0][1], sorted_points[0][1],
+            sorted_points[0][1], sorted_points[0][1])
+
+
+def find_first_last_occurances(mask, lines, value):
+    for line in xrange(lines):
+        a = mask[line]
+        b = a[::-1]
+        l = len(b)
+        try:
+            first_samp = a.tolist().index(value)
+            last_samp = l - 1 - b.tolist().index(value)
+            yield((line, first_samp))
+            yield((line, last_samp))
+        except ValueError:
+            # Some lines do not have any values and a value error is returned
+            # from the index() call
+            pass
 
 
 def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
@@ -440,7 +455,8 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
                                                   line=line.strip())
                   for line in coords_fd]
 
-    # Filter out the None values (removes all of the way way way outside points)
+    # Filter out the None values
+    # (removes all of the way way way outside points)
     coords = [coord for coord in coords if coord is not None]
 
     # Determine min and max rows and cols for those within the boundary
@@ -485,41 +501,64 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
     # As well as mark points usable or not
     dpoints = [{'row': point.row-min_row,
                 'col': point.col-min_col,
-                'usable': False, #is_in_data(gdal_objs=gdal_objs,
-                                 #    point=point),
+                'usable': is_in_data(gdal_objs=gdal_objs,
+                                     point=point),
                 'point': point}
-              for point in points]
+               for point in points]
 
     raster_data = (gdal_objs.data_ds.GetRasterBand(1)
                    .ReadAsArray(0, 0, gdal_objs.nsamps, gdal_objs.nlines))
 
-    # Grab all the valid data points points
-    image_locs = np.where(raster_data != gdal_objs.fill_value)
-    # Zip them into pairs
-    zipped = zip(*image_locs)
-    # Process through the zipped pairs to find the closest
-    plists = [closest_points(gdal_objs, dpoints, pair[0], pair[1]) for pair in zipped]
+    mask = np.zeros(shape=raster_data.shape, dtype=np.bool)
+
+    # Set all the valid data points to True
+    mask[raster_data != gdal_objs.fill_value] = True
+    del raster_data
+
+    # Process through the mask and generate pairs for the east/west edges
+    ew_edges = sorted([pair
+                       for pair
+                       in find_first_last_occurance(mask, gdal_objs.nlines,
+                                                    True)])
+
+    # Add all the data points between the first and last line edges
+    first_line = ew_edges[:2]
+    last_line = ew_edges[-2:]
+    min_line = first_line
+
+    ew_edges.extend([(first_line[0][0], samp)
+                     for samp in xrange(first_line[0][1] + 1,
+                                        first_line[1][1])])
+
+    ew_edges.extend([(last_line[0][0], samp)
+                     for samp in xrange(last_line[0][1] + 1,
+                                        last_line[1][1])])
+
+    # Remove duplicates and re-sort
+    ew_edges = sorted(list(set(ew_edges)))
+
+    plist = [closest_points(gdal_objs, dpoints, pair[1], pair[0])
+             for pair in ew_edges]
+
     # Join the sets of four into one list
-    plist = [p for sub_p in plists for p in sub_p]
-    # Truncate to the set
+    plist = [group for sub_group in plists for group in sub_group]
+
+    # Remove duplicates
     plist = list(set(plist))
 
-    # Need to combine the lists
-    #    dpoints[p1[1]]['usable'] = True
-    #    dpoints[p2[1]]['usable'] = True
-    #    dpoints[p3[1]]['usable'] = True
-    #    dpoints[p4[1]]['usable'] = True
-    #plist = []
-    #[i for sub in zipped for i in sub]
+    for point in plist:
+        dpoints[point]['usable'] = True
 
     with open('usable_point_list.txt', 'w') as points_fd:
         index = 0
         for dpoint in dpoints:
             if dpoints[index]['usable']:
                 points_fd.write('{0},{1},{2},{3},{4}\n'
-                    .format(index, dpoints[index]['row'], dpoints[index]['col'],
-                            dpoints[index]['point'].longitude,
-                            dpoints[index]['point'].latitude))
+                                .format(index,
+                                        dpoints[index]['row'],
+                                        dpoints[index]['col'],
+                                        dpoints[index]['point'].longitude,
+                                        dpoints[index]['point'].latitude))
 
             index += 1
 
@@ -528,9 +567,11 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
         for dpoint in dpoints:
             if not dpoints[index]['usable']:
                 points_fd.write('{0},{1},{2},{3},{4}\n'
-                    .format(index, dpoints[index]['row'], dpoints[index]['col'],
-                            dpoints[index]['point'].longitude,
-                            dpoints[index]['point'].latitude))
+                                .format(index,
+                                        dpoints[index]['row'],
+                                        dpoints[index]['col'],
+                                        dpoints[index]['point'].longitude,
+                                        dpoints[index]['point'].latitude))
             index += 1
 
     return dpoints
@@ -574,8 +615,6 @@ def main():
     points = retrieve_narr_points(gdal_objs=gdal_objs,
                                   data_bounds=data_bounds,
                                   lst_data_dir=args.lst_data_dir)
-
-    #print points
 
 
 if __name__ == '__main__':
