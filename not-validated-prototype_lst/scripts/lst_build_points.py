@@ -116,7 +116,7 @@ def retrieve_command_line_arguments():
 
 
 def initialize_gdal_objects(espa_metadata):
-    """
+    """Initialize the gdal objects and information we will need later
     """
 
     logger = logging.getLogger(__name__)
@@ -240,7 +240,7 @@ def check_within_bounds(data_bounds, longitude, latitude):
     return False
 
 
-def convert_line_to_coordinate_info(gdal_objs, data_bounds, line):
+def convert_line_to_coordinate_info(data_bounds, line):
     """Converts a line of information into a CoordinateInfo
 
     Args:
@@ -332,7 +332,7 @@ def convert_line_to_point_info(gdal_objs, min_max, line):
 
 
 def is_in_data(gdal_objs, point):
-    """Determine if the point is located on valid data
+    """Determine if the point is located within the data
     """
 
     (data_x, data_y) = (util.Geo
@@ -381,8 +381,24 @@ def haversine_distance(longitude_1, latitude_1, longitude_2, latitude_2):
                                                            sin_lon_sqrd)))
 
 
-def closest_points(gdal_objs, dpoints, samp, line):
+def grid_point_distance(gdal_objs, point, samp, line):
+    """Determine the distance from the line sample to the grid point
     """
+
+    (map_x, map_y) = (util.Geo
+                      .convert_imageXY_to_mapXY(samp, line,
+                                                gdal_objs.data_transform))
+
+    (longitude, latitude, height) = gdal_objs.data_to_ll.TransformPoint(map_x,
+                                                                        map_y)
+
+    return haversine_distance(longitude, latitude,
+                              point['point'].longitude,
+                              point['point'].latitude)
+
+
+def center_grid_point(gdal_objs, dpoints, samp, line):
+    """Returns the closest point to the line sample
     """
 
     (map_x, map_y) = (util.Geo
@@ -394,36 +410,113 @@ def closest_points(gdal_objs, dpoints, samp, line):
 
     dlist = list()
     index = 0
-    for p in dpoints:
+    for dpoint in dpoints:
 
         distance = haversine_distance(longitude, latitude,
-                                      p['point'].longitude,
-                                      p['point'].latitude)
+                                      dpoint['point'].longitude,
+                                      dpoint['point'].latitude)
         dlist.append((distance, index))
         index += 1
 
-    sorted_points = sorted(dlist)
-    return (sorted_points[0][1], sorted_points[0][1],
-            sorted_points[0][1], sorted_points[0][1])
+    # Return the closest grid point
+    return sorted(dlist)[0][1]
 
 
 def find_first_last_occurances(mask, lines, value):
+    """Find the first and last valid data pixels for each line
+    """
+
     for line in xrange(lines):
-        a = mask[line]
-        b = a[::-1]
-        l = len(b)
+        l2r = mask[line]
+        r2l = l2r[::-1]
         try:
-            first_samp = a.tolist().index(value)
-            last_samp = l - 1 - b.tolist().index(value)
-            yield((line, first_samp))
-            yield((line, last_samp))
+            first_samp = l2r.tolist().index(value)
+            last_samp = len(r2l) - 1 - r2l.tolist().index(value)
+            yield (line, first_samp)
+            yield (line, last_samp)
         except ValueError:
             # Some lines do not have any values and a value error is returned
             # from the index() call
             pass
 
 
-def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
+def bounded_points_from_file(data_bounds, data_path):
+    """Figure out the NARR points that are within the data bounds
+    """
+
+    # Generate a list of the points within the defined boundary
+    with open(data_path, 'r') as coords_fd:
+        points = [convert_line_to_coordinate_info(data_bounds=data_bounds,
+                                                  line=line.strip())
+                  for line in coords_fd]
+
+    # Filter out the None values
+    # (removes all of the way way way outside points)
+    return [point for point in points if point is not None]
+
+
+def gridded_points(debug, gdal_objs, lst_data_dir):
+    """
+    """
+
+    # Determine full path to the file
+    data_path = os.path.join(lst_data_dir, NARR_COORDINATES_FILENAME)
+
+    # Determine buffered points
+    buffered_points = bounded_points_from_file(data_bounds, data_path)
+
+    # Determine min and max rows and cols for those within the boundary
+    min_row = 9999
+    max_row = -9999
+    min_col = 9999
+    max_col = -9999
+    for point in bounded_points:
+        min_row = min(min_row, point.row)
+        max_row = max(max_row, point.row)
+        min_col = min(min_col, point.col)
+        max_col = max(max_col, point.col)
+
+    min_max = MinMaxRowColInfo(min_row=min_row,
+                               max_row=max_row,
+                               min_col=min_col,
+                               max_col=max_col)
+
+    grid_rows = max_row - min_row + 1
+    grid_cols = max_col - min_col + 1
+
+    # Using the mins and maxs read the coordinates again
+    # but keep a complete rectangular grid of them
+    with open(data_path, 'r') as coords_fd:
+        points = [convert_line_to_point_info(gdal_objs=gdal_objs,
+                                             min_max=min_max,
+                                             line=line.strip())
+                  for line in coords_fd]
+
+    # Filter out the None values (Only keeps the grid we want)
+    points = [point for point in points if point is not None]
+
+    if debug:
+        with open('full_point_list.txt', 'w') as points_fd:
+            index = 0
+            for point in points:
+                points_fd.write('{0},{1},{2}\n'.format(index,
+                                                       point.longitude,
+                                                       point.latitude))
+                index += 1
+
+    # Determine the final set of grid points
+    # As well as initially mark points usable or not
+    grid_points = [{'row': point.row-min_row,
+                    'col': point.col-min_col,
+                    'usable': is_in_data(gdal_objs=gdal_objs,
+                                         point=point),
+                    'point': point}
+                   for point in points]
+
+    return (grid_points, grid_rows, grid_cols)
+
+
+def retrieve_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
     """Reads the NARR coordinates file and filters to a final set of points
 
     Args:
@@ -445,66 +538,10 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
 
     """
 
-    # Determine full path to the file
-    data_path = os.path.join(lst_data_dir, NARR_COORDINATES_FILENAME)
-
-    # Generate a list of the points within the defined boundary
-    with open(data_path, 'r') as coords_fd:
-        coords = [convert_line_to_coordinate_info(gdal_objs=gdal_objs,
-                                                  data_bounds=data_bounds,
-                                                  line=line.strip())
-                  for line in coords_fd]
-
-    # Filter out the None values
-    # (removes all of the way way way outside points)
-    coords = [coord for coord in coords if coord is not None]
-
-    # Determine min and max rows and cols for those within the boundary
-    min_row = 9999
-    max_row = -9999
-    min_col = 9999
-    max_col = -9999
-    for coord in coords:
-        min_row = min(min_row, coord.row)
-        max_row = max(max_row, coord.row)
-        min_col = min(min_col, coord.col)
-        max_col = max(max_col, coord.col)
-
-    min_max = MinMaxRowColInfo(min_row=min_row,
-                               max_row=max_row,
-                               min_col=min_col,
-                               max_col=max_col)
-
-    rows = max_row - min_row + 1
-    cols = max_col - min_col + 1
-
-    # Using the mins and maxs read the coordinates again
-    # but keep a complete rectangular grid of them
-    with open(data_path, 'r') as coords_fd:
-        points = [convert_line_to_point_info(gdal_objs=gdal_objs,
-                                             min_max=min_max,
-                                             line=line.strip())
-                  for line in coords_fd]
-
-    # Filter out the None values (Only keeps the grid we want)
-    points = [point for point in points if point is not None]
-
-    with open('full_point_list.txt', 'w') as points_fd:
-        index = 0
-        for point in points:
-            points_fd.write('{0},{1},{2}\n'.format(index,
-                                                   point.longitude,
-                                                   point.latitude))
-            index += 1
-
-    # Determine the final set of points
-    # As well as mark points usable or not
-    dpoints = [{'row': point.row-min_row,
-                'col': point.col-min_col,
-                'usable': is_in_data(gdal_objs=gdal_objs,
-                                     point=point),
-                'point': point}
-               for point in points]
+    # Determine grid points
+    (grid_points, grid_rows, grid_cols) = gridded_points(debug,
+                                                         gdal_objs,
+                                                         lst_data_dir)
 
     raster_data = (gdal_objs.data_ds.GetRasterBand(1)
                    .ReadAsArray(0, 0, gdal_objs.nsamps, gdal_objs.nlines))
@@ -518,8 +555,8 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
     # Process through the mask and generate pairs for the east/west edges
     ew_edges = sorted([pair
                        for pair
-                       in find_first_last_occurance(mask, gdal_objs.nlines,
-                                                    True)])
+                       in find_first_last_occurances(mask, gdal_objs.nlines,
+                                                     True)])
 
     # Add all the data points between the first and last line edges
     first_line = ew_edges[:2]
@@ -537,44 +574,72 @@ def retrieve_narr_points(gdal_objs, data_bounds, lst_data_dir):
     # Remove duplicates and re-sort
     ew_edges = sorted(list(set(ew_edges)))
 
-    plist = [closest_points(gdal_objs, dpoints, pair[1], pair[0])
-             for pair in ew_edges]
+    for pair in ew_edges:
+        cc_point = center_grid_point(gdal_objs, grid_points, pair[1], pair[0])
 
-    # Join the sets of four into one list
-    plist = [group for sub_group in plists for group in sub_group]
+        '''
+            UL UC UR
+            CL CC CR
+            LL LC LR
+        '''
 
-    # Remove duplicates
-    plist = list(set(plist))
+        # Figure out all the remaining possible grid points
+        ul_point = cc_point + grid_cols - 1
+        uc_point = ul_point + 1
+        ur_point = uc_point + 1
+        cl_point = cc_point - 1
+        cr_point = cc_point + 1
+        ll_point = cc_point - grid_cols - 1
+        lc_point = ll_point + 1
+        lr_point = lc_point + 1
 
-    for point in plist:
-        dpoints[point]['usable'] = True
+        # Get all of the distance to the outer grid points
+        ul_dist = grid_point_distance(gdal_objs, grid_points[ul_point],
+                                      pair[1], pair[0])
+        uc_dist = grid_point_distance(gdal_objs, grid_points[uc_point],
+                                      pair[1], pair[0])
+        ur_dist = grid_point_distance(gdal_objs, grid_points[ur_point],
+                                      pair[1], pair[0])
 
-    with open('usable_point_list.txt', 'w') as points_fd:
-        index = 0
-        for dpoint in dpoints:
-            if dpoints[index]['usable']:
-                points_fd.write('{0},{1},{2},{3},{4}\n'
-                                .format(index,
-                                        dpoints[index]['row'],
-                                        dpoints[index]['col'],
-                                        dpoints[index]['point'].longitude,
-                                        dpoints[index]['point'].latitude))
+        cl_dist = grid_point_distance(gdal_objs, grid_points[cl_point],
+                                      pair[1], pair[0])
+        cr_dist = grid_point_distance(gdal_objs, grid_points[cr_point],
+                                      pair[1], pair[0])
 
-            index += 1
+        ll_dist = grid_point_distance(gdal_objs, grid_points[ll_point],
+                                      pair[1], pair[0])
+        lc_dist = grid_point_distance(gdal_objs, grid_points[lc_point],
+                                      pair[1], pair[0])
+        lr_dist = grid_point_distance(gdal_objs, grid_points[lr_point],
+                                      pair[1], pair[0])
 
-    with open('unusable_point_list.txt', 'w') as points_fd:
-        index = 0
-        for dpoint in dpoints:
-            if not dpoints[index]['usable']:
-                points_fd.write('{0},{1},{2},{3},{4}\n'
-                                .format(index,
-                                        dpoints[index]['row'],
-                                        dpoints[index]['col'],
-                                        dpoints[index]['point'].longitude,
-                                        dpoints[index]['point'].latitude))
-            index += 1
+        # Determine quadrant by using the average quadrant distances
 
-    return dpoints
+        avg_dist_ul = (cl_dist + ul_dist + uc_dist) / 3.0
+        avg_dist_ur = (uc_dist + ur_dist + cr_dist) / 3.0
+        avg_dist_lr = (cr_dist + lr_dist + lc_dist) / 3.0
+        avg_dist_ll = (lc_dist + ll_dist + cl_dist) / 3.0
+
+        min_dist = min(avg_dist_ul, avg_dist_ur, avg_dist_lr, avg_dist_ll)
+
+        if min_dist == avg_dist_ul:
+            grid_points[cl_point]['usable'] = True
+            grid_points[ul_point]['usable'] = True
+            grid_points[uc_point]['usable'] = True
+        elif min_dist == avg_dist_ur:
+            grid_points[uc_point]['usable'] = True
+            grid_points[ur_point]['usable'] = True
+            grid_points[cr_point]['usable'] = True
+        elif min_dist == avg_dist_lr:
+            grid_points[cr_point]['usable'] = True
+            grid_points[lr_point]['usable'] = True
+            grid_points[lc_point]['usable'] = True
+        else:
+            grid_points[lc_point]['usable'] = True
+            grid_points[ll_point]['usable'] = True
+            grid_points[cl_point]['usable'] = True
+
+    return grid_points
 
 
 def main():
@@ -612,9 +677,29 @@ def main():
     logger.debug(str(data_bounds))
 
     # Coordinate Information
-    points = retrieve_narr_points(gdal_objs=gdal_objs,
+    points = retrieve_narr_points(debug=args.debug,
+                                  gdal_objs=gdal_objs,
                                   data_bounds=data_bounds,
                                   lst_data_dir=args.lst_data_dir)
+
+    if args.debug:
+        with open('usable_point_list.txt', 'w') as usable_fd:
+            with open('unusable_point_list.txt', 'w') as unusable_fd:
+                index = 0
+                for point in points:
+                    line = ('{0},{1},{2},{3},{4}\n'
+                            .format(index, point['row'], point['col'],
+                                    point['point'].longitude,
+                                    point['point'].latitude))
+
+                    if point['usable']:
+                        usable_fd.write(line)
+                    if not point['usable']:
+                        unusable_fd.write(line)
+
+                index += 1
+
+    del points
 
 
 if __name__ == '__main__':
