@@ -11,7 +11,7 @@ include $(TOP)/make.config
 
 SCRIPTS = \
     lst_core_processing.py \
-    lst_build_points.py \
+    lst_determine_grid_points.py \
     extract_modtran_results.py
 
 SCRIPT_IMPORTS = \
