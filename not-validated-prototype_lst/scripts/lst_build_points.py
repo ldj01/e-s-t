@@ -17,6 +17,8 @@ import os
 import sys
 import logging
 import math
+import array
+import struct
 import numpy as np
 from argparse import ArgumentParser
 from collections import namedtuple
@@ -27,25 +29,32 @@ from lst_exceptions import MissingBandError
 import lst_utilities as util
 
 
+# Name of the static NARR coordinates file
 NARR_COORDINATES_FILENAME = 'narr_coordinates.txt'
+
+# Geometric values for the Earth
 RADIUS_EARTH_IN_METERS = 6378137.0
 DIAMETER_EARTH_IN_METERS = RADIUS_EARTH_IN_METERS * 2
 
 
+# Gdal specific information
 GdalInfo = namedtuple('GdalInfo',
                       ('data_ds', 'data_srs',
                        'data_transform', 'll_srs',
                        'll_to_data', 'data_to_ll',
                        'nlines', 'nsamps', 'fill_value'))
+
+# Data boundry information
 DataBoundInfo = namedtuple('DataBoundInfo',
                            ('north_lat', 'south_lat', 'east_lon', 'west_lon'))
-CoordinateInfo = namedtuple('CoordinateInfo', ('col', 'row'))
+
+# Minimum and Maximum row and colume information
 MinMaxRowColInfo = namedtuple('MinMaxRowColInfo',
                               ('min_row', 'max_row', 'min_col', 'max_col'))
+
+# Point information
 PointInfo = namedtuple('PointInfo',
-                       ('col', 'row',
-                        'latitude', 'longitude',
-                        'map_y', 'map_x'))
+                       ('col', 'row', 'lat', 'lon', 'map_y', 'map_x'))
 
 
 def retrieve_command_line_arguments():
@@ -116,7 +125,13 @@ def retrieve_command_line_arguments():
 
 
 def initialize_gdal_objects(espa_metadata):
-    """Initialize the gdal objects and information we will need later
+    """Initialize the gdal objects and other static information
+
+    Args:
+        espa_metadata <espa.Metadata>: The metadata for the data
+
+    Returns:
+        <GdalInfo>: Contains GDAL objects and static information
     """
 
     logger = logging.getLogger(__name__)
@@ -169,10 +184,11 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
     """Determines the data boundaries specific to the NARR data resolution
 
     Args:
-        TODO TODO TODO
+        espa_metadata <espa.Metadata>: The metadata for the data
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
 
     Returns:
-        TODO TODO TODO
+        <DataBoundInfo>: Contains adjusted data boundry information
     """
 
     # Adjustment is specific to NARR data resolution in meters
@@ -218,114 +234,55 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
                          east_lon=east_lon, west_lon=west_lon)
 
 
-def check_within_bounds(data_bounds, longitude, latitude):
+def check_within_bounds(data_bounds, lon, lat):
     """
 
     Args:
-        data_bounds <DataBoundInfo>: The bounds to adhere to
-        longitude <float>: The longitude to check
-        latitude <float>: The latitude to check
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        lon <float>: The longitude to check
+        lat <float>: The latitude to check
 
     Returns:
-        <boolean>:  True - If within the bounds
-                   False - If not within the bounds
+        <boo>:  True - If within the bounds
+                False - If not within the bounds
     """
 
-    if (data_bounds.north_lat > latitude and
-            data_bounds.south_lat < latitude and
-            data_bounds.east_lon > longitude and
-            data_bounds.west_lon < longitude):
+    if (data_bounds.north_lat > lat and data_bounds.south_lat < lat and
+            data_bounds.east_lon > lon and data_bounds.west_lon < lon):
+
         return True
 
     return False
 
 
-def convert_line_to_coordinate_info(data_bounds, line):
-    """Converts a line of information into a CoordinateInfo
+def convert_narr_line_to_point_info(gdal_objs, min_max, line):
+    """Converts a line of information into a PointInfo
 
     Args:
-        data_bounds <DataBoundInfo>: The bounds to adhere to
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        min_max <MinMaxRowColInfo>: Contains the min and max rows and columes
         line <str>: The line of information read from the coordinate file
 
     Returns:
-        <CoordinateInfo>: NamedTuple of coordinate information
+        <PointInfo>: Contains point information from the NARR coordinates file
     """
 
-    (col, row, latitude, longitude) = line.split()
-
-    ''' TODO: Should think about fixing the input file, so that this
-              confusing conversion is not needed.
-
-        When you read the file data, it is as if you are reading the values
-        from the lower left to the upper right as applied to the earth.  And
-        the values being read in start with an origin somewhere around the
-        lower left, hence the need for the following conversion.
-
-        NOTE: If this is changed here, then else-where in the code will break.
-    '''
+    (col, row, lat, lon) = line.split()
 
     # Convert to numerical types
     col = int(col)
     row = int(row)
-    latitude = float(latitude)
-    longitude = float(longitude)
-
-    if longitude > 180.0:
-        longitude = 360.0 - longitude
-    else:
-        longitude = -longitude
-
-    if not check_within_bounds(data_bounds, longitude, latitude):
-        return None
-    else:
-        return CoordinateInfo(col=col, row=row)
-
-
-def convert_line_to_point_info(gdal_objs, min_max, line):
-    """Converts a line of information into a CoordinateInfo
-
-    Args:
-        data_bounds <DataBoundInfo>: The bounds to adhere to
-        line <str>: The line of information read from the coordinate file
-
-    Returns:
-        <CoordinateInfo>: NamedTuple of coordinate information
-    """
-
-    (col, row, latitude, longitude) = line.split()
-
-    ''' TODO: Should think about fixing the input file, so that this
-              confusing conversion is not needed.
-
-        When you read the file data, it is as if you are reading the values
-        from the lower left to the upper right as applied to the earth.  And
-        the values being read in start with an origin somewhere around the
-        lower left, hence the need for the following conversion.
-
-        NOTE: If this is changed here, then else-where in the code will break.
-    '''
-
-    # Convert to numerical types
-    col = int(col)
-    row = int(row)
-    latitude = float(latitude)
-    longitude = float(longitude)
+    lat = float(lat)
+    lon = fix_narr_longitude(float(lon))
 
     if (min_max.min_row <= row and
             min_max.max_row >= row and
             min_max.min_col <= col and
             min_max.max_col >= col):
 
-        if longitude > 180.0:
-            longitude = 360.0 - longitude
-        else:
-            longitude = -longitude
+        (map_x, map_y, height) = gdal_objs.ll_to_data.TransformPoint(lon, lat)
 
-        (map_x, map_y, height) = gdal_objs.ll_to_data.TransformPoint(longitude,
-                                                                     latitude)
-
-        return PointInfo(col=col, row=row,
-                         latitude=latitude, longitude=longitude,
+        return PointInfo(col=col, row=row, lat=lat, lon=lon,
                          map_x=map_x, map_y=map_y)
     else:
         return None
@@ -333,6 +290,15 @@ def convert_line_to_point_info(gdal_objs, min_max, line):
 
 def is_in_data(gdal_objs, point):
     """Determine if the point is located within the data
+
+    Args:
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        point <PointInfo>: Contains point information from the NARR
+                           coordinates file
+
+    Returns:
+        <boo>:  True - If within the data bounds
+                False - If not within the data bounds
     """
 
     (data_x, data_y) = (util.Geo
@@ -348,90 +314,113 @@ def is_in_data(gdal_objs, point):
     return True
 
 
-def haversine_distance(longitude_1, latitude_1, longitude_2, latitude_2):
+def haversine_distance(lon_1, lat_1, lon_2, lat_2):
     """Calulates the great-circle distance between two points in meters
 
     The points are given in decimal degrees.  Haversine formula is used.
 
     Args:
-        longitude_1 <float>: The longitude for the first point
-        latitude_1 <float>: The latitude for the first point
-        longitude_2 <float>: The longitude for the second point
-        latitude_2 <float>: The latitude for the second point
+        lon_1 <float>: The longitude for the first point
+        lat_1 <float>: The latitude for the first point
+        lon_2 <float>: The longitude for the second point
+        lat_2 <float>: The latitude for the second point
 
     Returns:
-        <float>: The great-circle distance in meters
+        <float>: The great-circle distance in meters between the points
 
     Sources:
         https://en.wikipedia.org/wiki/Haversine_formula
     """
 
     # Convert to radians
-    (lon_1, lat_1, lon_2, lat_2) = map(math.radians, [longitude_1, latitude_1,
-                                                      longitude_2, latitude_2])
+    (rlon_1, rlat_1, rlon_2, rlat_2) = map(math.radians, [lon_1, lat_1,
+                                                          lon_2, lat_2])
 
     # Figure out some sines
-    sin_lon_sqrd = math.sin((lon_2 - lon_1) / 2.0)**2
-    sin_lat_sqrd = math.sin((lat_2 - lat_1) / 2.0)**2
+    sin_lon_sqrd = math.sin((rlon_2 - rlon_1) / 2.0)**2
+    sin_lat_sqrd = math.sin((rlat_2 - rlat_1) / 2.0)**2
 
     # Compute and return the distance
     return (DIAMETER_EARTH_IN_METERS * math.asin(math.sqrt(sin_lat_sqrd +
-                                                           math.cos(lat_1) *
-                                                           math.cos(lat_2) *
+                                                           math.cos(rlat_1) *
+                                                           math.cos(rlat_2) *
                                                            sin_lon_sqrd)))
 
 
 def grid_point_distance(gdal_objs, point, samp, line):
     """Determine the distance from the line sample to the grid point
+
+    Args:
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        point <PointInfo>: Contains point information from the NARR
+                           coordinates file
+        samp <int>: The sample in the data
+        line <int>: The line in the data
+
+    Returns:
+        <float>: The great-circle distance in meters between the grid points
     """
 
     (map_x, map_y) = (util.Geo
                       .convert_imageXY_to_mapXY(samp, line,
                                                 gdal_objs.data_transform))
 
-    (longitude, latitude, height) = gdal_objs.data_to_ll.TransformPoint(map_x,
-                                                                        map_y)
+    (lon, lat, height) = gdal_objs.data_to_ll.TransformPoint(map_x, map_y)
 
-    return haversine_distance(longitude, latitude,
-                              point['point'].longitude,
-                              point['point'].latitude)
+    return haversine_distance(lon, lat,
+                              point['point'].lon,
+                              point['point'].lat)
 
 
-def center_grid_point(gdal_objs, dpoints, samp, line):
+def center_grid_point(gdal_objs, points, samp, line):
     """Returns the closest point to the line sample
+
+    Args:
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        points [<PointInfo>]: List of points
+        samp <int>: The sample in the data
+        line <int>: The line in the data
+
+    Returns:
+        <int>: The closest grid point index
     """
 
     (map_x, map_y) = (util.Geo
                       .convert_imageXY_to_mapXY(samp, line,
                                                 gdal_objs.data_transform))
 
-    (longitude, latitude, height) = gdal_objs.data_to_ll.TransformPoint(map_x,
-                                                                        map_y)
+    (lon, lat, height) = gdal_objs.data_to_ll.TransformPoint(map_x, map_y)
 
-    dlist = list()
+    grid_points = list()
     index = 0
-    for dpoint in dpoints:
+    for point in points:
 
-        distance = haversine_distance(longitude, latitude,
-                                      dpoint['point'].longitude,
-                                      dpoint['point'].latitude)
-        dlist.append((distance, index))
+        distance = haversine_distance(lon, lat,
+                                      point['point'].lon, point['point'].lat)
+        grid_points.append((distance, index))
         index += 1
 
-    # Return the closest grid point
-    return sorted(dlist)[0][1]
+    # Return the closest grid point index
+    return sorted(grid_points)[0][1]
 
 
-def find_first_last_occurances(mask, lines, value):
+def find_first_last_valid(mask, lines):
     """Find the first and last valid data pixels for each line
+
+    Args:
+        mask <numpy 2d bool array>: Mask of valid data as bool
+        lines <int>: Number of line in the data
+
+    Returns:
+        Yields (line, sample): For the left and right sides of the valid data
     """
 
     for line in xrange(lines):
         l2r = mask[line]
         r2l = l2r[::-1]
         try:
-            first_samp = l2r.tolist().index(value)
-            last_samp = len(r2l) - 1 - r2l.tolist().index(value)
+            first_samp = l2r.tolist().index(True)
+            last_samp = len(r2l) - 1 - r2l.tolist().index(True)
             yield (line, first_samp)
             yield (line, last_samp)
         except ValueError:
@@ -440,56 +429,120 @@ def find_first_last_occurances(mask, lines, value):
             pass
 
 
-def bounded_points_from_file(data_bounds, data_path):
-    """Figure out the NARR points that are within the data bounds
+def fix_narr_longitude(lon):
+    """Fixes the NARR longitude value to be within +-180
+
+    Args:
+        lon <float>: The longitude to fix
+
+    Returns:
+        <float>: The fixed longitude
     """
 
-    # Generate a list of the points within the defined boundary
+    ''' TODO: Should think about fixing the input file, so that this
+              confusing conversion is not needed.
+
+        When you read the file data, it is as if you are reading the values
+        from the lower left to the upper right as applied to the earth.  And
+        the values being read in start with an origin somewhere around the
+        lower left, hence the need for the following conversion.
+
+        NOTE: If this is changed here, then else-where in the code will break.
+    '''
+
+    if lon > 180.0:
+        return 360.0 - lon
+    else:
+        return -lon
+
+
+def extract_narr_row_col(data_bounds, line):
+    """Extracts the row and colume from a line of NARR coordinate information
+
+    Args:
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        line <str>: The line of information read from the coordinate file
+
+    Returns:
+        row <int>: The row for the point
+        col <int>: The colume for the point
+    """
+
+    (col, row, lat, lon) = line.split()
+
+    # Convert to numerical types
+    col = int(col)
+    row = int(row)
+    lat = float(lat)
+    lon = fix_narr_longitude(float(lon))
+
+    if not check_within_bounds(data_bounds, lon, lat):
+        return None
+    else:
+        return (row, col)
+
+
+def determine_narr_min_max_row_col(data_bounds, data_path):
+    """Determine the NARR points that are within the data bounds
+
+    Args:
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        data_path <str>: The full path to the NARR coordinates file
+
+    Returns:
+        <MinMaxRowColInfo>: Contains the min and max rows and columes
+    """
+
+    # Generate a list of the points [(row, col),] within the defined boundary
     with open(data_path, 'r') as coords_fd:
-        points = [convert_line_to_coordinate_info(data_bounds=data_bounds,
-                                                  line=line.strip())
-                  for line in coords_fd]
+        rows_cols = [extract_narr_row_col(data_bounds=data_bounds,
+                                          line=line.strip())
+                     for line in coords_fd]
 
     # Filter out the None values
-    # (removes all of the way way way outside points)
-    return [point for point in points if point is not None]
+    remaining = [point for point in rows_cols if point is not None]
+
+    # Determine min and max rows and cols for those within the boundary
+    (rows, cols) = zip(*remaining)
+    min_row = min(rows)
+    max_row = max(rows)
+    min_col = min(cols)
+    max_col = max(cols)
+
+    return MinMaxRowColInfo(min_row=min_row, max_row=max_row,
+                            min_col=min_col, max_col=max_col)
 
 
-def gridded_points(debug, gdal_objs, lst_data_dir):
-    """
+def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
+    """Determine the grid of NARR points which cover the data
+
+    Args:
+        debug <bool>: Perform debug output or not
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        lst_data_dir <str>: The directory for the NARR coodinate file
+
+    Returns:
+        grid_points <dict>: Dictionary of the gridded points
+        grid_rows <int>: Number of rows in the grid
+        grid_cols <int>: Number of columns in the grid
     """
 
     # Determine full path to the file
     data_path = os.path.join(lst_data_dir, NARR_COORDINATES_FILENAME)
 
     # Determine buffered points
-    buffered_points = bounded_points_from_file(data_bounds, data_path)
+    min_max = determine_narr_min_max_row_col(data_bounds, data_path)
 
-    # Determine min and max rows and cols for those within the boundary
-    min_row = 9999
-    max_row = -9999
-    min_col = 9999
-    max_col = -9999
-    for point in bounded_points:
-        min_row = min(min_row, point.row)
-        max_row = max(max_row, point.row)
-        min_col = min(min_col, point.col)
-        max_col = max(max_col, point.col)
-
-    min_max = MinMaxRowColInfo(min_row=min_row,
-                               max_row=max_row,
-                               min_col=min_col,
-                               max_col=max_col)
-
-    grid_rows = max_row - min_row + 1
-    grid_cols = max_col - min_col + 1
+    grid_rows = min_max.max_row - min_max.min_row + 1
+    grid_cols = min_max.max_col - min_max.min_col + 1
 
     # Using the mins and maxs read the coordinates again
     # but keep a complete rectangular grid of them
     with open(data_path, 'r') as coords_fd:
-        points = [convert_line_to_point_info(gdal_objs=gdal_objs,
-                                             min_max=min_max,
-                                             line=line.strip())
+        points = [convert_narr_line_to_point_info(gdal_objs=gdal_objs,
+                                                  min_max=min_max,
+                                                  line=line.strip())
                   for line in coords_fd]
 
     # Filter out the None values (Only keeps the grid we want)
@@ -500,14 +553,14 @@ def gridded_points(debug, gdal_objs, lst_data_dir):
             index = 0
             for point in points:
                 points_fd.write('{0},{1},{2}\n'.format(index,
-                                                       point.longitude,
-                                                       point.latitude))
+                                                       point.lon,
+                                                       point.lat))
                 index += 1
 
     # Determine the final set of grid points
     # As well as initially mark points usable or not
-    grid_points = [{'row': point.row-min_row,
-                    'col': point.col-min_col,
+    grid_points = [{'row': point.row-min_max.min_row,
+                    'col': point.col-min_max.min_col,
                     'usable': is_in_data(gdal_objs=gdal_objs,
                                          point=point),
                     'point': point}
@@ -516,16 +569,14 @@ def gridded_points(debug, gdal_objs, lst_data_dir):
     return (grid_points, grid_rows, grid_cols)
 
 
-def retrieve_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
-    """Reads the NARR coordinates file and filters to a final set of points
+def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
+    """Creates a point grid file for later processing
 
     Args:
-        data_bounds <DataBoundInfo>: The bounds to adhere to
-        lst_data_dir <str>: The directory to search for the coodinate file
-
-    Returns:
-        points <list>: A list of the NARR coordinate information where each
-                       element of the list is a CoordinateInfo
+        debug <bool>: Perform debug output or not
+        gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        lst_data_dir <str>: The directory for the NARR coodinate file
 
     Notes: The file format contains lines of the following information.
                'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
@@ -535,13 +586,11 @@ def retrieve_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
            Each line in the file represents for the purpose of this
            application a (row, col) coodinate pair that coinsides with the
            rows and cols of the NARR data.
-
     """
 
     # Determine grid points
-    (grid_points, grid_rows, grid_cols) = gridded_points(debug,
-                                                         gdal_objs,
-                                                         lst_data_dir)
+    (grid_points, grid_rows, grid_cols) = determine_gridded_narr_points(
+        debug, gdal_objs, data_bounds, lst_data_dir)
 
     raster_data = (gdal_objs.data_ds.GetRasterBand(1)
                    .ReadAsArray(0, 0, gdal_objs.nsamps, gdal_objs.nlines))
@@ -552,11 +601,10 @@ def retrieve_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
     mask[raster_data != gdal_objs.fill_value] = True
     del raster_data
 
-    # Process through the mask and generate pairs for the east/west edges
+    # Process through the mask and generate pairs for the left/right edges
     ew_edges = sorted([pair
                        for pair
-                       in find_first_last_occurances(mask, gdal_objs.nlines,
-                                                     True)])
+                       in find_first_last_valid(mask, gdal_objs.nlines)])
 
     # Add all the data points between the first and last line edges
     first_line = ew_edges[:2]
@@ -639,7 +687,55 @@ def retrieve_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
             grid_points[ll_point]['usable'] = True
             grid_points[cl_point]['usable'] = True
 
-    return grid_points
+    if debug:
+        with open('point_list.txt', 'w') as points_fd:
+            with open('usable_point_list.txt', 'w') as usable_fd:
+                with open('unusable_point_list.txt', 'w') as unusable_fd:
+                    index = 0
+                    for point in grid_points:
+                        line = ('{0},{1},{2}\n'
+                                .format(index,
+                                        point['point'].lon,
+                                        point['point'].lat))
+
+                        if point['usable']:
+                            usable_fd.write(line)
+                        if not point['usable']:
+                            unusable_fd.write(line)
+
+                        line = ('{0},{1},{2},{3},{4},{5},{6},{7}\n'
+                                .format(index, point['row'], point['col'],
+                                        int(point['usable']),
+                                        point['point'].lon,
+                                        point['point'].lat,
+                                        point['point'].map_x,
+                                        point['point'].map_y))
+                        points_fd.write(line)
+
+                        index += 1
+
+    # Generate a binary file containing all of the point information
+    # Binary is used so that precision in the floats is not lost
+    with open('point_list.count', 'w') as ascii_fd:
+        ascii_fd.write('{}\n'.format(len(grid_points)))
+
+    with open('point_list.bin', 'wb') as binary_fd:
+        index = 0
+        point_struct = struct.Struct('BBBBffff')
+        # Allocate enough buffer space for all the points we will use
+        point_buf = array.array('c',
+                                '\0' * point_struct.size * len(grid_points))
+
+        for point in grid_points:
+            # Binary
+            point_struct.pack_into(point_buf, -0,
+                                   index, point['row'], point['col'],
+                                   int(point['usable']),
+                                   point['point'].lon, point['point'].lat,
+                                   point['point'].map_x, point['point'].map_y)
+
+            index += 1
+        binary_fd.write(point_buf)
 
 
 def main():
@@ -676,30 +772,11 @@ def main():
                                                  gdal_objs=gdal_objs)
     logger.debug(str(data_bounds))
 
-    # Coordinate Information
-    points = retrieve_narr_points(debug=args.debug,
-                                  gdal_objs=gdal_objs,
-                                  data_bounds=data_bounds,
-                                  lst_data_dir=args.lst_data_dir)
-
-    if args.debug:
-        with open('usable_point_list.txt', 'w') as usable_fd:
-            with open('unusable_point_list.txt', 'w') as unusable_fd:
-                index = 0
-                for point in points:
-                    line = ('{0},{1},{2},{3},{4}\n'
-                            .format(index, point['row'], point['col'],
-                                    point['point'].longitude,
-                                    point['point'].latitude))
-
-                    if point['usable']:
-                        usable_fd.write(line)
-                    if not point['usable']:
-                        unusable_fd.write(line)
-
-                index += 1
-
-    del points
+    # Generate the point grid
+    generate_point_grid(debug=args.debug,
+                        gdal_objs=gdal_objs,
+                        data_bounds=data_bounds,
+                        lst_data_dir=args.lst_data_dir)
 
 
 if __name__ == '__main__':
