@@ -28,6 +28,8 @@ from espa import Metadata
 from lst_exceptions import MissingBandError
 import lst_utilities as util
 
+from lst_grid_points import PointInfo, write_grid_points, read_grid_points
+
 
 # Name of the static NARR coordinates file
 NARR_COORDINATES_FILENAME = 'narr_coordinates.txt'
@@ -48,13 +50,9 @@ GdalInfo = namedtuple('GdalInfo',
 DataBoundInfo = namedtuple('DataBoundInfo',
                            ('north_lat', 'south_lat', 'east_lon', 'west_lon'))
 
-# Minimum and Maximum row and colume information
+# Minimum and Maximum row and column information
 MinMaxRowColInfo = namedtuple('MinMaxRowColInfo',
                               ('min_row', 'max_row', 'min_col', 'max_col'))
-
-# Point information
-PointInfo = namedtuple('PointInfo',
-                       ('col', 'row', 'lat', 'lon', 'map_y', 'map_x'))
 
 
 def retrieve_command_line_arguments():
@@ -260,7 +258,7 @@ def convert_narr_line_to_point_info(gdal_objs, min_max, line):
 
     Args:
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        min_max <MinMaxRowColInfo>: Contains the min and max rows and columes
+        min_max <MinMaxRowColInfo>: Contains the min and max rows and columns
         line <str>: The line of information read from the coordinate file
 
     Returns:
@@ -457,7 +455,7 @@ def fix_narr_longitude(lon):
 
 
 def extract_narr_row_col(data_bounds, line):
-    """Extracts the row and colume from a line of NARR coordinate information
+    """Extracts the row and column from a line of NARR coordinate information
 
     Args:
         data_bounds <DataBoundInfo>: Contains adjusted data boundry information
@@ -465,7 +463,7 @@ def extract_narr_row_col(data_bounds, line):
 
     Returns:
         row <int>: The row for the point
-        col <int>: The colume for the point
+        col <int>: The column for the point
     """
 
     (col, row, lat, lon) = line.split()
@@ -490,7 +488,7 @@ def determine_narr_min_max_row_col(data_bounds, data_path):
         data_path <str>: The full path to the NARR coordinates file
 
     Returns:
-        <MinMaxRowColInfo>: Contains the min and max rows and columes
+        <MinMaxRowColInfo>: Contains the min and max rows and columns
     """
 
     # Generate a list of the points [(row, col),] within the defined boundary
@@ -528,6 +526,8 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
         grid_cols <int>: Number of columns in the grid
     """
 
+    logger = logging.getLogger(__name__)
+
     # Determine full path to the file
     data_path = os.path.join(lst_data_dir, NARR_COORDINATES_FILENAME)
 
@@ -548,23 +548,20 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
     # Filter out the None values (Only keeps the grid we want)
     points = [point for point in points if point is not None]
 
-    if debug:
-        with open('full_point_list.txt', 'w') as points_fd:
-            index = 0
-            for point in points:
-                points_fd.write('{0},{1},{2}\n'.format(index,
-                                                       point.lon,
-                                                       point.lat))
-                index += 1
-
     # Determine the final set of grid points
-    # As well as initially mark points usable or not
-    grid_points = [{'row': point.row-min_max.min_row,
-                    'col': point.col-min_max.min_col,
-                    'usable': is_in_data(gdal_objs=gdal_objs,
-                                         point=point),
-                    'point': point}
-                   for point in points]
+    # As well as initially mark points to run_modtran or not
+    index = 0
+    grid_points = list()
+    for point in points:
+        grid_points.append({'index': index,
+                            'row': point.row-min_max.min_row,
+                            'col': point.col-min_max.min_col,
+                            'run_modtran': is_in_data(gdal_objs=gdal_objs,
+                                                      point=point),
+                            'point': point})
+        index += 1
+
+    logger.info('Found {} Grid Points'.format(len(grid_points)))
 
     return (grid_points, grid_rows, grid_cols)
 
@@ -587,6 +584,8 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
            application a (row, col) coodinate pair that coinsides with the
            rows and cols of the NARR data.
     """
+
+    logger = logging.getLogger(__name__)
 
     # Determine grid points
     (grid_points, grid_rows, grid_cols) = determine_gridded_narr_points(
@@ -611,10 +610,12 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
     last_line = ew_edges[-2:]
     min_line = first_line
 
+    # Add any first row length of pixels
     ew_edges.extend([(first_line[0][0], samp)
                      for samp in xrange(first_line[0][1] + 1,
                                         first_line[1][1])])
 
+    # Add any last row length of pixels
     ew_edges.extend([(last_line[0][0], samp)
                      for samp in xrange(last_line[0][1] + 1,
                                         last_line[1][1])])
@@ -622,6 +623,9 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
     # Remove duplicates and re-sort
     ew_edges = sorted(list(set(ew_edges)))
 
+    # For each pair of samp/line find the grid points that will be needed for
+    # MODTRAN and mark them as "run_modran" = True so that later when MODTRAN
+    # is ran only the required points are ran through it
     for pair in ew_edges:
         cc_point = center_grid_point(gdal_objs, grid_points, pair[1], pair[0])
 
@@ -671,72 +675,64 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
         min_dist = min(avg_dist_ul, avg_dist_ur, avg_dist_lr, avg_dist_ll)
 
         if min_dist == avg_dist_ul:
-            grid_points[cl_point]['usable'] = True
-            grid_points[ul_point]['usable'] = True
-            grid_points[uc_point]['usable'] = True
+            grid_points[cl_point]['run_modtran'] = True
+            grid_points[ul_point]['run_modtran'] = True
+            grid_points[uc_point]['run_modtran'] = True
         elif min_dist == avg_dist_ur:
-            grid_points[uc_point]['usable'] = True
-            grid_points[ur_point]['usable'] = True
-            grid_points[cr_point]['usable'] = True
+            grid_points[uc_point]['run_modtran'] = True
+            grid_points[ur_point]['run_modtran'] = True
+            grid_points[cr_point]['run_modtran'] = True
         elif min_dist == avg_dist_lr:
-            grid_points[cr_point]['usable'] = True
-            grid_points[lr_point]['usable'] = True
-            grid_points[lc_point]['usable'] = True
+            grid_points[cr_point]['run_modtran'] = True
+            grid_points[lr_point]['run_modtran'] = True
+            grid_points[lc_point]['run_modtran'] = True
         else:
-            grid_points[lc_point]['usable'] = True
-            grid_points[ll_point]['usable'] = True
-            grid_points[cl_point]['usable'] = True
+            grid_points[lc_point]['run_modtran'] = True
+            grid_points[ll_point]['run_modtran'] = True
+            grid_points[cl_point]['run_modtran'] = True
 
     if debug:
         with open('point_list.txt', 'w') as points_fd:
-            with open('usable_point_list.txt', 'w') as usable_fd:
-                with open('unusable_point_list.txt', 'w') as unusable_fd:
-                    index = 0
-                    for point in grid_points:
-                        line = ('{0},{1},{2}\n'
-                                .format(index,
-                                        point['point'].lon,
-                                        point['point'].lat))
+            for point in grid_points:
+                line = ('{0},{1},{2},{3},{4},{5},{6},{7}\n'
+                        .format(point['index'],
+                                int(point['run_modtran']),
+                                point['row'],
+                                point['col'],
+                                point['point'].lon,
+                                point['point'].lat,
+                                point['point'].map_x,
+                                point['point'].map_y))
+                points_fd.write(line)
 
-                        if point['usable']:
-                            usable_fd.write(line)
-                        if not point['usable']:
-                            unusable_fd.write(line)
 
-                        line = ('{0},{1},{2},{3},{4},{5},{6},{7}\n'
-                                .format(index, point['row'], point['col'],
-                                        int(point['usable']),
-                                        point['point'].lon,
-                                        point['point'].lat,
-                                        point['point'].map_x,
-                                        point['point'].map_y))
-                        points_fd.write(line)
+        with open('run_modtran_point_list.txt', 'w') as modtran_fd:
+            with open('do_not_run_modtran_point_list.txt', 'w') as nmodtran_fd:
+                for point in grid_points:
+                    line = ('{0},{1},{2}\n'
+                            .format(point['index'],
+                                    point['point'].lon,
+                                    point['point'].lat))
 
-                        index += 1
+                    if point['run_modtran']:
+                        modtran_fd.write(line)
+                    if not point['run_modtran']:
+                        nmodtran_fd.write(line)
+
+    # Total Points and Usable Points
+    logger.info('Number of points in grid [{}]'.format(len(grid_points)))
+    count = 0
+    for point in grid_points:
+        if point['run_modtran']:
+            count += 1
+    logger.info('Number of points for MODTRAN RUN [{}]'.format(count))
 
     # Generate a binary file containing all of the point information
     # Binary is used so that precision in the floats is not lost
-    with open('point_list.count', 'w') as ascii_fd:
-        ascii_fd.write('{}\n'.format(len(grid_points)))
+    write_grid_points(grid_points)
 
-    with open('point_list.bin', 'wb') as binary_fd:
-        index = 0
-        point_struct = struct.Struct('BBBBffff')
-        # Allocate enough buffer space for all the points we will use
-        point_buf = array.array('c',
-                                '\0' * point_struct.size * len(grid_points))
-
-        for point in grid_points:
-            # Binary
-            point_struct.pack_into(point_buf, -0,
-                                   index, point['row'], point['col'],
-                                   int(point['usable']),
-                                   point['point'].lon, point['point'].lat,
-                                   point['point'].map_x, point['point'].map_y)
-
-            index += 1
-        binary_fd.write(point_buf)
-
+    # TODO TODO TODO - This is test read code.... remove it
+    read_grid_points()
 
 def main():
     """Main processing for building the points list

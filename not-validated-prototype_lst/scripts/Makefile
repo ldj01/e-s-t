@@ -20,6 +20,7 @@ SCRIPT_IMPORTS = \
     extract_auxiliary_narr_data.py \
     lst_environment.py \
     lst_exceptions.py \
+    lst_grid_points.py \
     lst_utilities.py
 
 #-----------------------------------------------------------------------------
