@@ -14,6 +14,7 @@ import os
 import logging
 import errno
 import commands
+import datetime
 import requests
 from cStringIO import StringIO
 from osgeo import gdal, osr
@@ -121,6 +122,53 @@ class System(object):
                 pass
             else:
                 raise
+
+
+class NARR(object):
+    """Provides common NARR data related methods
+    """
+
+    @staticmethod
+    def dates(espa_metadata):
+        """Determines the before(t0), after(t1), and aquisition dates
+
+        Args:
+            espa_metadata <espa.metadata>: The metadata for the data
+
+        Returns:
+            acqusition <datetime>: Scene center date and time
+            t0 <datetime>: NARR data datetime before scene center
+            t1 <datetime>: NARR data datetime after scene center
+        """
+
+        center_time = str(espa_metadata.xml_object
+                          .global_metadata.scene_center_time)
+
+        acq_date = str(espa_metadata.xml_object
+                       .global_metadata.acquisition_date)
+
+        # Join them while dropping the last two '<number>Z'
+        date_time = '-'.join([acq_date, center_time[:-2]])
+
+        acqusition = (datetime.datetime
+                      .strptime(date_time, '%Y-%m-%d-%H:%M:%S.%f'))
+
+        '''
+        Determine the 3hr increments to use from the auxillary data
+        We want the one before and after the scene acquisition time
+        and convert back to formatted strings
+        '''
+        scene_hour = int(center_time[:2])
+        t0_hour = scene_hour - (scene_hour % 3)
+
+        t0 = datetime.datetime(acqusition.year,
+                               acqusition.month,
+                               acqusition.day,
+                               t0_hour)
+
+        t1 = t0 + datetime.timedelta(hours=3)
+
+        return (acqusition, t0, t1)
 
 
 class Metadata(object):

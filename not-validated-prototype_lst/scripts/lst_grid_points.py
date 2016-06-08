@@ -26,15 +26,16 @@ GridPointInfo = namedtuple('GridPointInfo',
                            ('index',
                             'run_modtran',
                             'col', 'row',
+                            'narr_col', 'narr_row',
                             'lat', 'lon',
                             'map_y', 'map_x'))
 
-GRID_POINT_FMT = 'BBBBffff'
+GRID_POINT_FMT = 'BBBBBBffff'
 GRID_POINT_HEADER_NAME = 'grid_points.hdr'
 GRID_POINT_BINARY_NAME = 'grid_points.bin'
 
 
-def write_grid_points(grid_points):
+def write_grid_points(grid_points, grid_rows, grid_cols):
     """Writes grid points to a binary file with a header
 
     Binary is used so tha precision in the floats is not lost.
@@ -45,6 +46,8 @@ def write_grid_points(grid_points):
 
     with open(GRID_POINT_HEADER_NAME, 'w') as ascii_fd:
         ascii_fd.write('{}\n'.format(len(grid_points)))
+        ascii_fd.write('{}\n'.format(grid_rows))
+        ascii_fd.write('{}\n'.format(grid_cols))
 
     with open(GRID_POINT_BINARY_NAME, 'wb') as binary_fd:
         point_struct = struct.Struct(GRID_POINT_FMT)
@@ -60,6 +63,8 @@ def write_grid_points(grid_points):
                                    int(point['run_modtran']),
                                    point['row'],
                                    point['col'],
+                                   point['narr_row'],
+                                   point['narr_col'],
                                    point['point'].lon,
                                    point['point'].lat,
                                    point['point'].map_x,
@@ -79,9 +84,12 @@ def read_grid_points():
     logger = logging.getLogger(__name__)
 
     count = 0
+    grid_rows = 0
+    grid_cols = 0
     with open(GRID_POINT_HEADER_NAME, 'r') as ascii_fd:
-        line = ascii_fd.read()
-        count = int(line.strip())
+        count = int(ascii_fd.readline().strip())
+        grid_rows = int(ascii_fd.readline().strip())
+        grid_cols = int(ascii_fd.readline().strip())
 
     logger.info('Reading [{}] points from grid file'.format(count))
 
@@ -90,18 +98,17 @@ def read_grid_points():
         point_struct = struct.Struct(GRID_POINT_FMT)
 
         for position in xrange(count):
-            print position
+            logger.debug('Reading point {}'.format(position))
             point_buffer = bytearray(binary_fd.read(point_struct.size))
-            (index, run_modtran, row, col,
+            (index, run_modtran, row, col, narr_row, narr_col,
             lon, lat, map_x, map_y) = point_struct.unpack(point_buffer)
 
             grid_points.append(GridPointInfo(index=index,
                                              run_modtran=run_modtran,
                                              row=row, col=col,
+                                             narr_row=narr_row,
+                                             narr_col=narr_col,
                                              lon=lon, lat=lat,
                                              map_x=map_x, map_y=map_y))
 
-    for point in grid_points:
-        print point
-
-    return grid_points
+    return (grid_points, grid_rows, grid_cols)

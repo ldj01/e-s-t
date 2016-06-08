@@ -27,7 +27,7 @@ from espa import Metadata
 from lst_exceptions import MissingBandError
 import lst_utilities as util
 
-from lst_grid_points import PointInfo, write_grid_points, read_grid_points
+from lst_grid_points import PointInfo, write_grid_points
 
 
 # Name of the static NARR coordinates file
@@ -61,12 +61,10 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    # Create a command line arugement parser
     parser = ArgumentParser(description='Builds a directory structure of'
                                         ' points and required information'
                                         ' suitable for MODTRAN execution.')
 
-    # ---- Add Arguments ----
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -75,7 +73,7 @@ def retrieve_command_line_arguments():
     parser.add_argument('--lst_data_dir',
                         action='store', dest='lst_data_dir',
                         required=False, default=None,
-                        help='Output debug messages and/or keep debug data')
+                        help='Specify the LST Data directory')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -87,7 +85,6 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Reports the version of the software')
 
-    # Parse the command line arguments
     args = parser.parse_args()
 
     # Command line arguments are required so print the help if none were
@@ -96,25 +93,19 @@ def retrieve_command_line_arguments():
         parser.print_help()
         sys.exit(1)  # EXIT FAILURE
 
-    # Report the version and exit
     if args.version:
         print(util.Version.version_text())
         sys.exit(0)  # EXIT SUCCESS
 
-    # Verify that the --xml parameter was specified
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
 
-    # Verify that the XML filename provided is not an empty string
     if args.xml_filename == '':
         raise Exception('The XML metadata filename provided was empty')
 
-    # Verify that the --lst_data_dir parameter was specified
     if args.lst_data_dir is None:
-        raise Exception('--lst_data_dir must be specified on the'
-                        ' command line')
+        raise Exception('--lst_data_dir must be specified on the command line')
 
-    # Verify that the LST data directory provided is not an empty string
     if args.lst_data_dir == '':
         raise Exception('The LST data directory provided was empty')
 
@@ -555,6 +546,8 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
         grid_points.append({'index': index,
                             'row': point.row-min_max.min_row,
                             'col': point.col-min_max.min_col,
+                            'narr_row': point.row,
+                            'narr_col': point.col,
                             'run_modtran': is_in_data(gdal_objs=gdal_objs,
                                                       point=point),
                             'point': point})
@@ -728,10 +721,8 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
 
     # Generate a binary file containing all of the point information
     # Binary is used so that precision in the floats is not lost
-    write_grid_points(grid_points)
+    write_grid_points(grid_points, grid_rows, grid_cols)
 
-    # TODO TODO TODO - This is test read code.... remove it
-    read_grid_points()
 
 def main():
     """Main processing for building the points list
