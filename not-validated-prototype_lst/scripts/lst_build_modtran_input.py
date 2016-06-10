@@ -16,21 +16,20 @@ import os
 import sys
 import logging
 import math
-import array
 from argparse import ArgumentParser
 from collections import namedtuple
-from osgeo import gdal, osr
 
 from espa import Metadata
-from lst_exceptions import InvalidParameterFileError
 import lst_utilities as util
 
 from lst_grid_points import read_grid_points
 
 
+# The number of rows and columns present in the NARR data
 NARR_ROWS = 277
 NARR_COLS = 349
 
+# The number of pressure levels contained in the NARR data
 PRESSURE_LAYERS = [1000, 975, 950, 925, 900,
                    875, 850, 825, 800, 775,
                    750, 725, 700, 650, 600,
@@ -49,31 +48,45 @@ could be reduced, further reducing the number of MODTRAN runs.
 I think it would be significant for flat lands to only have to run 6 MODTRAN
 runs for a point instead of 27.
 
-Mountainous land could end up running all.
+Mountainous land could still end up running all 27.
 
-I think I have the information and can add it to the grid points data.
+I think I have the information in lst_determine_grid_points.py, and can add
+it to the grid points data.  It will also need modifications with this script
+and maybe the follow-on scripts and executables.
 
 TODO TODO TODO TODO TODO TODO TODO TODO
 TODO TODO TODO TODO TODO TODO TODO TODO
 '''
+# The elevations we potentially run MODTRAN through
+# We only use the ones needed based on the elevation of the NARR point
 GROUND_ALT = [0.0, 0.6, 1.1,
               1.6, 2.1, 2.6,
               3.1, 3.6, 4.05]
 
 # We can use strings for these in this code to make things simpler for
 # directory creation
+# The temperatures we run each elevation through
 TEMPERATURES = ['273', '310', '000']
+# The albedo associated with each temperature (1:1 relationship)
 ALBEDOS = ['0.0', '0.0', '0.1']
+# Provide them as a list of pairs
 TEMP_ALBEDO_PAIRS = zip(TEMPERATURES, ALBEDOS)
 
+# The parameters we use provided by the NARR data
+# Time 0 and Time 1 Height labels and directory names
 HGT_PARMS = ['HGT_t0', 'HGT_t1']
+# Time 0 and Time 1 Specific Humidity labels and directory names
 SPFH_PARMS = ['SPFH_t0', 'SPFH_t1']
+# Time 0 and Time 1 Temperature labels and directory names
 TMP_PARMS = ['TMP_t0', 'TMP_t1']
+# All of them combined
 PARAMETERS = HGT_PARMS + SPFH_PARMS + TMP_PARMS
 
+# MODTRAN template files located in the static data directory
 MODTRAN_HEAD = 'modtran_head.txt'
-MODTRAN_MIDDLE = 'modtran_middle.txt'
 MODTRAN_TAIL = 'modtran_tail.txt'
+# Name of the file to write for MODTRAN to execute on
+TAPE5 = 'tape5'
 
 
 def retrieve_command_line_arguments():
@@ -133,10 +146,36 @@ def retrieve_command_line_arguments():
     return args
 
 
-def read_narr_pressure_file(parameter, layer):
-    """
+def load_modtran_template_file(lst_data_dir, filename):
+    """Loads the specified MODTRAN template file
+
     Args:
-        TODO TODO TODO
+        lst_data_dir <str>: The directory for the NARR data file
+        filename <str>: The filename to load
+
+    Args:
+        <str>: The contents of the requested file
+    """
+
+    filename = os.path.join(lst_data_dir, filename)
+    file_data = None
+
+    with open(filename, 'r') as file_fd:
+        file_data = file_fd.read()
+
+    return file_data
+
+
+def load_narr_pressure_file(parameter, layer):
+    """Loads a NARR pressure layer for the parameter
+
+    Args:
+        parameter <str>: The parameter to load
+        layer <str>: The pressure layer to load for the parameter
+
+    Returns:
+       [<col>[<row>]]: Two-Dimensional list of the NARR points for the
+                       parameter and layer
     """
 
     logger = logging.getLogger(__name__)
@@ -147,10 +186,58 @@ def read_narr_pressure_file(parameter, layer):
     point_values = None
     with open(filename, 'r') as data_fd:
         point_values = [[float(data_fd.readline())
-                         for row in xrange(NARR_ROWS)]
-                        for col in xrange(NARR_COLS)]
+                         for dummy1 in xrange(NARR_ROWS)]
+                        for dummy2 in xrange(NARR_COLS)]
 
     return point_values
+
+
+def load_narr_pressure_layers(parameters, layers):
+    """Loads all the parameters and presssure layes
+
+    Args:
+        parameters [<str>]: All the parameters to load
+        layers [<str>]: All the pressure layers to load for each parameter
+
+    Returns:
+        <dict>: dict[parameters]->dict[layers]->[<col>[<row>]]
+    """
+
+    data = dict()
+    for parameter in parameters:
+        data[parameter] = dict()
+        for layer in layers:
+            data[parameter][layer] = dict()
+            data[parameter][layer] = load_narr_pressure_file(parameter, layer)
+
+    return data
+
+
+def determine_interp_factor(value, before, after):
+    """Determine interpolation factor for removal of division in follow-on
+       code
+
+    For the formula:
+        v = v0 + (v1 - v0) * ((t - t0) / (t1 - t0))
+
+    I'm defining the interpolation factor as this component of the formula:
+
+        ((t - t0) / (t1 - t0))
+
+    Args:
+        value <number>: The value to interpolate for
+        before <number>: The value before
+        after <number>: The value after
+
+    Returns:
+        <float>: The interpolation factor
+    """
+
+    f_value = float(value)
+    f_before = float(before)
+    f_after = float(after)
+
+    return (f_value - f_before) / (f_after - f_before)
 
 
 STD_ATMOS_FILENAME = 'std_mid_lat_summer_atmos.txt'
@@ -158,10 +245,14 @@ StdAtmosInfo = namedtuple('StdAtmosInfo',
                           ('hgt', 'pressure', 'temp', 'rh'))
 
 
-def read_std_mid_lat_summer_atmos_file(lst_data_dir):
-    """
+def load_std_atmosphere(lst_data_dir):
+    """Loads the standard atmosphere into an iterable
+
     Args:
-        TODO TODO TODO
+        lst_data_dir <str>: The directory for the NARR data file
+
+    Returns:
+        <iterable>: Essentially a list of StdAtmosInfo objects
     """
 
     logger = logging.getLogger(__name__)
@@ -171,9 +262,9 @@ def read_std_mid_lat_summer_atmos_file(lst_data_dir):
 
     with open(filename, 'r') as data_fd:
         for line in data_fd.readlines():
-            (hgt, pressure, temp, rh) = line.strip().split()
+            (hgt, pressure, temp, rel_hj) = line.strip().split()
             yield(StdAtmosInfo(hgt=float(hgt), pressure=float(pressure),
-                               temp=float(temp), rh=float(rh)))
+                               temp=float(temp), rh=float(rel_hj)))
 
 
 EQUATORIAL_RADIUS = 6378137.0
@@ -186,17 +277,20 @@ INV_R_MAX_SQRD = 1.0 / (EQUATORIAL_RADIUS_IN_KM * EQUATORIAL_RADIUS_IN_KM)
 INV_STD_GRAVITY = 1.0 / STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD
 
 
-def determine_geometric_height(data, point, layer, time):
-    """Converts from geopotential to geometric height
+def determine_geometric_hgt(data, point, layer, time):
+    """Determines geometric height for a layer in the point at time x
 
     Geopotential height is converted to geometrix height for both t0 and t1
     heights
 
     Args:
-        TODO TODO TODO
+        data <dict>: Data structure for the parameters and pressure layers
+        point <GridPointInfo>: The current point information
+        layer <str>: The layer to get the height for
+        time <int>: Time 0 or Time 1
 
     Returns:
-        TODO TODO TODO
+        <float>: The geometric height for the layer
     """
 
     # Geopotential height at time
@@ -226,38 +320,104 @@ MH_20 = 18.01534
 MD_RY = 28.9644
 
 
-def determine_relative_humidities(data, point, layer, time):
-    """
+def determine_rh_temp(data, point, layer, time):
+    """Determines relative humidity and temperature for a layer in the point
+       at time x
 
     Note: The layer value is the pressure, so needs conversion to float
+          from int
 
     Args:
-        TODO TODO TODO
+        data <dict>: Data structure for the parameters and pressure layers
+        point <GridPointInfo>: The current point information
+        layer <str>: The layer to get the relative humidity for
+        time <int>: Time 0 or Time 1
 
     Returns:
-        TODO TODO TODO
+        <float>: Relative humidity for the point layer
+        <float>: Temperature for the point layer
     """
 
     # Specific humidity at time
     spfh = data[SPFH_PARMS[time]][layer][point.narr_col][point.narr_row]
     # Temperature at time
-    tmp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]
+    temp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]
 
-    # calculate vapor pressure at given temperature - hpa
-    goff_pow_1 = math.pow(10.0, (11.344 * (1.0 - (tmp / 373.16)))) - 1.0
-    goff_pow_2 = math.pow(10.0, (-3.49149 * (373.16 / tmp - 1.0))) - 1.0
-    goff = (-7.90298 * (373.16 / tmp - 1.0) +
-            5.02808 * math.log10(373.16 / tmp) -
+    # Calculate vapor pressure at given temperature - hpa
+    goff_pow_1 = math.pow(10.0, (11.344 * (1.0 - (temp / 373.16)))) - 1.0
+    goff_pow_2 = math.pow(10.0, (-3.49149 * (373.16 / temp - 1.0))) - 1.0
+    goff = (-7.90298 * (373.16 / temp - 1.0) +
+            5.02808 * math.log10(373.16 / temp) -
             1.3816e-7 * goff_pow_1 +
             8.1328e-3 * goff_pow_2 +
             math.log10(1013.246))  # hPa
 
-    # calculate partial pressure
+    # Calculate partial pressure
     ph_20 = ((spfh * float(layer) * MD_RY) /
              (MH_20 - spfh * MH_20 + spfh * MD_RY))
 
-    # calculate relative humidity
-    return (ph_20 / pow(10.0, goff)) * 100.0
+    # Calculate relative humidity
+    relative_humidity = (ph_20 / pow(10.0, goff)) * 100.0
+
+    return (relative_humidity, temp)
+
+
+LayerInfo = namedtuple('LayerInfo',
+                       ('hgt', 'rh', 'temp'))
+
+
+def interpolate_to_pressure_layers(data, point, layers, interp_factor):
+    """Interpolate to each pressure layer for the point
+
+    Args:
+        data <dict>: Data structure for the parameters and pressure layers
+        point <GridPointInfo>: The current point information
+        layers [<str>]: All the pressure layers to load for each parameter
+        interp_factor <float>: The interpolation factor to use
+
+    Returns:
+        <dict>: dict[layers]->LayerInfo
+    """
+
+    interpolated_values = dict()
+    for layer in layers:
+        # Geometric height at t0
+        hgt_m0 = determine_geometric_hgt(data, point, layer, 0)
+        # print(hgt_m0)
+
+        # Geometric height at t1
+        hgt_m1 = determine_geometric_hgt(data, point, layer, 1)
+        # print(hgt_m1)
+
+        # Relative humitidy at t0
+        (rh_v0, temp_v0) = determine_rh_temp(data, point, layer, 0)
+        # print(rh_v0, temp_v0)
+
+        # Relative humitidy at t1
+        (rh_v1, temp_v1) = determine_rh_temp(data, point, layer, 1)
+        # print(rh_v1, temp_v1)
+
+        '''
+        Linearly interpolate geometric height, relative humidity, and
+        temperature for NARR points.  This is the NARR data
+        corresponding to the acquisition date and scene center time of
+        the Landsat data converted to appropriate values for MODTRAN
+        runs.
+        '''
+
+        # Geometric height at acquisition date and scene center time
+        hgt = (hgt_m0 + ((hgt_m1 - hgt_m0) * interp_factor))
+
+        # Relative humidity at acquisition date and scene center time
+        relative_humidity = (rh_v0 + ((rh_v1 - rh_v0) * interp_factor))
+
+        # Temperature at acquisition date and scene center time
+        temp = (temp_v0 + ((temp_v1 - temp_v0) * interp_factor))
+
+        interpolated_values[layer] = LayerInfo(hgt=hgt, rh=relative_humidity,
+                                               temp=temp)
+
+    return interpolated_values
 
 
 def get_latitude_longitude_strings(point):
@@ -268,7 +428,7 @@ def get_latitude_longitude_strings(point):
     longitude to be for MODTRAN.
 
     Args:
-        TODO TODO TODO
+        point <GridPointInfo>: The current point information
 
     Returns:
         latitude <str>: The latitude in string format
@@ -297,12 +457,202 @@ def get_latitude_longitude_strings(point):
     return (latitude, longitude)
 
 
-def butter:
-    pass
+def determine_layers_below_above(layers, values, elevation):
+    """Determine the layers below and above the current elevation
+
+    Args:
+        layers [<str>]: All the pressure layers to load for each parameter
+        values [<LayerInfo>]: All the interpolated layers information
+        elevation <float>: The elevation to determine the layers for
+
+    Returns
+        <str>: Below layer ID
+        <str>: Above layer ID
+        <int>: Index to the above layer
+    """
+
+    index = 0
+    for layer in layers:
+        if values[layer].hgt >= elevation:
+            index_below = index - 1
+            index_above = index
+            break
+
+        index += 1
+
+    # Only need to check for the low height condition
+    # We should never have a height above our highest elevation
+    if index_below < 0:
+        index_below = 0
+        index_above = 1
+
+    return (layers[index_below], layers[index_above], index_above)
 
 
-def generate_modtran_tape5_files(espa_metadata, lst_data_dir, std_atmosphere,
-                                 grid_points, grid_rows, grid_cols):
+def interpolate_to_elevation(values, elevation, below, above):
+    """Interpolate to our current elevation between the below and above layers
+
+    Args:
+        values [<LayerInfo>]: All the interpolated layers information
+        elevation <float>: The current elevation
+        below <str>: Below layer ID
+        above <str>: Above layer ID
+
+    Returns:
+        <float>: Pressure for the elevation
+        <float>: Temperature for the elevation
+        <float>: Relative Humidity for the elevation
+    """
+
+    # Setup for linear interpolation between the heights
+    hgt_interp_factor = \
+        determine_interp_factor(elevation,
+                                values[below].hgt,
+                                values[above].hgt)
+
+    # Linear interpolate pressure, temperature, and relative
+    # humidity to elevation for lowest layer
+    pressure = (float(below) +
+                ((float(above) - float(below)) * hgt_interp_factor))
+
+    temp = (values[below].temp +
+            ((values[above].temp - values[below].temp) * hgt_interp_factor))
+
+    rel_hum = (values[below].rh +
+               ((values[above].rh - values[below].rh) * hgt_interp_factor))
+
+    return (pressure, temp, rel_hum)
+
+
+PressureLayerInfo = namedtuple('PressureLayerInfo',
+                               ('hgt', 'pressure', 'temp', 'rh'))
+
+
+def determine_base_layers_for_elev(layers, values, elevation):
+    """Determine all of the base layers to use for the elevation
+
+    Args:
+        layers [<str>]: All the pressure layers
+        values [<LayerInfo>]: All the interpolated layers information
+        elevation <float>: The current elevation
+
+    Returns:
+        [PressureLayerInfo]: List of pressure layer information
+    """
+
+    # Determine layers above and below current elevation
+    (below,
+     above,
+     index_above) = determine_layers_below_above(layers=layers,
+                                                 values=values,
+                                                 elevation=elevation)
+
+    b_layers = list()
+
+    '''
+    MODTRAN throws an error when there are two identical layers in
+    the tape5 file, if the current ground altitude and the next
+    highest layer are close enough, don't add interpolated layer
+    '''
+    if math.fabs(elevation - values[above].hgt) > 0.001:
+        # Not too close so generate and add it as the first element
+        (pressure,
+         temp,
+         relative_humidity) = interpolate_to_elevation(values=values,
+                                                       elevation=elevation,
+                                                       below=below,
+                                                       above=above)
+
+        b_layers.append(PressureLayerInfo(hgt=elevation,
+                                          pressure=pressure,
+                                          temp=temp,
+                                          rh=relative_humidity))
+
+    # Remaining elements are the pressure layers above so add them
+    for layer in layers[index_above:]:
+        b_layers.append(PressureLayerInfo(hgt=values[layer].hgt,
+                                          pressure=float(layer),
+                                          temp=values[layer].temp,
+                                          rh=values[layer].rh))
+
+    return b_layers
+
+
+def determine_all_layers_for_elev(std_atmos, layers, values, elevation):
+    """Determine all of the layers to use for the elevation
+
+    Args:
+        std_atmos [StdAtmosInfo]: The standard atmosphere
+        layers [<str>]: All the pressure layers
+        values [<LayerInfo>]: All the interpolated layers information
+        elevation <float>: The current elevation
+
+    Returns:
+        [PressureLayerInfo]: List of pressure layer information
+    """
+
+    s_layers = determine_base_layers_for_elev(layers=layers,
+                                              values=values,
+                                              elevation=elevation)
+
+    # Determine maximum height of base layers and where the
+    # standard atmosphere is greater than this
+    first_index = None
+    layer_index = 0
+    for layer in std_atmos:
+        # Check against the top base pressure layer
+        if layer.hgt > s_layers[-1].hgt:
+            first_index = layer_index
+            break
+
+        layer_index += 1
+    second_index = first_index + 1
+
+    '''
+    If there are more than 2 layers above the highest NARR layer,
+    then we need to interpolate a value between the highest NARR
+    layer and the 2nd standard atmosphere layer above the NARR
+    layers to create a smooth transition between the NARR layers
+    and the standard upper atmosphere
+    '''
+
+    # Add an interpolated std layer
+    if len(std_atmos[first_index:]) >= 3:
+
+        # Setup for linear interpolation between the layers
+        hgt = ((std_atmos[second_index].hgt + s_layers[-1].hgt) / 2.0)
+        std_interp_factor = \
+            determine_interp_factor(hgt, s_layers[-1].hgt,
+                                    std_atmos[second_index].hgt)
+
+        pressure = (s_layers[-1].pressure +
+                    ((std_atmos[second_index].pressure -
+                      s_layers[-1].pressure) * std_interp_factor))
+
+        temp = (s_layers[-1].temp +
+                ((std_atmos[second_index].temp -
+                  s_layers[-1].temp) * std_interp_factor))
+
+        rel_hum = (s_layers[-1].rh +
+                   ((std_atmos[second_index].rh -
+                     s_layers[-1].rh) * std_interp_factor))
+
+        s_layers.append(PressureLayerInfo(hgt=hgt,
+                                          pressure=pressure,
+                                          temp=temp,
+                                          rh=rel_hum))
+
+    # Add the remaining standard atmosphere layers
+    for layer in std_atmos[second_index:]:
+        s_layers.append(PressureLayerInfo(hgt=layer.hgt,
+                                          pressure=layer.pressure,
+                                          temp=layer.temp,
+                                          rh=layer.rh))
+
+    return s_layers
+
+
+def write_tape5_file(filename, head_data, middle_data, tail_data):
     """
     Args:
         TODO TODO TODO
@@ -310,277 +660,176 @@ def generate_modtran_tape5_files(espa_metadata, lst_data_dir, std_atmosphere,
 
     logger = logging.getLogger(__name__)
 
-    # Load the head and tail template files
-    filename = os.path.join(lst_data_dir, MODTRAN_HEAD)
-    head_template = None
-    with open(filename, 'r') as template_fd:
-        head_template = template_fd.read()
+    logger.info('Creating [{}]'.format(filename))
 
-    filename = os.path.join(lst_data_dir, MODTRAN_TAIL)
-    tail_template = None
-    with open(filename, 'r') as template_fd:
-        tail_template = template_fd.read()
+    with open(filename, 'w') as tape5_fd:
+        tape5_fd.write(head_data)
+        tape5_fd.write(middle_data)
+        tape5_fd.write(tail_data)
 
-    # Read the NARR pressure layers into a data structure
-    data = dict()
-    for parameter in PARAMETERS:
-        data[parameter] = dict()
-        for layer in PRESSURE_LAYERS:
-            data[parameter][layer] = dict()
-            data[parameter][layer] = read_narr_pressure_file(parameter, layer)
 
+def generate_tape5_for_elevation(std_atmos, layers, head_template, tail_data,
+                                 point_path, values, elevation):
+    """
+    Args:
+        TODO TODO TODO
+    """
+
+    # Append the height directory
+    hgt_path = os.path.join(point_path, '{0:05.3f}'.format(elevation))
+
+    s_layers = determine_all_layers_for_elev(std_atmos=std_atmos,
+                                             layers=layers,
+                                             values=values,
+                                             elevation=elevation)
+
+    # Update the middle section for the MODTRAN tape5 file with
+    # current information
+    middle_data = ''.join(['{0:10.3f}{1:10.3e}{2:10.3e}{3:10.3e}{4:10.3e}'
+                           '{5:10.3e}{6:16s}\n'.format(x.hgt,
+                                                       x.pressure,
+                                                       x.temp,
+                                                       x.rh,
+                                                       0.0, 0.0,
+                                                       'AAH             ')
+                           for x in s_layers])
+
+    # Update the head section for the MODTRAN tape5 file with
+    # current information
+    temp_head_data = head_template.replace('nml', str(len(s_layers)))
+    temp_head_data = temp_head_data.replace('gdalt',
+                                            '{0:05.3f}'
+                                            .format(elevation))
+
+    # Iterate through all the (temperature,albedo) pairs at which to
+    # run MODTRAN and create the final required tape5 file for
+    # each one
+    for (temperature, albedo) in TEMP_ALBEDO_PAIRS:
+        # Append the temperature and albedo to the path
+        ta_path = os.path.join(hgt_path, temperature, albedo)
+
+        # Now create before writing the tape5 file
+        util.System.create_directory(ta_path)
+
+        # Update the head section for the MODTRAN tape5 file with
+        # current information
+        head_data = temp_head_data.replace('tmp', temperature)
+        head_data = head_data.replace('alb', albedo)
+
+        write_tape5_file(filename=os.path.join(ta_path, TAPE5),
+                         head_data=head_data,
+                         middle_data=middle_data,
+                         tail_data=tail_data)
+
+
+def determine_elevations(elevations, height):
+    """Determine a list of adjusted elevations to use
+
+    Args:
+        elevations [<float>]: Initial list of elelvations
+        height <float>: Height for the bottom pressure layer
+
+    Returns
+        [<float>]: List of elevations to use
+    """
+
+    # Copy the elevations to iterate over
+    new_elevations = [x for x in elevations]
+
+    # Adjust the first element to be the geometric height unless it
+    # is negative, then use 0.0
+    if height < 0.0:
+        new_elevations[0] = 0.0
+    else:
+        new_elevations[0] = height
+
+    return new_elevations
+
+
+def generate_tape5_files_for_point(std_atmos, data, point,
+                                   interp_factor, doy_str,
+                                   head_template, tail_template):
+    """Generate tape5 file for the current point
+
+    Args:
+        std_atmos [StdAtmosInfo]: The standard atmosphere
+        data <dict>: Data structure for the parameters and pressure layers
+        point <GridPointInfo>: The current point information
+        interp_factor <float>: The interpolation factor to use
+        head_template <str>: The template for the head of the tape5 file
+        tail_template <str>: The template for the tail of the tape5 file
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # Define the point directory
+    point_path = ('{0:03}_{1:03}_{2:03}_{3:03}'
+                  .format(point.row, point.col,
+                          point.narr_row, point.narr_col))
+
+    (latitude, longitude) = get_latitude_longitude_strings(point=point)
+    logger.debug('MODTRAN latitude [{}]'.format(latitude))
+    logger.debug('MODTRAN longitude [{}]'.format(longitude))
+
+    # Update the tail section for the MODTRAN tape5 file with current
+    # information
+    tail_data = tail_template.replace('latitu', latitude)
+    tail_data = tail_data.replace('longit', longitude)
+    tail_data = tail_data.replace('jay', doy_str)
+
+    values = interpolate_to_pressure_layers(data=data,
+                                            point=point,
+                                            layers=PRESSURE_LAYERS,
+                                            interp_factor=interp_factor)
+
+    elevations = determine_elevations(elevations=GROUND_ALT,
+                                      height=values[PRESSURE_LAYERS[0]].hgt)
+
+    for elevation in elevations:
+        generate_tape5_for_elevation(std_atmos=std_atmos,
+                                     layers=PRESSURE_LAYERS,
+                                     head_template=head_template,
+                                     tail_data=tail_data,
+                                     point_path=point_path,
+                                     values=values,
+                                     elevation=elevation)
+
+
+def generate_modtran_tape5_files(espa_metadata, lst_data_dir, std_atmos,
+                                 grid_points):
+    """
+    Args:
+        espa_metadata <espa.metadata>: The metadata information for the input
+        lst_data_dir <str>: The directory for the NARR data files
+        std_atmos [StdAtmosInfo]: The standard atmosphere
+        grid_points [GridPointInfo]: List of the grid point information
+    """
+
+    # Load the MODTRAN head and tail template files
+    head_template = load_modtran_template_file(lst_data_dir, MODTRAN_HEAD)
+    tail_template = load_modtran_template_file(lst_data_dir, MODTRAN_TAIL)
+
+    # Load the NARR pressure layers into a data structure
+    data = load_narr_pressure_layers(parameters=PARAMETERS,
+                                     layers=PRESSURE_LAYERS)
+
+    # Get the dates and determine the day-of-year
     (acq_date, t0_date, t1_date) = util.NARR.dates(espa_metadata)
     doy_str = '{0:03d}'.format(acq_date.timetuple().tm_yday)
 
     # Setup for linear interpolation between the dates in seconds
-    # Determine divisor in seconds
-    inv_t1_minus_t0 = 1.0 / (t1_date - t0_date).seconds
-    # Determine difference to min time
-    ta_minus_t0 = (acq_date - t0_date).seconds
+    interp_factor = (float((acq_date - t0_date).seconds) /
+                     float((t1_date - t0_date).seconds))
 
-    interp_factor = ta_minus_t0 * inv_t1_minus_t0
-
-    # Determine geometric height and relative humidity
     for point in grid_points:
         if point.run_modtran:
-            # Define the point directory
-            point_path = ('{0:03}_{1:03}_{2:03}_{3:03}'
-                          .format(point.row, point.col,
-                                  point.narr_row, point.narr_col))
-
-            (latitude, longitude) = get_latitude_longitude_strings(point)
-            logger.debug('MODTRAN latitude [{}]'.format(latitude))
-            logger.debug('MODTRAN longitude [{}]'.format(longitude))
-
-            # Update the tail section for the MODTRAN tape5 file with current
-            # information
-            tail_data = tail_template.replace('latitu', latitude)
-            tail_data = tail_data.replace('longit', longitude)
-            tail_data = tail_data.replace('jay', doy_str)
-
-            hgt_v = dict()
-            rh_v = dict()
-            tmp_v = dict()
-            for layer in PRESSURE_LAYERS:
-                # Geometric height at t0
-                hgt_m0 = determine_geometric_height(data, point, layer, 0)
-                # print(hgt_m0)
-
-                # Geometric height at t1
-                hgt_m1 = determine_geometric_height(data, point, layer, 1)
-                # print(hgt_m1)
-
-                # Relative humitidy at t0
-                rh_v0 = determine_relative_humidities(data, point, layer, 0)
-                # print(rh_v0)
-
-                # Relative humitidy at t1
-                rh_v1 = determine_relative_humidities(data, point, layer, 0)
-                # print(rh_v1)
-
-                '''
-                Linearly interpolate geometric height, relative humidity, and
-                temperature for NARR points.  This is the NARR data
-                corresponding to the acquisition date and scene center time of
-                the Landsat data converted to appropriate values for MODTRAN
-                runs.
-                '''
-
-                # Geometric height at acquisition date and scene center time
-                hgt_v[layer] = (hgt_m0 + ((hgt_m1 - hgt_m0) * interp_factor))
-
-                # Relative humidity at acquisition date and scene center time
-                rh_v[layer] = (rh_v0 + ((rh_v1 - rh_v0) * interp_factor))
-
-                # Temperature at acquisition date and scene center time
-                tmp_v[layer] = (tmp_v0 + ((tmp_v1 - tmp_v0) * interp_factor))
-
-            # Copy the elevations to iterate over
-            elevations = [x for x in GROUND_ALT]
-            # Adjust the first element to be the geometric height unless it
-            # is negative, then use 0.0
-            if hgt_v[PRESSURE_LAYERS[0]] < 0:
-                elevations[0] = 0.0
-            else:
-                elevations[0] = hgt_v[PRESSURE_LAYERS[0]]
-
-            for elevation in elevations:
-                # Append the height directory
-                hgt_path = os.path.join(point_path,
-                                        '{0:05.3f}'.format(elevation))
-
-                # Determine layers below current elevation and closest
-                # layer above and below
-                index = 0
-                for layer in PRESSURE_LAYERS:
-                    if hgt_v[layer] >= elevation:
-                        index_below = index - 1
-                        index_above = index
-
-                    index += 1
-
-                # Only need to check for the low height condition
-                # We should never have a height above our highest elevation
-                if index_below < 0:
-                    index_below = 0
-                    index_above = 1
-
-                layer_below = PRESSURE_LAYERS[index_below]
-                layer_above = PRESSURE_LAYERS[index_above]
-
-                # Setup for linear interpolation between the heights
-                inv_ha_minus_hb = 1.0 / (hgt_v[layer_above] -
-                                         hgt_v[layer_below])
-                e_minus_hb = elevation - hgt_v[layer_below]
-                hgt_interp_factor = e_minus_hb * inv_ha_minus_hb
-
-                # Linear interpolate pressure, temperature, and relative
-                # humidity to elevation for lowest layer
-                new_pressure = (float(layer_below) +
-                                ((float(layer_above) - float(layer_below)) *
-                                 hgt_interp_factor))
-                new_temp = (tmp_v[layer_below] +
-                            ((tmp_v[layer_above] - tmp_v[layer_below]) *
-                             hgt_interp_factor))
-                new_rh = (rh_v[layer_below] +
-                          ((rh_v[layer_above] - rh_v[layer_below]) *
-                           hgt_interp_factor))
-
-                # Create arrays of values containing only the layers to be
-                # included in current tape5 file
-                temp_hgt = list()
-                temp_pressure = list()
-                temp_temp = list()
-                temp_rh = list()
-
-                # First element is the recently figured-out values
-                temp_hgt.append(elevation)
-                temp_pressure.append(new_pressure)
-                temp_temp.append(new_temp)
-                temp_rh.append(new_rh)
-
-                # Remaining elements are the pressure layers above
-                for layer in PRESSURE_LAYERS[index_above:]:
-                    temp_hgt.append(hgt_v[layer])
-                    temp_pressure.append(float(layer))
-                    temp_temp.append(tmp_v[layer])
-                    temp_rh.append(rh_v[layer])
-
-                '''
-                MODTRAN throws an error when there are two identical layers in
-                the tape5 file, if the current ground altitude and the next
-                highest layer are close enough, eliminate interpolated layer
-                '''
-                if math.fabs(elevation - hgt_v[layer_above]) < 0.001:
-                    # Simply remove the first element of the array because
-                    # that is the element we just tested
-                    del temp_height[0]
-                    del temp_pressure[0]
-                    del temp_temp[0]
-                    del temp_rh[0]
-
-                # Determine maximum height of NARR layers and where the
-                # standard atmosphere is greater than this
-                first_index = None
-                layer_index = 0
-                for layer in std_atmosphere:
-                    # Check against the top pressure layer we have saved
-                    if layer.hgt > temp_hgt[-1]:
-                        first_index = layer_index
-                        break
-
-                    layer_index += 1
-                second_index = first_index + 1
-
-                '''
-                If there are more than 2 layers above the highest NARR layer,
-                then we need to interpolate a value between the highest NARR
-                layer and the 2nd standard atmosphere layer above the NARR
-                layers to create a smooth transition between the NARR layers
-                and the standard upper atmosphere
-                '''
-                if len(std_atmosphere[first_index:]) >= 3:
-
-                    # Setup for linear interpolation between the layers
-                    inv_s_minus_l = 1.0 / (std_atmosphere[second_index].hgt -
-                                           temp_hgt[-1])
-                    std_height = ((std_atmosphere[second_index].hgt +
-                                   temp_hgt[-1]) / 2.0)
-                    h_minus_l = std_height - temp_hgt[-1]
-
-                    std_interp_factor = h_minus_l * inv_s_minus_l
-
-                    std_pressure = (temp_pressure[-1] +
-                                    ((std_atmosphere[second_index].pressure -
-                                      temp_pressure[-1]) * std_interp_factor))
-
-                    std_temp = (temp_temp[-1] +
-                                ((std_atmosphere[second_index].temp -
-                                  temp_temp[-1]) * std_interp_factor))
-
-                    std_rh = (temp_rh[-1] +
-                              ((std_atmosphere[second_index].rh -
-                                temp_rh[-1]) * std_interp_factor))
-
-                    temp_hgt.append(std_height)
-                    temp_pressure.append(std_pressure)
-                    temp_temp.append(std_temp)
-                    temp_rh.append(std_rh)
-
-                # Add the remaining standard atmosphere layers
-                for layer in std_atmosphere[second_index:]:
-                    temp_hgt.append(layer.hgt)
-                    temp_pressure.append(layer.pressure)
-                    temp_temp.append(layer.temp)
-                    temp_rh.append(layer.rh)
-
-                # Update the middle section for the MODTRAN tape5 file with
-                # current information
-                num_layers = len(temp_hgt)
-                middle_data = ''
-                for index in xrange(num_layers):
-                    middle_data = ''.join([middle_data,
-                                           '{0:10.3f}'
-                                           '{1:10.3e}'
-                                           '{2:10.3e}'
-                                           '{3:10.3e}'
-                                           '{4:10.3e}'
-                                           '{5:10.3e}'
-                                           '{6:16s}\n'
-                                           .format(temp_hgt[index],
-                                                   temp_pressure[index],
-                                                   temp_temp[index],
-                                                   temp_rh[index],
-                                                   0.0, 0.0,
-                                                   'AAH             ')])
-
-                # Update the head section for the MODTRAN tape5 file with
-                # current information
-                temp_head_data = head_template.replace('nml', str(num_layers))
-                temp_head_data = temp_head_data.replace('gdalt',
-                                                        '{0:05.3f}'
-                                                        .format(elevation))
-
-                # Iterate through all the temperature,albedo pairs at which to
-                # run MODTRAN and create the final required tape5 file for
-                # each one
-                for (temperature, albedo) in TEMP_ALBEDO_PAIRS:
-                    # Append the temperature and albedo to the path
-                    ta_path = os.path.join(hgt_path, temperature, albedo)
-                    # Now create before writing the tape5 file
-                    logger.info('Creating [{}]'.format(ta_path))
-                    util.System.create_directory(ta_path)
-
-                    # Update the head section for the MODTRAN tape5 file with
-                    # current information
-                    head_data = temp_head_data.replace('nml', str(num_layers))
-                    head_data = head_data.replace('tmp', temperature)
-                    head_data = head_data.replace('alb', albedo)
-
-                    with open('tape5', 'w') as tape5_fd:
-                        tape5_fd.write(head_data)
-                        tape5_fd.write(middle_data)
-                        tape5_fd.write(tail_data)
+            generate_tape5_files_for_point(std_atmos=std_atmos,
+                                           data=data,
+                                           point=point,
+                                           interp_factor=interp_factor,
+                                           doy_str=doy_str,
+                                           head_template=head_template,
+                                           tail_template=tail_template)
 
 
 def main():
@@ -603,23 +852,27 @@ def main():
                         datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging_level,
                         stream=sys.stdout)
+    logger = logging.getLogger(__name__)
+
+    logger.info('*** Begin MODTRAN Tape5 Generation ***')
 
     # XML Metadata
     espa_metadata = Metadata()
     espa_metadata.parse(xml_filename=args.xml_filename)
 
     # Load the grid information
-    (grid_points, grid_rows, grid_cols) = read_grid_points()
+    (grid_points, dummy1, dummy2) = read_grid_points()
 
     # Load the standard atmospheric layers information
-    std_atmosphere = [layer for layer in
-                      read_std_mid_lat_summer_atmos_file(args.lst_data_dir)]
+    std_atmos = [layer for layer in
+                 load_std_atmosphere(lst_data_dir=args.lst_data_dir)]
 
-    generate_modtran_tape5_files(espa_metadata, args.lst_data_dir,
-                                 std_atmosphere=std_atmosphere,
-                                 grid_points=grid_points,
-                                 grid_rows=grid_rows,
-                                 grid_cols=grid_cols)
+    generate_modtran_tape5_files(espa_metadata=espa_metadata,
+                                 lst_data_dir=args.lst_data_dir,
+                                 std_atmos=std_atmos,
+                                 grid_points=grid_points)
+
+    logger.info('*** MODTRAN Tape5 Generation Complete ***')
 
 
 if __name__ == '__main__':
