@@ -21,8 +21,3 @@ class LSTError(Exception):
 class MissingBandError(LSTError):
     """Exception to use for missing bands"""
     pass
-
-
-class InvalidParameterFileError(LSTError):
-    """Exception to use for invalid NARR parameter file"""
-    pass
