@@ -15,19 +15,13 @@
 import os
 import sys
 import logging
-import math
-import array
-import struct
-import numpy as np
+import glob
 from argparse import ArgumentParser
-from collections import namedtuple
-from osgeo import gdal, osr
+from multiprocessing import Pool
 
-from espa import Metadata
-from lst_exceptions import MissingBandError
 import lst_utilities as util
 
-from lst_grid_points import PointInfo, write_grid_points, read_grid_points
+from lst_grid_points import read_grid_points
 
 
 def retrieve_command_line_arguments():
@@ -37,15 +31,18 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    # Create a command line arugement parser
     parser = ArgumentParser(description='Runs MODTRAN on a pre-determined'
                                         ' set of points')
 
-    # ---- Add Arguments ----
-    parser.add_argument('--xml',
-                        action='store', dest='xml_filename',
+    parser.add_argument('--modtran_data_path',
+                        action='store', dest='modtran_data_path',
                         required=False, default=None,
-                        help='The XML metadata file to use')
+                        help='Path to the MODTRAN \'DATA\' directory')
+
+    parser.add_argument('--process_count',
+                        action='store', dest='process_count',
+                        required=False, default=1,
+                        help='Number of processes to utilize')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -57,29 +54,59 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Reports the version of the software')
 
-    # Parse the command line arguments
     args = parser.parse_args()
-
-    # Command line arguments are required so print the help if none were
-    # provided
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)  # EXIT FAILURE
 
     # Report the version and exit
     if args.version:
         print(util.Version.version_text())
         sys.exit(0)  # EXIT SUCCESS
 
-    # Verify that the --xml parameter was specified
-    if args.xml_filename is None:
-        raise Exception('--xml must be specified on the command line')
+    if args.modtran_data_path is None:
+        raise Exception('--modtran_data_path must be specified on the command line')
 
-    # Verify that the XML filename provided is not an empty string
-    if args.xml_filename == '':
-        raise Exception('The XML metadata filename provided was empty')
+    if args.modtran_data_path == '':
+        raise Exception('The MODTRAN data directory provided was empty')
 
     return args
+
+
+TAPE5 = 'tape5'
+
+
+def process_point_dir((point_path, modtran_data_path)):
+    """Swim in the pool using the path
+
+    Args:
+        path <str>: The path to a directory containing a tape5 file
+    """
+
+    logger = logging.getLogger(__name__)
+
+    current_directory = os.getcwd()
+
+    # Get the real paths to simplify the logic a bit
+    r_paths = [os.path.realpath(path)
+               for path in glob.glob(os.path.join(point_path, '*', '*', '*'))]
+
+    try:
+        for tape5_path in r_paths:
+            logger.info('Processing Directory [{}]'.format(tape5_path))
+            os.chdir(tape5_path)
+            # MODTRAN requires the directory to always be named 'DATA'
+            util.System.create_link(modtran_data_path, 'DATA')
+
+            output = ''
+            try:
+                output = util.System.execute_cmd('modtran')
+
+            finally:
+                if len(output) > 0:
+                    logger.info(output)
+    finally:
+        os.chdir(current_directory)
+
+
+PROC_CFG_FILENAME = 'processing.conf'
 
 
 def main():
@@ -102,13 +129,25 @@ def main():
                         datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging_level,
                         stream=sys.stdout)
-    logger = logging.getLogger(__name__)
 
-    # XML Metadata
-    espa_metadata = Metadata()
-    espa_metadata.parse(xml_filename=args.xml_filename)
+    # Load the grid information
+    (grid_points, dummy1, dummy2) = read_grid_points()
 
-    raise NotImplementedError('I\'m not implemented yet!!!!!!!!!!!!')
+    # Cut down to just the ones we need to run MODTRAN on
+    point_parms = [('{0:03}_{1:03}_{2:03}_{3:03}'.format(point.row,
+                                                         point.col,
+                                                         point.narr_row,
+                                                         point.narr_col),
+                    args.modtran_data_path)
+                   for point in grid_points if point.run_modtran]
+
+    process_count = int(args.process_count)
+
+    if process_count > 1:
+        pools = Pool(process_count)
+        pools.map(process_point_dir, point_parms)
+    else:
+        map(process_point_dir, point_parms)
 
 
 if __name__ == '__main__':
