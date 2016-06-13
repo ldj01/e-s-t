@@ -45,8 +45,8 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='The XML metadata file to use')
 
-    parser.add_argument('--lst_aux_dir',
-                        action='store', dest='lst_aux_dir',
+    parser.add_argument('--lst_aux_path',
+                        action='store', dest='lst_aux_path',
                         required=False, default=None,
                         help='Base auxiliary data directory to use')
 
@@ -79,10 +79,10 @@ def retrieve_command_line_arguments():
     if args.xml_filename == '':
         raise Exception('No XML metadata filename provided.')
 
-    if args.lst_aux_dir is None:
-        raise Exception('--lst_aux_dir must be specified on the command line')
+    if args.lst_aux_path is None:
+        raise Exception('--lst_aux_path must be specified on the command line')
 
-    if args.lst_aux_dir == '':
+    if args.lst_aux_path == '':
         raise Exception('No LST Auxiliary data directory provided.')
 
     return args
@@ -92,7 +92,7 @@ AuxFilenameSet = namedtuple('AuxFilenameSet',
                             ('parameter', 'hdr', 'grb', 'output_dir'))
 
 
-def build_aux_filenames(lst_aux_dir, parm, date, date_type):
+def build_aux_filenames(lst_aux_path, parm, date, date_type):
     """Builds a filename set based on date and time
 
     Args:
@@ -111,7 +111,7 @@ def build_aux_filenames(lst_aux_dir, parm, date, date_type):
 
     path = AUX_PATH_TEMPLATE.format(date.year, date.month, date.day)
 
-    hdr_path = os.path.join(lst_aux_dir, path, filename)
+    hdr_path = os.path.join(lst_aux_path, path, filename)
 
     return AuxFilenameSet(parameter=parm,
                           hdr=hdr_path,
@@ -119,7 +119,7 @@ def build_aux_filenames(lst_aux_dir, parm, date, date_type):
                           output_dir='{0}_{1}'.format(parm, date_type))
 
 
-def aux_filenames(lst_aux_dir, parms, t0_date, t1_date):
+def aux_filenames(lst_aux_path, parms, t0_date, t1_date):
     """Builds t0 and t1 filename sets for each parameter
 
     Args:
@@ -130,9 +130,9 @@ def aux_filenames(lst_aux_dir, parms, t0_date, t1_date):
     """
 
     for parm in parms:
-        yield build_aux_filenames(lst_aux_dir=lst_aux_dir, parm=parm,
+        yield build_aux_filenames(lst_aux_path=lst_aux_path, parm=parm,
                                   date=t0_date, date_type='t0')
-        yield build_aux_filenames(lst_aux_dir=lst_aux_dir, parm=parm,
+        yield build_aux_filenames(lst_aux_path=lst_aux_path, parm=parm,
                                   date=t1_date, date_type='t1')
 
 
@@ -175,7 +175,7 @@ def extract_from_grib(aux_set):
                     logger.info(output)
 
 
-def extract_narr_aux_data(espa_metadata, lst_aux_dir):
+def extract_narr_aux_data(espa_metadata, lst_aux_path):
     """Extracts the required NARR data from the auxiliary archive
 
     Args:
@@ -184,12 +184,12 @@ def extract_narr_aux_data(espa_metadata, lst_aux_dir):
 
     logger = logging.getLogger(__name__)
 
-    (acq_date, t0_date, t1_date) = util.NARR.dates(espa_metadata)
+    (dummy, t0_date, t1_date) = util.NARR.dates(espa_metadata)
 
     logger.info('Before Date = {}'.format(str(t0_date)))
     logger.info(' After Date = {}'.format(str(t1_date)))
 
-    for aux_set in aux_filenames(lst_aux_dir, PARMS_TO_EXTRACT,
+    for aux_set in aux_filenames(lst_aux_path, PARMS_TO_EXTRACT,
                                  t0_date, t1_date):
 
         logger.info('Using {0}'.format(aux_set.hdr))
@@ -223,9 +223,9 @@ def main():
                         datefmt='%Y-%m-%d %H:%M:%S',
                         level=log_level,
                         stream=sys.stdout)
-
-    # Get the logger
     logger = logging.getLogger(__name__)
+
+    logger.info('*** Begin Extract Auxiliary NARR Data ***')
 
     # XML Metadata
     espa_metadata = Metadata()
@@ -233,13 +233,13 @@ def main():
 
     try:
         logger.info('Extracting LST AUX data')
-        extract_narr_aux_data(espa_metadata, args.lst_aux_dir)
+        extract_narr_aux_data(espa_metadata, args.lst_aux_path)
 
     except Exception:
         logger.exception('Failed processing auxiliary NARR data')
         raise
 
-    logger.info('Completed extraction of auxiliary NARR data')
+    logger.info('*** Extract Auxiliary NARR Data - Complete ***')
 
 
 if __name__ == '__main__':
