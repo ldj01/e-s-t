@@ -15,10 +15,10 @@ import logging
 import errno
 import commands
 import datetime
-import requests
-from cStringIO import StringIO
-from osgeo import gdal, osr
 from time import sleep
+from cStringIO import StringIO
+import requests
+from osgeo import gdal, osr
 
 
 #import metadata_api
@@ -30,7 +30,7 @@ class Version(object):
         Provides methods for retrieving version information.
     '''
 
-    version = '0.0.4'
+    version = '0.1.0'
 
     @staticmethod
     def version_number():
@@ -119,6 +119,28 @@ class System(object):
             os.makedirs(directory, mode=0755)
         except OSError as ose:
             if ose.errno == errno.EEXIST and os.path.isdir(directory):
+                pass
+            else:
+                raise
+
+    @staticmethod
+    def create_link(src_path, link_path):
+        """Create the specified link with some error checking
+
+        Args:
+            src_path (str): The location where the link will point.
+            link_path (str): The location where the link will reside.
+
+        Raises:
+            Exception()
+        """
+
+        # Create/Make sure the directory exists
+        try:
+            os.symlink(src_path, link_path)
+        except OSError as ose:
+            if (ose.errno == errno.EEXIST and os.path.islink(link_path) and
+                    src_path == os.path.realpath(link_path)):
                 pass
             else:
                 raise
