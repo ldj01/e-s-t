@@ -12,8 +12,9 @@ include $(TOP)/make.config
 SCRIPTS = \
     lst_determine_grid_points.py \
     lst_build_modtran_input.py \
-    lst_extract_auxiliary_narr_data.py \
     lst_core_processing.py \
+    lst_extract_auxiliary_narr_data.py \
+    lst_generate_products.py \
     lst_run_modtran.py \
     extract_modtran_results.py
 
