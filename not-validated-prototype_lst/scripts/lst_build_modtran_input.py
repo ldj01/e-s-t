@@ -40,7 +40,7 @@ PRESSURE_LAYERS = [1000, 975, 950, 925, 900,
 '''
 TODO TODO TODO TODO TODO TODO TODO TODO
 TODO TODO TODO TODO TODO TODO TODO TODO
-
+-----------------------------------------------------------------------------
 I think if we know more information about the data points that will need a
 NARR point, the number of ALTITUDES needed to run through MODTRAN for a point
 could be reduced, further reducing the number of MODTRAN runs.
@@ -53,7 +53,7 @@ Mountainous land could still end up running all 27.
 I think I have the information in lst_determine_grid_points.py, and can add
 it to the grid points data.  It will also need modifications with this script
 and maybe the follow-on scripts and executables.
-
+-----------------------------------------------------------------------------
 TODO TODO TODO TODO TODO TODO TODO TODO
 TODO TODO TODO TODO TODO TODO TODO TODO
 '''
@@ -104,8 +104,8 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='The XML metadata file to use')
 
-    parser.add_argument('--lst_data_dir',
-                        action='store', dest='lst_data_dir',
+    parser.add_argument('--data_path',
+                        action='store', dest='data_path',
                         required=False, default=None,
                         help='Specify the LST Data directory')
 
@@ -137,27 +137,27 @@ def retrieve_command_line_arguments():
     if args.xml_filename == '':
         raise Exception('The XML metadata filename provided was empty')
 
-    if args.lst_data_dir is None:
-        raise Exception('--lst_data_dir must be specified on the command line')
+    if args.data_path is None:
+        raise Exception('--data_path must be specified on the command line')
 
-    if args.lst_data_dir == '':
+    if args.data_path == '':
         raise Exception('The LST data directory provided was empty')
 
     return args
 
 
-def load_modtran_template_file(lst_data_dir, filename):
+def load_modtran_template_file(data_path, filename):
     """Loads the specified MODTRAN template file
 
     Args:
-        lst_data_dir <str>: The directory for the NARR data file
-        filename <str>: The filename to load
+        data_path <str>: The directory for LST data files
+        filename <str>: he filename to load
 
     Args:
         <str>: The contents of the requested file
     """
 
-    filename = os.path.join(lst_data_dir, filename)
+    filename = os.path.join(data_path, filename)
     file_data = None
 
     with open(filename, 'r') as file_fd:
@@ -245,11 +245,11 @@ StdAtmosInfo = namedtuple('StdAtmosInfo',
                           ('hgt', 'pressure', 'temp', 'rh'))
 
 
-def load_std_atmosphere(lst_data_dir):
+def load_std_atmosphere(data_path):
     """Loads the standard atmosphere into an iterable
 
     Args:
-        lst_data_dir <str>: The directory for the NARR data file
+        data_path <str>: The directory for LST data files
 
     Returns:
         <iterable>: Essentially a list of StdAtmosInfo objects
@@ -257,7 +257,7 @@ def load_std_atmosphere(lst_data_dir):
 
     logger = logging.getLogger(__name__)
 
-    filename = os.path.join(lst_data_dir, STD_ATMOS_FILENAME)
+    filename = os.path.join(data_path, STD_ATMOS_FILENAME)
     logger.debug('Reading Standard Atmosphere File [{}]'.format(filename))
 
     with open(filename, 'r') as data_fd:
@@ -280,7 +280,7 @@ INV_STD_GRAVITY = 1.0 / STANRDARD_GRAVITY_IN_M_PER_SEC_SQRD
 def determine_geometric_hgt(data, point, layer, time):
     """Determines geometric height for a layer in the point at time x
 
-    Geopotential height is converted to geometrix height for both t0 and t1
+    Geopotential height is converted to geometric height for both t0 and t1
     heights
 
     Args:
@@ -652,10 +652,14 @@ def determine_all_layers_for_elev(std_atmos, layers, values, elevation):
     return s_layers
 
 
-def write_tape5_file(filename, head_data, middle_data, tail_data):
-    """
+def write_tape5_file(filename, head_data, body_data, tail_data):
+    """Write the tape5 file with the specified information
+
     Args:
-        TODO TODO TODO
+        filename <str>: The path and filename to create
+        head_data <str>: The head information for the file
+        body_data <str>: The body information for the file
+        tail_data <str>: The tail information for the file
     """
 
     logger = logging.getLogger(__name__)
@@ -664,42 +668,21 @@ def write_tape5_file(filename, head_data, middle_data, tail_data):
 
     with open(filename, 'w') as tape5_fd:
         tape5_fd.write(head_data)
-        tape5_fd.write(middle_data)
+        tape5_fd.write(body_data)
         tape5_fd.write(tail_data)
 
 
-def generate_tape5_for_elevation(std_atmos, layers, head_template, tail_data,
-                                 point_path, values, elevation):
-    """
+def generate_for_temp_alb_pairs(hgt_path, temp_head_data, body_data,
+                                tail_data):
+    """Generates all of the tape5 files for the tempurature and albedo pairs
+
     Args:
-        TODO TODO TODO
+        hgt_path <str>: Path to the height directory to place the temperature
+                        and albedo pairs
+        temp_head_data <str>: Template head data for the file
+        body_data <str>: The body information for the file
+        tail_data <str>: The tail information for the file
     """
-
-    # Append the height directory
-    hgt_path = os.path.join(point_path, '{0:05.3f}'.format(elevation))
-
-    s_layers = determine_all_layers_for_elev(std_atmos=std_atmos,
-                                             layers=layers,
-                                             values=values,
-                                             elevation=elevation)
-
-    # Update the middle section for the MODTRAN tape5 file with
-    # current information
-    middle_data = ''.join(['{0:10.3f}{1:10.3e}{2:10.3e}{3:10.3e}{4:10.3e}'
-                           '{5:10.3e}{6:16s}\n'.format(x.hgt,
-                                                       x.pressure,
-                                                       x.temp,
-                                                       x.rh,
-                                                       0.0, 0.0,
-                                                       'AAH             ')
-                           for x in s_layers])
-
-    # Update the head section for the MODTRAN tape5 file with
-    # current information
-    temp_head_data = head_template.replace('nml', str(len(s_layers)))
-    temp_head_data = temp_head_data.replace('gdalt',
-                                            '{0:05.3f}'
-                                            .format(elevation))
 
     # Iterate through all the (temperature,albedo) pairs at which to
     # run MODTRAN and create the final required tape5 file for
@@ -718,8 +701,55 @@ def generate_tape5_for_elevation(std_atmos, layers, head_template, tail_data,
 
         write_tape5_file(filename=os.path.join(ta_path, TAPE5),
                          head_data=head_data,
-                         middle_data=middle_data,
+                         body_data=body_data,
                          tail_data=tail_data)
+
+
+def generate_tape5_for_elevation(std_atmos, layers, head_template, tail_data,
+                                 point_path, values, elevation):
+    """Generates all of the tape5 files for the elevation
+
+    Args:
+        std_atmos [StdAtmosInfo]: The standard atmosphere
+        layers [<str>]: All the pressure layers
+        head_template <str>: Template for the head of a tape5 file
+        tail_data <str>: Updated tail data for a tape5 file
+        point_path <str>: Path to the point directory to contain the tape5
+                          files
+        values [<LayerInfo>]: All the interpolated layers information
+        elevation <float>: The current elevation
+    """
+
+    # Append the height directory
+    hgt_path = os.path.join(point_path, '{0:05.3f}'.format(elevation))
+
+    s_layers = determine_all_layers_for_elev(std_atmos=std_atmos,
+                                             layers=layers,
+                                             values=values,
+                                             elevation=elevation)
+
+    # Update the middle section for the MODTRAN tape5 file with
+    # current information
+    body_data = ''.join(['{0:10.3f}{1:10.3e}{2:10.3e}{3:10.3e}{4:10.3e}'
+                         '{5:10.3e}{6:16s}\n'.format(x.hgt,
+                                                     x.pressure,
+                                                     x.temp,
+                                                     x.rh,
+                                                     0.0, 0.0,
+                                                     'AAH             ')
+                         for x in s_layers])
+
+    # Update the head section for the MODTRAN tape5 file with
+    # current information
+    temp_head_data = head_template.replace('nml', str(len(s_layers)))
+    temp_head_data = temp_head_data.replace('gdalt',
+                                            '{0:05.3f}'
+                                            .format(elevation))
+
+    generate_for_temp_alb_pairs(hgt_path=hgt_path,
+                                temp_head_data=temp_head_data,
+                                body_data=body_data,
+                                tail_data=tail_data)
 
 
 def determine_elevations(elevations, height):
@@ -795,19 +825,19 @@ def generate_tape5_files_for_point(std_atmos, data, point,
                                      elevation=elevation)
 
 
-def generate_modtran_tape5_files(espa_metadata, lst_data_dir, std_atmos,
+def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
                                  grid_points):
     """
     Args:
         espa_metadata <espa.metadata>: The metadata information for the input
-        lst_data_dir <str>: The directory for the NARR data files
+        data_path <str>: The directory for the NARR data files
         std_atmos [StdAtmosInfo]: The standard atmosphere
         grid_points [GridPointInfo]: List of the grid point information
     """
 
     # Load the MODTRAN head and tail template files
-    head_template = load_modtran_template_file(lst_data_dir, MODTRAN_HEAD)
-    tail_template = load_modtran_template_file(lst_data_dir, MODTRAN_TAIL)
+    head_template = load_modtran_template_file(data_path, MODTRAN_HEAD)
+    tail_template = load_modtran_template_file(data_path, MODTRAN_TAIL)
 
     # Load the NARR pressure layers into a data structure
     data = load_narr_pressure_layers(parameters=PARAMETERS,
@@ -865,14 +895,14 @@ def main():
 
     # Load the standard atmospheric layers information
     std_atmos = [layer for layer in
-                 load_std_atmosphere(lst_data_dir=args.lst_data_dir)]
+                 load_std_atmosphere(data_path=args.data_path)]
 
     generate_modtran_tape5_files(espa_metadata=espa_metadata,
-                                 lst_data_dir=args.lst_data_dir,
+                                 data_path=args.data_path,
                                  std_atmos=std_atmos,
                                  grid_points=grid_points)
 
-    logger.info('*** MODTRAN Tape5 Generation Complete ***')
+    logger.info('*** MODTRAN Tape5 Generation - Complete ***')
 
 
 if __name__ == '__main__':
