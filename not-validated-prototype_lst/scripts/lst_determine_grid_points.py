@@ -3,8 +3,8 @@
 '''
     File: lst_determine_grid_points.py
 
-    Purpose: Determines a set of points some of which will be used to run MODTRAN
-             against.
+    Purpose: Determines a set of points some of which will be used to run
+             MODTRAN against.
 
     Project: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -16,8 +16,6 @@ import os
 import sys
 import logging
 import math
-import array
-import struct
 import numpy as np
 from argparse import ArgumentParser
 from collections import namedtuple
@@ -70,8 +68,8 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='The XML metadata file to use')
 
-    parser.add_argument('--lst_data_dir',
-                        action='store', dest='lst_data_dir',
+    parser.add_argument('--data_path',
+                        action='store', dest='data_path',
                         required=False, default=None,
                         help='Specify the LST Data directory')
 
@@ -103,10 +101,11 @@ def retrieve_command_line_arguments():
     if args.xml_filename == '':
         raise Exception('The XML metadata filename provided was empty')
 
-    if args.lst_data_dir is None:
-        raise Exception('--lst_data_dir must be specified on the command line')
+    if args.data_path is None:
+        raise Exception('--data_path must be specified on the'
+                        ' command line')
 
-    if args.lst_data_dir == '':
+    if args.data_path == '':
         raise Exception('The LST data directory provided was empty')
 
     return args
@@ -190,28 +189,28 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
                      global_metadata.bounding_coordinates.east)
     west_lon = float(espa_metadata.xml_object.
                      global_metadata.bounding_coordinates.west)
-    (ul_x, ul_y, height) = gdal_objs.ll_to_data.TransformPoint(west_lon,
-                                                               north_lat)
-    (ur_x, ur_y, height) = gdal_objs.ll_to_data.TransformPoint(east_lon,
-                                                               north_lat)
-    (lr_x, lr_y, height) = gdal_objs.ll_to_data.TransformPoint(east_lon,
-                                                               south_lat)
-    (ll_x, ll_y, height) = gdal_objs.ll_to_data.TransformPoint(west_lon,
-                                                               south_lat)
+    (ul_x, ul_y, dummy) = gdal_objs.ll_to_data.TransformPoint(west_lon,
+                                                              north_lat)
+    (ur_x, ur_y, dummy) = gdal_objs.ll_to_data.TransformPoint(east_lon,
+                                                              north_lat)
+    (lr_x, lr_y, dummy) = gdal_objs.ll_to_data.TransformPoint(east_lon,
+                                                              south_lat)
+    (ll_x, ll_y, dummy) = gdal_objs.ll_to_data.TransformPoint(west_lon,
+                                                              south_lat)
 
     north_y = max(ur_y, ul_y) + adjustment
     south_y = min(ll_y, lr_y) - adjustment
     east_x = max(ur_x, lr_x) + adjustment
     west_x = min(ul_x, ll_x) - adjustment
 
-    (ul_lon, ul_lat, height) = gdal_objs.data_to_ll.TransformPoint(west_x,
-                                                                   north_y)
-    (ur_lon, ur_lat, height) = gdal_objs.data_to_ll.TransformPoint(east_x,
-                                                                   north_y)
-    (lr_lon, lr_lat, height) = gdal_objs.data_to_ll.TransformPoint(east_x,
-                                                                   south_y)
-    (ll_lon, ll_lat, height) = gdal_objs.data_to_ll.TransformPoint(west_x,
-                                                                   south_y)
+    (ul_lon, ul_lat, dummy) = gdal_objs.data_to_ll.TransformPoint(west_x,
+                                                                  north_y)
+    (ur_lon, ur_lat, dummy) = gdal_objs.data_to_ll.TransformPoint(east_x,
+                                                                  north_y)
+    (lr_lon, lr_lat, dummy) = gdal_objs.data_to_ll.TransformPoint(east_x,
+                                                                  south_y)
+    (ll_lon, ll_lat, dummy) = gdal_objs.data_to_ll.TransformPoint(west_x,
+                                                                  south_y)
 
     north_lat = max(ul_lat, ur_lat)
     south_lat = min(lr_lat, ll_lat)
@@ -226,7 +225,8 @@ def check_within_bounds(data_bounds, lon, lat):
     """
 
     Args:
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+                                     information
         lon <float>: The longitude to check
         lat <float>: The latitude to check
 
@@ -474,7 +474,8 @@ def determine_narr_min_max_row_col(data_bounds, data_path):
     """Determine the NARR points that are within the data bounds
 
     Args:
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+                                     information
         data_path <str>: The full path to the NARR coordinates file
 
     Returns:
@@ -501,14 +502,16 @@ def determine_narr_min_max_row_col(data_bounds, data_path):
                             min_col=min_col, max_col=max_col)
 
 
-def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
+def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
+                                  data_path):
     """Determine the grid of NARR points which cover the data
 
     Args:
         debug <bool>: Perform debug output or not
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
-        lst_data_dir <str>: The directory for the NARR coodinate file
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+                                     information
+        data_path <str>: The directory for the NARR coodinate file
 
     Returns:
         grid_points <dict>: Dictionary of the gridded points
@@ -519,7 +522,7 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
     logger = logging.getLogger(__name__)
 
     # Determine full path to the file
-    data_path = os.path.join(lst_data_dir, NARR_COORDINATES_FILENAME)
+    data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
 
     # Determine buffered points
     min_max = determine_narr_min_max_row_col(data_bounds, data_path)
@@ -558,14 +561,15 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds, lst_data_dir):
     return (grid_points, grid_rows, grid_cols)
 
 
-def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
+def generate_point_grid(debug, gdal_objs, data_bounds, data_path):
     """Creates a point grid file for later processing
 
     Args:
         debug <bool>: Perform debug output or not
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
-        lst_data_dir <str>: The directory for the NARR coodinate file
+        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+                                     information
+        data_path <str>: The directory for the NARR coodinate file
 
     Notes: The file format contains lines of the following information.
                'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
@@ -581,7 +585,7 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
 
     # Determine grid points
     (grid_points, grid_rows, grid_cols) = determine_gridded_narr_points(
-        debug, gdal_objs, data_bounds, lst_data_dir)
+        debug, gdal_objs, data_bounds, data_path)
 
     raster_data = (gdal_objs.data_ds.GetRasterBand(1)
                    .ReadAsArray(0, 0, gdal_objs.nsamps, gdal_objs.nlines))
@@ -600,7 +604,6 @@ def generate_point_grid(debug, gdal_objs, data_bounds, lst_data_dir):
     # Add all the data points between the first and last line edges
     first_line = ew_edges[:2]
     last_line = ew_edges[-2:]
-    min_line = first_line
 
     # Add any first row length of pixels
     ew_edges.extend([(first_line[0][0], samp)
@@ -746,6 +749,8 @@ def main():
                         stream=sys.stdout)
     logger = logging.getLogger(__name__)
 
+    logger.info('*** Begin Determine Grid Points ***')
+
     # XML Metadata
     espa_metadata = Metadata()
     espa_metadata.parse(xml_filename=args.xml_filename)
@@ -762,7 +767,9 @@ def main():
     generate_point_grid(debug=args.debug,
                         gdal_objs=gdal_objs,
                         data_bounds=data_bounds,
-                        lst_data_dir=args.lst_data_dir)
+                        data_path=args.data_path)
+
+    logger.info('*** Determine Grid Points - Complete ***')
 
 
 if __name__ == '__main__':
