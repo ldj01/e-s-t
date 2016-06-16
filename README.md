@@ -1,7 +1,7 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
 ## Land Surface Temperature 0.0.4 Release Notes
-Release Date: July 2016
+Release Date: August 2016
 
 This application produces Land Surface Temperature products for Landsats 4, 5, 7 and 8.
 
@@ -11,6 +11,7 @@ See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/p
 ## Release Notes
 * Version change
 * Updated emissivity coefficients
+* Changed usage of scene_id to product_id
 
 ## Installation
 
