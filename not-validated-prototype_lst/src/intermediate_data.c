@@ -16,22 +16,22 @@ open_intermediate(Input_Data_t *input,
     snprintf(inter->thermal_filename,
              sizeof(inter->thermal_filename),
              "%s_%s.img",
-             input->meta.scene_id,
+             input->meta.product_id,
              LST_THERMAL_RADIANCE_BAND_NAME);
     snprintf(inter->upwelled_filename,
              sizeof(inter->upwelled_filename),
              "%s_%s.img",
-             input->meta.scene_id,
+             input->meta.product_id,
              LST_UPWELLED_RADIANCE_BAND_NAME);
     snprintf(inter->downwelled_filename,
              sizeof(inter->downwelled_filename),
              "%s_%s.img",
-             input->meta.scene_id,
+             input->meta.product_id,
              LST_DOWNWELLED_RADIANCE_BAND_NAME);
     snprintf(inter->transmittance_filename,
              sizeof(inter->transmittance_filename),
              "%s_%s.img",
-             input->meta.scene_id,
+             input->meta.product_id,
              LST_ATMOS_TRANS_BAND_NAME);
 
     /* Now open the file descriptors */
@@ -77,7 +77,7 @@ open_intermediate(Input_Data_t *input,
     snprintf(inter->cell_filename,
              sizeof(inter->cell_filename),
              "%s_cellnumbers.img",
-             input->meta.scene_id);
+             input->meta.product_id);
 
     inter->cell_fd = fopen(inter->cell_filename, "wb");
     if (inter->cell_fd == NULL)
