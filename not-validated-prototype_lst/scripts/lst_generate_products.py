@@ -62,6 +62,10 @@ def retrieve_command_line_arguments():
         print(util.Version.version_text())
         sys.exit(0)  # EXIT SUCCESS
 
+    # Verify that the --xml parameter was specified
+    if args.xml_filename is None:
+        raise Exception('--xml must be specified on the command line')
+
     return args
 
 
@@ -136,12 +140,12 @@ def determine_grid_points(xml_filename, data_path, debug):
             logger.info(output)
 
 
-def extract_auxiliary_narr_data(xml_filename, lst_aux_path, debug):
+def extract_auxiliary_narr_data(xml_filename, aux_path, debug):
     """Determines the grid points to utilize
 
     Args:
         xml_filename <str>: XML metadata filename
-        lst_aux_path <str>: Directory for the auxiliary data files
+        aux_path <str>: Directory for the auxiliary data files
         debug <bool>: Debug logging and processing
     """
 
@@ -149,7 +153,7 @@ def extract_auxiliary_narr_data(xml_filename, lst_aux_path, debug):
     try:
         cmd = ['lst_extract_auxiliary_narr_data.py',
                '--xml', xml_filename,
-               '--lst_aux_path', lst_aux_path]
+               '--aux_path', aux_path]
 
         if debug:
             cmd.append('--debug')
@@ -186,17 +190,25 @@ def build_modtran_input(xml_filename, data_path, debug):
             logger.info(output)
 
 
-def generate_emissivity_products(aster_ged_server_name):
+def generate_emissivity_products(server_name, server_path):
     """Generate the required Emissivity products
     """
 
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # TODO TODO TODO
-    pass
+    output = ''
+    try:
+        cmd = ['estimate_landsat_emissivity.py',
+               '--xml', xml_filename,
+               '--aster-ged-server-name', server_name,
+               '--aster-ged-server-path', server_path]
+
+        if debug:
+            cmd.append('--debug')
+
+        output = util.System.execute_cmd(' '.join(cmd))
+    finally:
+        if len(output) > 0:
+            logger = logging.getLogger(__name__)
+            logger.info(output)
 
 
 def run_modtran(modtran_data_path, process_count, debug):
@@ -261,13 +273,14 @@ def main():
     data_path = proc_cfg.get('processing', 'lst_data_path')
 
     # Determine NARR data locations
-    lst_aux_path = proc_cfg.get('processing', 'lst_aux_path')
+    aux_path = proc_cfg.get('processing', 'lst_aux_path')
 
     # Determine MODTRAN 'DATA' location
     modtran_data_path = proc_cfg.get('processing', 'modtran_data_path')
 
-    # Determine the server name to get the ASTER data from
-    aster_ged_server_name = proc_cfg.get('processing', 'aster_ged_server_name')
+    # Determine the server name and path to get the ASTER data from
+    server_name = proc_cfg.get('processing', 'aster_ged_server_name')
+    server_path = proc_cfg.get('processing', 'aster_ged_server_path')
 
     # -------------- Generate the products --------------
     determine_grid_points(xml_filename=args.xml_filename,
@@ -275,14 +288,14 @@ def main():
                           debug=args.debug)
 
     extract_auxiliary_narr_data(xml_filename=args.xml_filename,
-                                lst_aux_path=lst_aux_path,
+                                aux_path=aux_path,
                                 debug=args.debug)
 
     build_modtran_input(xml_filename=args.xml_filename,
                         data_path=data_path,
                         debug=args.debug)
 
-    generate_emissivity_products(aster_ged_server_name)
+    generate_emissivity_products(server_name, server_path)
 
     run_modtran(modtran_data_path=modtran_data_path,
                 process_count=process_count,
