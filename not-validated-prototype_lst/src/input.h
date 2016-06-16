@@ -63,7 +63,7 @@ typedef struct
 {
     Satellite_t satellite;      /* Satellite */
     Instrument_t instrument;    /* Instrument */
-    char *scene_id;             /* SceneID */
+    char *product_id;           /* ProductID */
     Date_t acq_date;            /* Acq. date/time (scene center) */
     int zone;                   /* UTM zone number */
     Map_coord_t ul_map_corner;  /* Map projection coordinates of the upper

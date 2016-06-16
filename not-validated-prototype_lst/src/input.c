@@ -453,7 +453,7 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
     }
 
     /* Get the scene ID */
-    input->meta.scene_id = strdup(metadata->global.scene_id);
+    input->meta.product_id = strdup(metadata->global.product_id);
 
     /* Get the map projection coordinates */
     input->meta.ul_map_corner.x = metadata->global.proj_info.ul_corner[0];
