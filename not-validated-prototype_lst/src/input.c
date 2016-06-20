@@ -404,7 +404,10 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
     {
         /* Only look at the ones with the product name we are looking for */
         if (strcmp (metadata->band[index].product, "L1T") == 0
-            || strcmp (metadata->band[index].product, "L1G") == 0)
+            || strcmp (metadata->band[index].product, "L1G") == 0
+            || strcmp (metadata->band[index].product, "L1TP") == 0
+            || strcmp (metadata->band[index].product, "L1GT") == 0
+            || strcmp (metadata->band[index].product, "L1GS") == 0)
         {
             if (strcmp (metadata->band[index].name,
                         input->reference_band_name) == 0)
@@ -420,10 +423,8 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
                    size values */
                 input->lines = metadata->band[index].nlines;
                 input->samples = metadata->band[index].nsamps;
-                input->x_pixel_size =
-                    metadata->band[index].pixel_size[0];
-                input->y_pixel_size =
-                    metadata->band[index].pixel_size[1];
+                input->x_pixel_size = metadata->band[index].pixel_size[0];
+                input->y_pixel_size = metadata->band[index].pixel_size[1];
 
                 input->thermal_rad_gain = metadata->band[index].rad_gain;
                 input->thermal_rad_bias = metadata->band[index].rad_bias;
