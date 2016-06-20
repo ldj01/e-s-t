@@ -545,8 +545,13 @@ int calculate_pixel_atmospheric_parameters
 
     if (verbose)
     {
-        LOG_MESSAGE ("Iterate through all pixels in Landsat scene\n",
-                     FUNC_NAME);
+        LOG_MESSAGE("Iterate through all pixels in Landsat scene",
+                    FUNC_NAME);
+        snprintf(msg, sizeof(msg), "Pixel Count = %d", pixel_count);
+        LOG_MESSAGE(msg, FUNC_NAME);
+        snprintf(msg,  sizeof(msg),"Lines = %d, Samples = %d",
+                 input->lines, input->samples);
+        LOG_MESSAGE(msg, FUNC_NAME);
     }
 
     /* Loop through each line in the image */
