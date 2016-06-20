@@ -149,7 +149,7 @@ def main():
 
     # Get the science application
     cmd = [get_science_application_name(satellite_sensor_code)]
-    # Pass all arguments through to the since application
+    # Pass all arguments through to the science application
     cmd.extend(sys.argv[1:])
 
     # Convert the list to a string
