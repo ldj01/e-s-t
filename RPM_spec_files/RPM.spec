@@ -29,12 +29,8 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildArch:	x86_64
 Packager:	USGS EROS LSRD
 
-#BuildRequires:
-#Requires:
-
 %description
-Provides science application executables for generating land surface temperature products.  This is a C and Python implementation which is statically built.
-
+Provides science application executables for generating land surface temperature products for Landsat 4, 5, 7, and 8.  These applications are implemented in Python.
 
 # ----------------------------------------------------------------------------
 %prep
