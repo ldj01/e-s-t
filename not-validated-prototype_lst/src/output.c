@@ -79,7 +79,11 @@ add_lst_band_product
     /* Find the representative band for metadata information */
     for (band_index = 0; band_index < in_meta.nbands; band_index++)
     {
-        if ((strcmp (in_meta.band[band_index].product, "L1T") == 0)
+        if (((strcmp (in_meta.band[band_index].product, "L1T") == 0)
+             || (strcmp (in_meta.band[band_index].product, "L1G") == 0)
+             || (strcmp (in_meta.band[band_index].product, "L1TP") == 0)
+             || (strcmp (in_meta.band[band_index].product, "L1GT") == 0)
+             || (strcmp (in_meta.band[band_index].product, "L1GS") == 0))
             && (strcmp (in_meta.band[band_index].name, reference_band_name)
                 == 0))
         {
