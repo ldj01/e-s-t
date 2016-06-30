@@ -25,6 +25,15 @@ import lst_utilities as util
 from lst_grid_points import read_grid_points
 
 
+class InvalidNarrDataPointError(Exception):
+    """Exception for invalid NARR data points
+    """
+    pass
+
+
+# Invalid NARR data value
+INVALID_NARR_DATA_VALUE = 9.999e+20
+
 # The number of rows and columns present in the NARR data
 NARR_ROWS = 277
 NARR_COLS = 349
@@ -296,6 +305,9 @@ def determine_geometric_hgt(data, point, layer, time):
     # Geopotential height at time
     hgt = data[HGT_PARMS[time]][layer][point.narr_col][point.narr_row]
 
+    if hgt == INVALID_NARR_DATA_VALUE:
+        raise InvalidNarrDataPointError('Invalid NARR data point value [HGT]')
+
     rad_lat = math.radians(point.lat)
     sin_lat = math.sin(rad_lat)
     cos_lat = math.cos(rad_lat)
@@ -340,8 +352,15 @@ def determine_rh_temp(data, point, layer, time):
 
     # Specific humidity at time
     spfh = data[SPFH_PARMS[time]][layer][point.narr_col][point.narr_row]
+
+    if spfh == INVALID_NARR_DATA_VALUE:
+        raise InvalidNarrDataPointError('Invalid NARR data point value [SPFH]')
+
     # Temperature at time
     temp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]
+
+    if temp == INVALID_NARR_DATA_VALUE:
+        raise InvalidNarrDataPointError('Invalid NARR data point value [TMP]')
 
     # Calculate vapor pressure at given temperature - hpa
     goff_pow_1 = math.pow(10.0, (11.344 * (1.0 - (temp / 373.16)))) - 1.0
@@ -472,6 +491,9 @@ def determine_layers_below_above(layers, values, elevation):
     """
 
     index = 0
+    index_below = 0
+    index_above = len(layers) - 1
+
     for layer in layers:
         if values[layer].hgt >= elevation:
             index_below = index - 1
