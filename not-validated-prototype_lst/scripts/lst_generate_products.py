@@ -190,7 +190,8 @@ def build_modtran_input(xml_filename, data_path, debug):
             logger.info(output)
 
 
-def generate_emissivity_products(server_name, server_path):
+def generate_emissivity_products(xml_filename, server_name, server_path,
+                                 debug):
     """Generate the required Emissivity products
     """
 
@@ -295,7 +296,10 @@ def main():
                         data_path=data_path,
                         debug=args.debug)
 
-    generate_emissivity_products(server_name, server_path)
+    generate_emissivity_products(xml_filename=args.xml_filename,
+                                 server_name=server_name,
+                                 server_path=server_path,
+                                 debug=args.debug)
 
     run_modtran(modtran_data_path=modtran_data_path,
                 process_count=process_count,
