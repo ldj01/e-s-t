@@ -434,6 +434,66 @@ def snow_and_ndsi_locations(src_info, no_data_value):
     return (snow_locations, ndsi_no_data_locations)
 
 
+ASTER_GED_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
+ASTER_GED_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
+
+
+def download_aster_ged_tile(base_url_path, lat, lon):
+    """
+    Args:
+    Returns:
+    """
+
+    # Build the base filename using the correct format
+    filename = ''
+    if lon < 0:
+        filename = ASTER_GED_N_FORMAT.format(lat, lon)
+    else:
+        filename = ASTER_GED_P_FORMAT.format(lat, lon)
+
+    # Build the HDF5 filename for the tile
+    h5_file_path = ''.join([filename, '.h5'])
+
+    # Build the URL and download the tile
+    url_path = ''.join([base_url_path, h5_file_path])
+    status_code = util.Web.http_transfer_file(url_path, h5_file_path)
+
+    # Check for and handle tiles that are not available in the
+    # ASTER data
+    if status_code != requests.codes['ok']:
+        if status_code != requests.codes['not_found']:
+            raise Exception('HTTP - Transfer Failed')
+        else:
+            return(filename, h5_file_path)
+
+
+def build_ls_emis_data(server_name, server_path, src_info, coefficients):
+    """Build Landsat Emissivity Data
+
+    Download the ASTER GED tiles that encompass our Landsat scene and extract
+    the bands required to generate the Landsat Emissivity data.  Mosaic the
+    Landsat Emissivity tiles together and then warp them to the projection and
+    image extents of the Landsat scenes.  For convenience the ASTER NDVI is
+    also extracted and warped to the Landsat scenes projection and image
+    extents.
+
+    Returns:
+        ls_emis_warped_name
+          - The name of the reprojected Landsat Emissivity data.
+        aster_ndvi_warped_name
+          - The name of the reprojected ASTER NDVI data.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # Specify the base URL to use for retrieving the ASTER GED data
+    base_url_path = ''.join(['http://', server_name, server_path])
+
+    # The ASTER data is in geographic projection so specify that here
+    ds_srs = osr.SpatialReference()
+    ds_srs.ImportFromEPSG(4326)
+
+
 def generate_emissivity_data(espa_metadata):
     """Generate the Landsat Emissivity band data
     Args:
@@ -509,29 +569,7 @@ class EstimateLandsatEmissivity(object):
         aster_ndvi_mean_filenames = list()
         for lat in xrange(int(src_info.bound.south), int(src_info.bound.north)+1):
             for lon in xrange(int(src_info.bound.west), int(src_info.bound.east)+1):
-                # Build the base filename using the correct format
-                filename = ''
-                if lon < 0:
-                    filename = self.file_n_format.format(lat, lon)
-                else:
-                    filename = self.file_p_format.format(lat, lon)
-
-                # Build the HDF5 filename for the tile
-                h5_file_path = ''.join([filename, '.h5'])
-
-                # Build the URL and download the tile
-                url_path = ''.join([self.base_url_path, h5_file_path])
-                status_code = util.Web.http_transfer_file(url_path,
-                                                          h5_file_path)
-
-                # Check for and handle tiles that are not available in the
-                # ASTER data
-                if status_code != requests.codes['ok']:
-                    if status_code != requests.codes['not_found']:
-                        raise Exception('HTTP - Transfer Failed')
-                    else:
-                        # Advance to the next tile
-                        continue
+                (filename, h5_file_path) = download_aster_ged_tile(self.base_url_path, lat, lon)
 
                 # ------------------------------------------------------------
                 # Build the output tile names
