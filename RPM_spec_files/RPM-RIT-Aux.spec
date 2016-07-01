@@ -32,7 +32,7 @@ Packager:	USGS EROS LSRD
 BuildRequires:	espa-product-formatter >= 1.8.0
 
 %description
-Provides science application executables for generating land surface temperature products.  These aplications are implemented in Python.
+Provides science application executables for generating land surface temperature products.  These applications are implemented in Python.
 
 
 # ----------------------------------------------------------------------------
