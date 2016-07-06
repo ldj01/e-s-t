@@ -21,3 +21,7 @@ class LSTError(Exception):
 class MissingBandError(LSTError):
     """Exception to use for missing bands"""
     pass
+
+class NoTilesError(LSTError):
+    """Exception to use for not finding any tiles"""
+    pass
