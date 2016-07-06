@@ -1213,13 +1213,15 @@ def retrieve_command_line_arguments():
         raise Exception('--xml must be specified on the command line')
 
     if args.aster_ged_server_name is None:
-        raise Exception('--aster-ged-server-name must be specified on the command line')
+        raise Exception('--aster-ged-server-name must be specified on the'
+                        ' command line')
 
     if args.aster_ged_server_name == '':
         raise Exception('The --aster-ged-server-name provided was empty')
 
     if args.aster_ged_server_path is None:
-        raise Exception('--aster-ged-server-path must be specified on the command line')
+        raise Exception('--aster-ged-server-path must be specified on the'
+                        ' command line')
 
     if args.aster_ged_server_path == '':
         raise Exception('The --aster-ged-server-path provided was empty')
