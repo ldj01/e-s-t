@@ -41,7 +41,7 @@ from osgeo import gdal, osr
 
 
 from espa import Metadata
-from lst_exceptions import MissingBandError
+from lst_exceptions import MissingBandError, NoTilesError
 
 
 # Import local modules
@@ -113,7 +113,7 @@ def get_band_info(band):
     """Returns a populated BandInfo
 
     Args:
-        band <xml_object>: Current being processed
+        band <xml_object>: Current band being processed
 
     Returns:
         <BandInfo>: Populated with band information
@@ -156,10 +156,8 @@ def extent_info(espa_metadata, band_info):
     extent_min_y = (extent_min_y - band_info.pixel_size.y * 0.5)
     extent_max_y = (extent_max_y + band_info.pixel_size.y * 0.5)
 
-    return ExtentInfo(min=XYInfo(x=extent_min_x,
-                                 y=extent_min_y),
-                      max=XYInfo(x=extent_max_x,
-                                 y=extent_max_y))
+    return ExtentInfo(min=XYInfo(x=extent_min_x, y=extent_min_y),
+                      max=XYInfo(x=extent_max_x, y=extent_max_y))
 
 
 def bound_info(espa_metadata):
@@ -302,8 +300,8 @@ def generate_landsat_ndvi(src_info, no_data_value):
         no_data_value <int>: No data (fill) value to use
 
     Returns:
-        <data>: Generated NDVI band data
-        <array>: Array of locations containing no data (fill) values
+        <numpy.2darray>: Generated NDVI band data
+        list(<int>): Locations containing no data (fill) values
     """
 
     logger = logging.getLogger(__name__)
@@ -351,8 +349,8 @@ def snow_and_ndsi_locations(src_info, no_data_value):
         no_data_value <int>: No data (fill) value to use
 
     Returns:
-        <array>: Array of locations where we decided snow exists
-        <array>: Array of locations containing no data (fill) values
+        list(<int>): Locations where we decided snow exists
+        list(<int>): Locations containing no data (fill) values
     """
 
     logger = logging.getLogger(__name__)
@@ -421,13 +419,13 @@ def download_aster_ged_tile(url, h5_file_path):
             raise Exception('HTTP - Transfer Failed')
 
 
-def extract_aster_data(url, filename, keep_intermediate_data):
+def extract_aster_data(url, filename, intermediate):
     """Extracts the internal band(s) data for later processing
 
     Args:
         url <str>: URL to retrieve the file from
         filename <str>: Base HDF filename to extract from
-        keep_intermediate_data <bool>: Keep any intermediate data generated
+        intermediate <bool>: Keep any intermediate products generated
 
     Returns:
         <numpy.2darray>: Band 13 data
@@ -466,16 +464,11 @@ def extract_aster_data(url, filename, keep_intermediate_data):
     logger.debug(lat_ds_name)
     logger.debug(lon_ds_name)
 
-    try:
-        aster_b13_data = extract_raster_data(emis_ds_name, 4)
-        aster_b14_data = extract_raster_data(emis_ds_name, 5)
-        aster_ndvi_data = extract_raster_data(ndvi_ds_name, 1)
-        aster_lat_data = extract_raster_data(lat_ds_name, 1)
-        aster_lon_data = extract_raster_data(lon_ds_name, 1)
-
-    except Exception:
-        logger.exception('Extracting ASTER data from tile')
-        raise
+    aster_b13_data = extract_raster_data(emis_ds_name, 4)
+    aster_b14_data = extract_raster_data(emis_ds_name, 5)
+    aster_ndvi_data = extract_raster_data(ndvi_ds_name, 1)
+    aster_lat_data = extract_raster_data(lat_ds_name, 1)
+    aster_lon_data = extract_raster_data(lon_ds_name, 1)
 
     # Determine the minimum and maximum latitude and longitude
     x_min = aster_lon_data.min()
@@ -492,7 +485,7 @@ def extract_aster_data(url, filename, keep_intermediate_data):
                                  x_min, x_max, y_min, y_max))
 
     # Remove the HDF5 tile since we no longer need it
-    if not keep_intermediate_data:
+    if not intermediate:
         if os.path.exists(h5_file_path):
             os.unlink(h5_file_path)
 
@@ -525,8 +518,6 @@ def generate_estimated_emis_tile(coefficients, tile_name,
                                [5] - Pixel size in Y direction
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
-
-    Returns:
     """
 
     logger = logging.getLogger(__name__)
@@ -563,19 +554,15 @@ def generate_estimated_emis_tile(coefficients, tile_name,
     del aster_b14_no_data_locations
 
     # Create the estimated Landsat EMIS raster output tile
-    try:
-        logger.info('Creating an estimated Landsat EMIS tile')
-        util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
-                                      tile_name,
-                                      emis_data,
-                                      samps, lines,
-                                      transform,
-                                      wkt,
-                                      no_data_value,
-                                      gdal.GDT_Float32)
-    except Exception:
-        logger.exception('Creating Landsat EMIS tile')
-        raise
+    logger.info('Creating an estimated Landsat EMIS tile {}'.format(tile_name))
+    util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
+                                  tile_name,
+                                  emis_data,
+                                  samps, lines,
+                                  transform,
+                                  wkt,
+                                  no_data_value,
+                                  gdal.GDT_Float32)
 
     del emis_data
 
@@ -599,8 +586,6 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
                                [5] - Pixel size in Y direction
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
-
-    Returns:
     """
 
     logger = logging.getLogger(__name__)
@@ -609,29 +594,27 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
     ndvi_no_data_locations = np.where(ndvi_data == no_data_value)
 
     # Scale the data
-    ndvi_data = ndvi_data * 0.01
+    data = ndvi_data * 0.01
 
     # Re-apply the no data locations.
-    ndvi_data[ndvi_no_data_locations] = no_data_value
+    data[ndvi_no_data_locations] = no_data_value
 
     # Create the ASTER NDVI raster output tile
-    try:
-        logger.info('Creating an ASTER NDVI tile')
-        util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
-                                      tile_name,
-                                      ndvi_data,
-                                      samps, lines,
-                                      transform,
-                                      wkt,
-                                      no_data_value,
-                                      gdal.GDT_Float32)
-    except Exception:
-        logger.exception('Creating ASTER NDVI tile')
-        raise
+    logger.info('Creating an ASTER NDVI tile {}'.format(tile_name))
+    util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
+                                  tile_name,
+                                  data,
+                                  samps, lines,
+                                  transform,
+                                  wkt,
+                                  no_data_value,
+                                  gdal.GDT_Float32)
+
+    del data
 
 
 def generate_tiles(src_info, coefficients, url, wkt,
-                   no_data_value, keep_intermediate_data):
+                   no_data_value, intermediate):
     """Generate tiles for emissivity and NDVI from ASTER data
 
     Args:
@@ -640,18 +623,20 @@ def generate_tiles(src_info, coefficients, url, wkt,
         url <str>: URL to retrieve the file from
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
-        keep_intermediate_data <bool>: Keep any intermediate data generated
+        intermediate <bool>: Keep any intermediate products generated
 
     Returns:
         list(<str>): Mean emissivity tile names
         list(<str>): Mean ASTER NDVI tile names
     """
 
-    # Process through the lattitude and longitude ASTER tiles which cover
-    # the Landsat scene we are processing
-    # - Download them
-    # - Extract the Emissivity bands 13 and 14 as well as the NDVI
-    # - Generate the Landsat EMIS from the 13 and 14 band data
+    '''
+    Process through the lattitude and longitude ASTER tiles which cover
+    the Landsat scene we are processing
+    - Download them
+    - Extract the Emissivity bands 13 and 14 as well as the NDVI
+    - Generate the Landsat EMIS from the 13 and 14 band data
+    '''
     ls_emis_mean_filenames = list()
     aster_ndvi_mean_filenames = list()
     for (lat, lon) in [(lat, lon)
@@ -679,7 +664,7 @@ def generate_tiles(src_info, coefficients, url, wkt,
          samps, lines, transform) = (
             extract_aster_data(url=url,
                                filename=filename,
-                               keep_intermediate_data=keep_intermediate_data))
+                               intermediate=intermediate))
 
         generate_estimated_emis_tile(coefficients=coefficients,
                                      tile_name=ls_emis_tile_name,
@@ -750,21 +735,18 @@ def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
 
 def build_ls_emis_data(server_name, server_path, src_info, coefficients,
                        ls_emis_warped_name, aster_ndvi_warped_name,
-                       no_data_value, keep_intermediate_data):
-    """Build Landsat Emissivity Data
+                       no_data_value, intermediate):
+    """Build estimated Landsat Emissivity Data
 
-    Download the ASTER GED tiles that encompass our Landsat scene and extract
-    the bands required to generate the Landsat Emissivity data.  Mosaic the
-    Landsat Emissivity tiles together and then warp them to the projection and
-    image extents of the Landsat scenes.  For convenience the ASTER NDVI is
-    also extracted and warped to the Landsat scenes projection and image
-    extents.
-
-    Returns:
-        ls_emis_warped_name
-          - The name of the reprojected Landsat Emissivity data.
-        aster_ndvi_warped_name
-          - The name of the reprojected ASTER NDVI data.
+    Args:
+        server_name <str>: Name of the ASTER GED server
+        server_path <str>: Path on the ASTER GED server
+        src_info <SourceInfo>: Information about the source data
+        coefficients <CoefficientInfo>: coefficients for the math
+        ls_emis_warped_name <str>: Path to the warped emissivity file
+        aster_ndvi_warped_name <str>: Path to the warped ASTER NDVI file
+        no_data_value <int>: No data (fill) value to use
+        intermediate <bool>: Keep any intermediate products generated
     """
 
     logger = logging.getLogger(__name__)
@@ -785,11 +767,11 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
                        url=url,
                        wkt=geographic_wkt,
                        no_data_value=no_data_value,
-                       keep_intermediate_data=keep_intermediate_data))
+                       intermediate=intermediate))
 
     # Check to see that we downloaded at least one ASTER tile for processing.
     if len(ls_emis_mean_filenames) == 0:
-        raise Exception('No ASTER tiles were downloaded')
+        raise NoTilesError('No ASTER tiles were downloaded')
 
     # Define the temporary names
     ls_emis_mosaic_name = 'landsat_emis_mosaic.tif'
@@ -807,7 +789,7 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
                                           aster_ndvi_mosaic_name,
                                           no_data_value)
 
-    if not keep_intermediate_data:
+    if not intermediate:
         # Cleanup the estimated Landsat EMIS tiles
         for emis_filename in ls_emis_mean_filenames:
             if os.path.exists(emis_filename):
@@ -828,7 +810,7 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
     warp_raster(src_info, src_proj4, no_data_value,
                 aster_ndvi_mosaic_name, aster_ndvi_warped_name)
 
-    if not keep_intermediate_data:
+    if not intermediate:
         # Cleanup the temp files
         if os.path.exists(ls_emis_mosaic_name):
             os.unlink(ls_emis_mosaic_name)
@@ -837,22 +819,22 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
 
 
 def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
-                        no_data_value, keep_intermediate_data):
+                        no_data_value, intermediate):
     """Retrieves the warped image data with some massaging of ASTER NDVI
 
     Args:
         ls_emis_warped_name <str>: Path to the warped emissivity file
         aster_ndvi_warped_name <str>: Path to the warped ASTER NDVI file
         no_data_value <float>: Value to use for fill
-        keep_intermediate_data <bool>: Keep any intermediate data generated
+        intermediate <bool>: Keep any intermediate products generated
 
     Returns:
         <numpy.2darray>: Emissivity data
-        list(<int>): Emissivity gap locations
-        list(<int>): Emissivity no data locations
+        list(<int>): Emissivity locations where gap data exists
+        list(<int>): Emissivity locations containing no data (fill) values
         <numpy.2darray>: ASTER NDVI data
-        list(<int>): ASTER NDVI gap locations
-        list(<int>): ASTER NDVI no data locations
+        list(<int>): ASTER NDVI locations where gap data exists
+        list(<int>): ASTER NDVI locations containing no data (fill) values
     """
 
     # Load the warped estimated Landsat EMIS into memory
@@ -869,7 +851,7 @@ def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
     # Use a realy small value so that we don't have negative zero (-0.0)
     aster_ndvi_data[aster_ndvi_data < 0.0000001] = 0
 
-    if not keep_intermediate_data:
+    if not intermediate:
         # Cleanup the intermediate files since we have them in memory
         if os.path.exists(ls_emis_warped_name):
             os.unlink(ls_emis_warped_name)
@@ -1006,9 +988,16 @@ def add_emissivity_band_to_xml(espa_metadata, filename, sensor_code,
 #        condition.
 # ------------------------------------------------------------------------
 def generate_emissivity_data(xml_filename, server_name, server_path,
-                             no_data_value, keep_intermediate_data):
+                             no_data_value, intermediate):
     """Provides the main processing algorithm for generating the estimated
        Landsat emissivity product.  It produces the final emissivity product.
+
+    Args:
+        xml_filename <str>: Filename for the ESPA Metadata XML
+        server_name <str>: Name of the ASTER GED server
+        server_path <str>: Path on the ASTER GED server
+        no_data_value <int>: No data (fill) value to use
+        intermediate <bool>: Keep any intermediate products generated
     """
 
     logger = logging.getLogger(__name__)
@@ -1037,7 +1026,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     (ls_ndvi_data, ndvi_no_data_locations) = (
         generate_landsat_ndvi(src_info, no_data_value))
 
-    if keep_intermediate_data:
+    if intermediate:
         logger.info('Writing Landsat NDVI raster')
         util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                       'internal_landsat_ndvi.tif',
@@ -1069,7 +1058,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                        ls_emis_warped_name=ls_emis_warped_name,
                        aster_ndvi_warped_name=aster_ndvi_warped_name,
                        no_data_value=no_data_value,
-                       keep_intermediate_data=keep_intermediate_data)
+                       intermediate=intermediate)
 
     (ls_emis_data, ls_emis_gap_locations, ls_emis_no_data_locations,
      aster_ndvi_data, aster_ndvi_gap_locations,
@@ -1077,7 +1066,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
         extract_warped_data(ls_emis_warped_name=ls_emis_warped_name,
                             aster_ndvi_warped_name=aster_ndvi_warped_name,
                             no_data_value=no_data_value,
-                            keep_intermediate_data=keep_intermediate_data))
+                            intermediate=intermediate))
 
     logger.info('Normalizing Landsat and ASTER NDVI')
     # Normalize Landsat NDVI by max value
@@ -1085,7 +1074,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
     ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
 
-    if keep_intermediate_data:
+    if intermediate:
         logger.info('Writing Landsat NDVI NORM MAX raster')
         util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                       'internal_landsat_ndvi_norm_max.tif',
@@ -1102,7 +1091,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     logger.info('Max ASTER NDVI {0}'.format(max_aster_ndvi))
     aster_ndvi_data = aster_ndvi_data / float(max_aster_ndvi)
 
-    if keep_intermediate_data:
+    if intermediate:
         logger.info('Writing Aster NDVI NORM MAX raster')
         util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                       'internal_aster_ndvi_norm_max.tif',
@@ -1173,7 +1162,12 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
 
 def retrieve_command_line_arguments():
-    # Build the command line argument parser
+    """Build the command line argument parser with some extra validation
+
+    Returns:
+        <args>: The command line arguments
+    """
+
     description = ('Estimates Landsat Emissivity from ASTER GED data')
     parser = ArgumentParser(description=description)
 
@@ -1192,10 +1186,10 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='Path on the ASTER GED server')
 
-    parser.add_argument('--keep-intermediate-data',
-                        action='store_true', dest='keep_intermediate_data',
+    parser.add_argument('--intermediate',
+                        action='store_true', dest='intermediate',
                         required=False, default=False,
-                        help='Keep any intermediate data generated')
+                        help='Keep any intermediate products generated')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -1218,11 +1212,30 @@ def retrieve_command_line_arguments():
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
 
+    if args.aster_ged_server_name is None:
+        raise Exception('--aster-ged-server-name must be specified on the command line')
+
+    if args.aster_ged_server_name == '':
+        raise Exception('The --aster-ged-server-name provided was empty')
+
+    if args.aster_ged_server_path is None:
+        raise Exception('--aster-ged-server-path must be specified on the command line')
+
+    if args.aster_ged_server_path == '':
+        raise Exception('The --aster-ged-server-path provided was empty')
+
+
     return args
 
 
 def get_satellite_sensor_code(xml_filename):
-    """Returns the satellite-sensor code if known
+    """Derives the satellite-sensor code from the XML filename
+
+    Args:
+        xml_filename <str>: Filename for the ESPA Metadata XML
+
+    Returns:
+        <str>: Satellite sensor code
     """
 
     old_prefixes = ['LT4', 'LT5', 'LE7', 'LT8', 'LC8', 'LO8']
@@ -1280,7 +1293,7 @@ def main():
                                  server_name=args.aster_ged_server_name,
                                  server_path=args.aster_ged_server_path,
                                  no_data_value=NO_DATA_VALUE,
-                                 keep_intermediate_data=args.keep_intermediate_data)
+                                 intermediate=args.intermediate)
     except Exception:
         logger.exception('Processing failed')
         sys.exit(1)  # EXIT FAILURE
