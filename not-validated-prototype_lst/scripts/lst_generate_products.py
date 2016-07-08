@@ -191,14 +191,13 @@ def build_modtran_input(xml_filename, data_path, debug):
 
 
 def generate_emissivity_products(xml_filename, server_name, server_path,
-                                 intermediate, debug):
+                                 debug):
     """Generate the required Emissivity products
 
     Args:
         xml_filename <str>: XML metadata filename
         server_name <str>: Name of the ASTER GED server
         server_path <str>: Path on the ASTER GED server
-        intermediate <bool>: Keep any intermediate products generated
         debug <bool>: Debug logging and processing
     """
 
@@ -208,9 +207,6 @@ def generate_emissivity_products(xml_filename, server_name, server_path,
                '--xml', xml_filename,
                '--aster-ged-server-name', server_name,
                '--aster-ged-server-path', server_path]
-
-        if intermediate:
-            cmd.append('--intermediate')
 
         if debug:
             cmd.append('--debug')
@@ -309,7 +305,6 @@ def main():
     generate_emissivity_products(xml_filename=args.xml_filename,
                                  server_name=server_name,
                                  server_path=server_path,
-                                 intermediate=args.intermediate,
                                  debug=args.debug)
 
     run_modtran(modtran_data_path=modtran_data_path,
@@ -318,6 +313,7 @@ def main():
 
     # TODO TODO TODO
     # TODO TODO TODO
+    # intermediate=args.intermediate,
     # Generate Intermediate Products
     # Generate Land Surface Temperature Product
     # TODO TODO TODO
