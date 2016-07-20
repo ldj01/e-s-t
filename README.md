@@ -55,7 +55,7 @@ See `land_surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
-* LST_AUX_DIR - Points to our NARR data archive.  See [LST Auxiliary Data](lst_auxiliary_data/README.md).
+* LST_AUX_DIR - Points to the local NARR data archive.  See [LST Auxiliary Data](lst_auxiliary_data/README.md).
   - `export LST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
 * LST_DATA_DIR - Points to the installed static file
   - `export LST_DATA_DIR="/usr/local/espa-land-surface-temperature/lst/static_data"`
