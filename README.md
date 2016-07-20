@@ -5,7 +5,7 @@ Release Date: August 2016
 
 See git tag [2016_Aug-0.0.5]
 
-This project contains application source scode for producing Land Surface Temperature products.
+This project contains application source code for producing Land Surface Temperature products.
 
 ## Product Descriptions
 See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/provisional/land_surface_temperature) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
