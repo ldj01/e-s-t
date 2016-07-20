@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.0.4 Release Notes
+## Land Surface Temperature 0.0.5 Release Notes
 Release Date: August 2016
 
-See git tag [2016_Aug]
+See git tag [2016_Aug-0.0.5]
 
 This project contains application source scode for producing Land Surface Temperature products.
 
@@ -11,9 +11,7 @@ This project contains application source scode for producing Land Surface Temper
 See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/provisional/land_surface_temperature) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
 
 ## Release Notes
-* Version change
-* Updated emissivity coefficients
-* Changed usage of scene_id to product_id
+* README.md Documentation Changes Only
 
 ## Installation
 
@@ -22,6 +20,8 @@ See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/p
 * Python 2.7+ and Numpy/GDAL
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The command line tools are utilized for some of the processing steps.
+* MODTRAN
+  - Used to generate upwelling, downwelling and transmittance from NARR data points.
 
 ### Environment Variables
 * Required for building this software (For an example see setup-build-environment.sh)
@@ -55,7 +55,7 @@ See `land_surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
-* LST_AUX_DIR - Points to our NARR data archive
+* LST_AUX_DIR - Points to our NARR data archive.  See [LST Auxiliary Data](lst_auxiliary_data/README.md).
   - `export LST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
 * LST_DATA_DIR - Points to the installed static file
   - `export LST_DATA_DIR="/usr/local/espa-land-surface-temperature/lst/static_data"`
@@ -75,11 +75,11 @@ The following input data are required to generate the spectral indicies products
 * Top of Atmosphere Reflectance (TOA)
   - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
 * Elevation
-  - Elevation data is expected to be in the same projection and image dimensions as the TOA products and in the ENVI file format.  The filename is also expected be `<sceneid>_dem.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
+  - Elevation data is expected to be in the same projection, resolution, and image dimensions as the TOA products as well as in the ENVI file format.  The filename is also expected be `<sceneid>_dem.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
 * ASTER GED
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
 * North American Regional Reanalysis (NARR)
-  - NARR data, it would be best to utilize the `lst_aux_data` software provided in this project to download and build your own archive for the dates you require.
+  - NARR data, it would be best to utilize the Land Surface Temperature Auxiliary Archive Generation software provided in this project to download and build your own archive for the dates you require.  See [LST Auxiliary Data](lst_auxiliary_data/README.md).
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.
