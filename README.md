@@ -71,7 +71,9 @@ See `land_surface_temperature.py --help` for command line details.
 ### Data Processing Requirements
 This version of the Land Surface Temperature application requires the input products to be in the ESPA internal file format.
 
-The following input data are required to generate the spectral indicies products:
+The following input data are required to generate the Land Surface Temperature products:
+* Level 1 Product
+  - The thermal band from the level 1 product is also utilized.
 * Top of Atmosphere Reflectance (TOA)
   - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
 * Elevation
