@@ -17,11 +17,15 @@ See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/p
 
 ### Dependencies
 * ESPA raw binary libraries, tools, and it's dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
-* Python 2.7+ and Numpy/GDAL
+* Python 2.7+
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The command line tools are utilized for some of the processing steps.
 * MODTRAN
   - Used to generate upwelling, downwelling and transmittance from NARR data points.
+* Additional Python libraries
+  - numpy: ```pip install numpy```
+  - gdal: ```pip install gdal```
+  - requests: ```pip install requests```
 
 ### Environment Variables
 * Required for building this software (For an example see setup-build-environment.sh)
