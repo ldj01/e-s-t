@@ -23,6 +23,8 @@ This script is used to update the archive on a daily basis from http://ftp.cpc.n
   - The command line tool is used to extract required parameters from original NARR source files.
 * Login credentials for https://rda.ucar.edu
   - The source for archived NARR data.
+* Additional Python libraries
+  - requests: ```pip install requests``` 
 
 ### Configuration Files
 * lst_auxiliary.config placed into the executable installation location.  Typically ```$PREFIX/bin```.  See [example](example-lst_auxiliary.config) file.
