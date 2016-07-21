@@ -3,7 +3,7 @@ Release Date: August 2016
 
 See git tag [2016_Aug-0.0.5]
 
-The scripts in this directory facilitate building an archive of NARR data used by the core Land Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the NARR data, even for the reduced files this software produces.
+The scripts in this directory facilitate building an archive of NARR data utilized by the Land Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the NARR data, even for the reduced files this software produces and archives.
 
 ## Script Descriptions
 
