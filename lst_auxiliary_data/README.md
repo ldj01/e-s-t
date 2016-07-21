@@ -9,7 +9,7 @@ The scripts in this directory facilitate building an archive of NARR data utiliz
 
 #### build_narr_aux_archive_from_CISL_RDA.py
 
-This script is used to retrieve data from the NARR archive located at http://rda.ucar.edu   This data is provided in 1 to 4 day increments depending on the year and days in the month.  Most files are 3day files.  When a file is downloaded and processed, all days with the file will be processed and added(or will update) the local archive.  See http://rda.ucar.edu for more details about the contents of the data.
+This script is used to retrieve data from the NARR archive located at http://rda.ucar.edu   This data is provided in 1 to 4 day increments depending on the year and days in the month.  Most files are 3day files.  When a file is downloaded and processed, all days within the file will be processed and added to (or will update) the local archive.  See http://rda.ucar.edu for more details about the contents of the data.
 
 #### update_narr_aux_data.py
 
@@ -20,7 +20,7 @@ This script is used to update the archive on a daily basis from http://ftp.cpc.n
 ### Dependencies
 * Python 2.7+
 * wgrib [Found here](http://www.cpc.ncep.noaa.gov/products/wesley/wgrib.html)
-  - The command line tool is used to extract required parameters from source files.
+  - The command line tool is used to extract required parameters from original NARR source files.
 * Login credentials for https://rda.ucar.edu
   - The source for archived NARR data.
 
@@ -28,14 +28,13 @@ This script is used to update the archive on a daily basis from http://ftp.cpc.n
 * lst_auxiliary.config placed into the executable installation location.  Typically ```$PREFIX/bin```.  See [example](example-lst_auxiliary.config) file.
 
 ### Environment Variables
-* Required for installing this software (For an example see setup-build-environment.sh)
+* Required for installing this software
 ```
 export PREFIX="path_to_Installation_Directory"
 ```
 
 ### Build Steps
-* Clone the repository and replace the defaulted version(master) with this
-  version of the software
+* Clone the repository and replace the defaulted version(master) with this version of the software
 ```
 git clone https://github.com/USGS-EROS/espa-land-surface-temperature.git
 cd espa-land-surface-temperature
