@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.0.5 Release Notes
+## Land Surface Temperature 0.0.4 Release Notes
 Release Date: August 2016
 
-See git tag [2016_Aug-0.0.5]
+See git tag [2016_Aug-1]
 
 This project contains application source code for producing Land Surface Temperature products.
 
