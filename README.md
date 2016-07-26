@@ -79,9 +79,9 @@ The following input data are required to generate the Land Surface Temperature p
 * Level 1 Product
   - The thermal band from the level 1 product is also utilized.
 * Top of Atmosphere Reflectance (TOA)
-  - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
+  - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  TOA products can also be generated through our on-demand processing system [ESPA](https://espa.cr.usgs.gov).  Be sure to select the ENVI output format if using our [ESPA](https://espa.cr.usgs.gov) on-demand system.
 * Elevation
-  - Elevation data is expected to be in the same projection, resolution, and image dimensions as the TOA products as well as in the ENVI file format.  The filename is also expected be `<sceneid>_dem.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
+  - Elevation data is expected to be in the same projection, resolution, and image dimensions as the TOA products as well as identified in the XML metadata file and in the ENVI file format.  The filename is also expected be `<sceneid>_elevation.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
 * ASTER GED
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
 * North American Regional Reanalysis (NARR)
