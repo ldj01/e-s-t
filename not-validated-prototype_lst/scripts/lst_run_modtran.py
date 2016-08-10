@@ -62,12 +62,18 @@ def retrieve_command_line_arguments():
         sys.exit(0)  # EXIT SUCCESS
 
     if args.modtran_data_path is None:
-        raise Exception('--modtran_data_path must be specified on the command line')
+        raise Exception('--modtran_data_path must be specified on the'
+                        'command line')
 
     if args.modtran_data_path == '':
         raise Exception('The MODTRAN data directory provided was empty')
 
     return args
+
+
+class ModtranProcessingError(Exception):
+    """Exception specifically for MODTRAN errors"""
+    pass
 
 
 TAPE5 = 'tape5'
@@ -98,6 +104,12 @@ def process_point_dir((point_path, modtran_data_path)):
             output = ''
             try:
                 output = util.System.execute_cmd('modtran')
+
+                if len(output) > 0:
+                    if 'STOP Error:' in output:
+                        msg = ('Error processing data point [{}]'
+                               .format(point_path))
+                        raise ModtranProcessingError(msg)
 
             finally:
                 if len(output) > 0:
@@ -130,6 +142,8 @@ def main():
                         level=logging_level,
                         stream=sys.stdout)
 
+    logger = logging.getLogger(__name__)
+
     # Load the grid information
     (grid_points, dummy1, dummy2) = read_grid_points()
 
@@ -143,11 +157,15 @@ def main():
 
     process_count = int(args.process_count)
 
-    if process_count > 1:
-        pools = Pool(process_count)
-        pools.map(process_point_dir, point_parms)
-    else:
-        map(process_point_dir, point_parms)
+    try:
+        if process_count > 1:
+            pools = Pool(process_count)
+            pools.map(process_point_dir, point_parms)
+        else:
+            map(process_point_dir, point_parms)
+    except:
+        logger.exception('Error processing points')
+        raise
 
 
 if __name__ == '__main__':
