@@ -16,13 +16,18 @@ import os
 import sys
 import logging
 import glob
+import shutil
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser
 from multiprocessing import Pool
 
 import lst_utilities as util
 
-from lst_grid_points import read_grid_points
+from lst_grid_points import (read_grid_points,
+                             GRID_POINT_HEADER_NAME,
+                             GRID_POINT_BINARY_NAME)
+
+from lst_build_modtran_input import PARAMETERS
 
 
 def retrieve_command_line_arguments():
@@ -243,6 +248,28 @@ def run_modtran(modtran_data_path, process_count, debug):
             logger.info(output)
 
 
+def cleanup_intermediate_data():
+    """Cleanup/remove all the LST temporary data
+    """
+
+    # File cleanup
+    cleanup_list = [GRID_POINT_HEADER_NAME,
+                    GRID_POINT_BINARY_NAME
+                   ]
+
+    for filename in cleanup_list:
+        if os.path.exists(filename):
+            os.unlink(filename)
+
+    # Directory cleanup
+    for directory in glob.glob('[0-9][0-9][0-9]_[0-9][0-9][0-9]_'
+                               '[0-9][0-9][0-9]_[0-9][0-9][0-9]'):
+        shutil.rmtree(directory)
+
+    for directory in PARAMETERS:
+        shutil.rmtree(directory)
+
+
 PROC_CFG_FILENAME = 'processing.conf'
 
 
@@ -313,11 +340,16 @@ def main():
 
     # TODO TODO TODO
     # TODO TODO TODO
-    # intermediate=args.intermediate,
-    # Generate Intermediate Products
-    # Generate Land Surface Temperature Product
+    # Calculate point atmospheric parameters
+    # Calculate pixel atmospheric parameters
+    # ???? intermediate=args.intermediate,
+    # ???? Generate Intermediate Products
+    # ???? Generate Land Surface Temperature Product
     # TODO TODO TODO
     # TODO TODO TODO
+
+    if not args.debug:
+        cleanup_intermediate_data()
 
     logger.info('*** LST Generate Products - Complete ***')
 
