@@ -71,6 +71,85 @@ def retrieve_command_line_arguments():
     return args
 
 
+class Tape6rocessingError(Exception):
+    """Exception specifically for Tape6 errors"""
+    pass
+
+
+TAPE6 = 'tape6'
+TAPE6_SEARCH_STR = 'AREA-AVERAGED GROUND TEMPERATURE [K]'
+
+
+def extract_target_surface_temp():
+    """Swim in the pool using the path
+
+    Returns:
+        <float>: Target surface temperature value
+
+    Note:
+        Search for the AREA-AVERAGED GROUND TEMPERATURE [K]
+        Also called IMAGED-PIXEL (H2ALT) SURFACE TEMPERATURES [K]
+        We are only performing the MODTRAN operation on one pixel and the
+        AREA-AVERAGED is easier to extract
+    """
+
+    value = None
+
+    with open(TAPE6, 'r') as tape6_fd:
+        for line in tape6_fd:
+            # Remove all whitespace and newlines
+            line = ' '.join(line.strip().split())
+
+            if line.startswith(TAPE6_SEARCH_STR):
+                value = float(list(reversed(line.split()))[0])
+                break
+
+    if value is None:
+        raise Tape6rocessingError('Unable to find [{}] in tape6 file'
+                                  .format(TAPE6_SEARCH_STR))
+
+    return value
+
+
+PLTOUT_ASC = 'pltout.asc'
+
+
+def extract_pltout_results():
+    """Extract auxiliary results
+    """
+
+    results = list()
+
+    # Retrieve the auxillary data and extract it
+    with open(PLTOUT_ASC, 'r') as pltout_fd:
+        for line in pltout_fd:
+            # Remove all whitespace and newlines
+            line = ' '.join(line.strip().split())
+
+            if len(line) > 0:
+                results.append(line)
+
+    return results
+
+
+RESULT_HDR = 'lst_modtran.hdr'
+RESULT_DATA = 'lst_modtran.data'
+
+
+def create_extracted_output(tsp_value, pltout_results):
+    """Creates the output file and header for the results
+    """
+
+    with open(RESULT_DATA, 'w') as radiance_data_fd:
+        radiance_data_fd.write('\n'.join(pltout_results))
+
+    with open(RESULT_HDR, 'w') as radiance_hdr_fd:
+        radiance_hdr_fd.write('TARGET_PIXEL_SURFACE_TEMPERATURE {0}\n'
+                              .format(tsp_value))
+        radiance_hdr_fd.write('RADIANCE_RECORD_COUNT {0}\n'
+                              .format(len(pltout_results)))
+
+
 class ModtranProcessingError(Exception):
     """Exception specifically for MODTRAN errors"""
     pass
@@ -114,6 +193,23 @@ def process_point_dir((point_path, modtran_data_path)):
             finally:
                 if len(output) > 0:
                     logger.info(output)
+
+            if not os.path.isfile(TAPE6):
+                raise ModtranProcessingError('Missing MODTRAN output file'
+                                             ' {}'.format(TAPE6))
+
+            if not os.path.isfile(PLTOUT_ASC):
+                raise ModtranProcessingError('Missing MODTRAN output file'
+                                             ' {}'.format(PLTOUT_ASC))
+
+            # Modtran is done with this point
+            # So now we can parse the results and generate a specifically
+            # formatted version to be used later in the processing flow
+            tsp_value = extract_target_surface_temp()
+            pltout_results = extract_pltout_results()
+
+            create_extracted_output(tsp_value, pltout_results)
+
     finally:
         os.chdir(current_directory)
 
