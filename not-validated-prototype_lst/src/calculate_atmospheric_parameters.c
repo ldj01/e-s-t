@@ -1,5 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <math.h>
+#include <getopt.h>
+#include <errno.h>
 
 
 #include "const.h"
@@ -9,7 +13,10 @@
 #include "lst_types.h"
 
 
-/******************************************************************************
+#define NUM_ELEVATIONS 9
+
+
+/*****************************************************************************
 METHOD:  planck_eq
 
 PURPOSE: Using Planck's equation to calculate radiance at each wavelength for
@@ -22,7 +29,7 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/30/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 void planck_eq
 (
     double *wavelength, /* I: Each wavelength */
@@ -65,7 +72,7 @@ void planck_eq
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  spline
 
 PURPOSE: spline constructs a cubic spline given a set of x and y values,
@@ -79,7 +86,7 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Modified from Numerical Recipes in C
                              (ISBN 0-521-43108-5)
-******************************************************************************/
+*****************************************************************************/
 int spline
 (
     double *x,
@@ -162,7 +169,7 @@ int spline
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  splint
 
 PURPOSE: splint uses the cubic spline generated with spline to interpolate
@@ -175,7 +182,7 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Modified from online code
-******************************************************************************/
+*****************************************************************************/
 static int splint_klo = -1;
 static int splint_khi = -1;
 static double one_sixth = (1.0 / 6.0); /* To remove a division */
@@ -237,7 +244,7 @@ void splint
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  int_tabulated
 
 PURPOSE: This function integrates a tabulated set of data { x(i) , f(i) },
@@ -252,7 +259,7 @@ Date        Programmer       Reason
 9/29/2014   Song Guo         Original Development
 
 NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
-******************************************************************************/
+*****************************************************************************/
 int int_tabulated
 (
     double *x,         /*I: Tabulated X-value data */
@@ -347,7 +354,7 @@ int int_tabulated
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  calculate_lt
 
 PURPOSE: Calculate blackbody radiance from temperature using spectral response
@@ -360,7 +367,7 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 int calculate_lt
 (
     double temperature,         /*I: temperature */
@@ -425,12 +432,12 @@ int calculate_lt
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  linear_interpolate_over_modtran
 
 PURPOSE: Simulate IDL (interpol) function for LST.
 
-******************************************************************************/
+*****************************************************************************/
 void linear_interpolate_over_modtran
 (
     double **modtran, /* I: The MODTRAN data - provides both the a and b */
@@ -491,7 +498,7 @@ void linear_interpolate_over_modtran
 }
 
 
-/******************************************************************************
+/*****************************************************************************
 MODULE:  calculate_lobs
 
 PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
@@ -504,7 +511,7 @@ HISTORY:
 Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
-******************************************************************************/
+*****************************************************************************/
 int calculate_lobs
 (
     double **modtran,           /*I: MODTRAN results with wavelengths */
@@ -702,6 +709,57 @@ void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 }
 
 
+typedef struct {
+    int8_t index;
+    int8_t run_modtran;
+    int8_t row;
+    int8_t col;
+    int8_t narr_row;
+    int8_t narr_col;
+    float lon;
+    float lat;
+    float map_x;
+    float map_y;
+} GRID_POINT;
+
+
+typedef struct {
+    int count;
+    int rows;
+    int cols;
+    GRID_POINT *points;
+} GRID_POINTS;
+
+
+typedef struct {
+    double elevation;
+    double transmission;
+    double upwelled_radiance;
+    double downwelled_radiance;
+} MODTRAN_ELEVATION;
+
+
+typedef struct {
+    int count;
+    int ran_modtran;
+    int8_t row;
+    int8_t col;
+    int8_t narr_row;
+    int8_t narr_col;
+    double lon;
+    double lat;
+    double map_x;
+    double map_y;
+    MODTRAN_ELEVATION *elevations;
+} MODTRAN_POINT;
+
+
+typedef struct {
+    int count;
+    MODTRAN_POINT *points;
+} MODTRAN_POINTS;
+
+
 /*****************************************************************************
 METHOD:  calculate_point_atmospheric_parameters
 
@@ -725,15 +783,13 @@ Date        Programmer       Reason
 #define WATER_ALBEDO (0.1)
 #define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
 #define INV_WATER_ALBEDO (1.0 / WATER_ALBEDO)
-int calculate_point_atmospheric_parameters
+int calc_point_atmos_params
 (
-    Input_Data_t *input,       /* I: Input structure */
-    REANALYSIS_POINTS *points, /* I: The coordinate points */
-    double **modtran_results,  /* O: Atmospheric parameters from modtran */
-    bool verbose               /* I: Value to indicate if intermediate
-                                     messages should be printed */
+    GRID_POINTS *points,     /* I: The coordinate points */
+    double **modtran_results /* O: Atmospheric parameters from modtran */
 )
 {
+#ifdef OLD
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
 
     FILE *fd;
@@ -944,7 +1000,7 @@ int calculate_point_atmospheric_parameters
                modtran runs, columns of array are organized:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
             current_data =
-                (double **) allocate_2d_array (num_entries, 4, sizeof (double));
+                (double **)allocate_2d_array(num_entries, 4, sizeof(double));
             if (current_data == NULL)
             {
                 RETURN_ERROR ("Allocating current_data memory",
@@ -1096,6 +1152,361 @@ int calculate_point_atmospheric_parameters
                  modtran_results[k][MGPE_DOWNWELLED_RADIANCE]);
     }
     fclose (fd);
+#endif
 
     return SUCCESS;
+}
+
+
+/****************************************************************************
+Method: usage
+
+Description: Display help/usage information to the user.
+****************************************************************************/
+void usage()
+{
+    printf("Land Surface Temperature - lst_atmos_parms\n");
+    printf("\n");
+    printf("Generates interpolated atmospheric parameters covering the scene"
+           " data.\n");
+    printf("\n");
+    printf("usage: lst_atmos_parms"
+           " --xml=<filename>"
+           " [--debug]\n");
+    printf("\n");
+    printf ("where the following parameters are required:\n");
+    printf ("    --xml: name of the input XML file\n");
+    printf ("\n");
+    printf ("where the following parameters are optional:\n");
+    printf ("    --debug: should debug output be generated?"
+            " (default is false)\n");
+    printf ("\n");
+    printf ("lst_atmos_parms --help will print the usage statement\n");
+    printf ("\n");
+    printf ("Example: lst_atmos_parms"
+            " --xml=LE07_L1T_028031_20041227_20160513_01_T1.xml\n");
+    printf ("Note: This application must run from the directory"
+            " where the input data is located.\n\n");
+}
+
+
+/*****************************************************************************
+Method:  get_args
+
+Description:  Gets the command-line arguments and validates that the required
+              arguments were specified.
+
+Returns: Type = int
+    Value           Description
+    -----           -----------
+    FAILURE         Error getting the command-line arguments or a command-line
+                    argument and associated value were not specified
+    SUCCESS         No errors encountered
+
+Notes:
+    1. Memory is allocated for the input and output files.  All of these
+       should be character pointers set to NULL on input.  The caller is
+       responsible for freeing the allocated memory upon successful return.
+*****************************************************************************/
+int get_args
+(
+    int argc,           /* I: number of cmd-line args */
+    char *argv[],       /* I: string of cmd-line args */
+    char *xml_filename, /* I: address of input XML metadata filename  */
+    bool *debug         /* O: debug flag */
+)
+{
+    int c;                         /* current argument index */
+    int option_index;              /* index of the command line option */
+    static int debug_flag = 0;     /* debug flag */
+    char errmsg[MAX_STR_LEN];      /* error message */
+    char FUNC_NAME[] = "get_args"; /* function name */
+
+    static struct option long_options[] = {
+        {"debug", no_argument, &debug_flag, 1},
+        {"xml", required_argument, 0, 'i'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    /* Loop through all the cmd-line options */
+    opterr = 0; /* turn off getopt_long error msgs as we'll print our own */
+    while (1)
+    {
+        /* optstring in call to getopt_long is empty since we will only
+           support the long options */
+        c = getopt_long(argc, argv, "", long_options, &option_index);
+        if (c == -1)
+        {
+            /* Out of cmd-line options */
+            break;
+        }
+
+        switch (c)
+        {
+            case 0:
+                /* If this option set a flag, do nothing else now. */
+                if (long_options[option_index].flag != 0)
+                    break;
+
+            case 'h':              /* help */
+                usage ();
+                return FAILURE;
+                break;
+
+            case 'i':              /* xml infile */
+                snprintf(xml_filename, PATH_MAX, "%s", optarg);
+                break;
+
+            case '?':
+            default:
+                snprintf(errmsg, sizeof(errmsg),
+                         "Unknown option %s", argv[optind - 1]);
+                usage();
+                RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+                break;
+        }
+    }
+
+    /* Make sure the XML file was specified */
+    if (strlen(xml_filename) <= 0)
+    {
+        usage();
+        RETURN_ERROR("XML input file is a required argument", FUNC_NAME,
+                     FAILURE);
+    }
+
+    /* Set the debug flag */
+    if (debug_flag)
+        *debug = true;
+    else
+        *debug = false;
+
+    return SUCCESS;
+}
+
+
+int load_grid_points_hdr(GRID_POINTS *grid_points)
+{
+    char FUNC_NAME[] = "load_grid_points_hdr";
+
+    FILE *grid_fd = NULL;
+
+    int status;
+
+    char header_filename[] = "grid_points.hdr";
+    char errmsg[PATH_MAX];
+
+    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", header_filename);
+
+    grid_fd = fopen(header_filename, "r");
+    if (grid_fd == NULL)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    errno = 0;
+    status = fscanf(grid_fd, "%d\n%d\n%d", &grid_points->count,
+                    &grid_points->rows, &grid_points->cols);
+    if (status != 3 || errno != 0)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  load_grid_points
+
+Description:  Loads the grid points into a data structure.
+
+Notes:
+    1. The grid point files must be present in the current working directory.
+*****************************************************************************/
+int load_grid_points(GRID_POINTS *grid_points)
+{
+    char FUNC_NAME[] = "load_grid_points";
+
+    FILE *grid_fd = NULL;
+
+    int status;
+
+    char binary_filename[] = "grid_points.bin";
+    char errmsg[PATH_MAX];
+
+    /* Initialize the points */
+    grid_points->points = NULL;
+
+    if (load_grid_points_hdr(grid_points) != SUCCESS)
+    {
+        RETURN_ERROR("Failed loading grid point header information",
+                     FUNC_NAME, FAILURE);
+    }
+
+    grid_points->points = malloc(grid_points->count * sizeof(GRID_POINT));
+    if (grid_points->points == NULL)
+    {
+        RETURN_ERROR("Failed allocating memory for grid points",
+                     FUNC_NAME, FAILURE);
+    }
+
+    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", binary_filename);
+
+    grid_fd = fopen(binary_filename, "rb");
+    if (grid_fd == NULL)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    status = fread(grid_points->points, sizeof(GRID_POINT),
+                   grid_points->count, grid_fd);
+    if (status != grid_points->count || errno != 0)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  free_grid_points
+
+Description:  Free allocated memory for the grid pointd.
+*****************************************************************************/
+void free_grid_points(GRID_POINTS *grid_points)
+{
+    free(grid_points->points);
+    grid_points->points = NULL;
+}
+
+
+/*****************************************************************************
+Method:  initialize_modtran_points
+
+Description:  Allocate the memory need to hold the Modtran results and
+              initialize known values.
+*****************************************************************************/
+int initialize_modtran_points
+(
+    GRID_POINTS *grid_points,        /* I: The coordinate points */
+    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
+)
+{
+    char FUNC_NAME[] = "initialize_modtran_points";
+
+    int index;
+
+    modtran_points->count = grid_points->count;
+
+    modtran_points->points = malloc(modtran_points->count *
+                                    sizeof(MODTRAN_POINT));
+    if (modtran_points->points == NULL)
+    {
+        RETURN_ERROR("Failed allocating memory for modtran points",
+                     FUNC_NAME, FAILURE);
+    }
+
+    for (index = 0; index < modtran_points->count; index++)
+    {
+        modtran_points->points[index].count = NUM_ELEVATIONS;
+        modtran_points->points[index].ran_modtran =
+            grid_points->points[index].run_modtran;
+        modtran_points->points[index].row =
+            grid_points->points[index].row;
+        modtran_points->points[index].col =
+            grid_points->points[index].col;
+        modtran_points->points[index].narr_row =
+            grid_points->points[index].narr_row;
+        modtran_points->points[index].narr_col =
+            grid_points->points[index].narr_col;
+        modtran_points->points[index].lon =
+            grid_points->points[index].lon;
+        modtran_points->points[index].lat =
+            grid_points->points[index].lat;
+        modtran_points->points[index].map_x =
+            grid_points->points[index].map_x;
+        modtran_points->points[index].map_y =
+            grid_points->points[index].map_y;
+
+        modtran_points->points[index].elevations =
+            malloc(NUM_ELEVATIONS * sizeof(MODTRAN_ELEVATION));
+        if (modtran_points->points[index].elevations == NULL)
+        {
+            RETURN_ERROR("Failed allocating memory for modtran point"
+                         " elevations", FUNC_NAME, FAILURE);
+        }
+
+        /* TODO TODO TODO - Iterate over the elevations and assign the
+                            elevation values */
+    }
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  main
+
+Description:  Main for the application.
+*****************************************************************************/
+int main(int argc, char *argv[])
+{
+    char FUNC_NAME[] = "main";
+
+    Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
+
+    char msg_str[MAX_STR_LEN];
+    char xml_filename[PATH_MAX];        /* input XML filename */
+
+    bool debug;                         /* debug flag for debug output */
+
+    GRID_POINTS grid_points;
+    MODTRAN_POINTS modtran_points;
+
+    /* Read the command-line arguments */
+    if (get_args(argc, argv, xml_filename, &debug)
+        != SUCCESS)
+    {
+        RETURN_ERROR("calling get_args", FUNC_NAME, EXIT_FAILURE);
+    }
+
+    /* Load the grid points */
+    if (load_grid_points(&grid_points) != SUCCESS)
+    {
+        RETURN_ERROR("calling load_grid_points", FUNC_NAME, EXIT_FAILURE);
+    }
+
+    int initialize_modtran_points
+(
+    GRID_POINTS *grid_points,        /* I: The coordinate points */
+    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
+)
+
+    /* Cleanup */
+    free_grid_points(&grid_points);
+
+    /* Calculate point atmospheric parameters from the Modtran runs */
+    if (calc_point_atmos_params(&grid_points, &modtran_points) != SUCCESS)
+    {
+        RETURN_ERROR("calling load_modtran_points", FUNC_NAME, EXIT_FAILURE);
+    }
+
+
+    /* Process the grid points */
+    printf("%d %d %d\n", grid_points.count, grid_points.rows, grid_points.cols);
+    printf("%d %d %d\n", grid_points.points[0].index, grid_points.points[0].row, grid_points.points[0].col);
+    printf("%d %d %d\n", grid_points.points[1].index, grid_points.points[1].row, grid_points.points[1].col);
+    printf("%d %d %d\n", grid_points.points[2].index, grid_points.points[2].row, grid_points.points[2].col);
+    printf("%d %d %d\n", grid_points.points[3].index, grid_points.points[3].row, grid_points.points[3].col);
+    printf("%d %d %d\n", grid_points.points[15].index, grid_points.points[15].row, grid_points.points[15].col);
+
+
+    /* TODO TODO TODO - Create the interpolated atmospheric bands */
+
+    /* TODO TODO TODO - Free the modtran_points */
+
+    return EXIT_SUCCESS;
 }
