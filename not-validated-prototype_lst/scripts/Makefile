@@ -14,10 +14,10 @@ SCRIPTS = \
     lst_build_modtran_input.py \
     lst_core_processing.py \
     lst_extract_auxiliary_narr_data.py \
+    lst_extract_modtran_results.py \
     lst_generate_products.py \
     lst_run_modtran.py \
-    estimate_landsat_emissivity.py \
-    extract_modtran_results.py
+    estimate_landsat_emissivity.py
 
 SCRIPT_IMPORTS = \
     build_lst_data.py \
