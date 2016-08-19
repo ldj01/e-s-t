@@ -15,28 +15,16 @@ RM = rm
 EXTRA = -Wall $(EXTRA_OPTIONS)
 
 # Define the include files
-INC = const.h utilities.h date.h 2d_array.h get_args.h input.h output.h \
-      build_points.h build_modtran_input.h \
-      calculate_point_atmospheric_parameters.h \
-      calculate_pixel_atmospheric_parameters.h
+INC1 = utilities.h 2d_array.h calculate_atmospheric_parameters.h
 INCDIR  = -I. -I$(XML2INC) -I$(ESPAINC)
 NCFLAGS = $(EXTRA) $(INCDIR)
 
 # Define the source code and object files
-SRC = \
-      utilities.c                              \
+SRC1 = \
+      utilities.o                              \
       2d_array.c                               \
-      date.c                                   \
-      input.c                                  \
-      intermediate_data.c                      \
-      output.c                                 \
-      get_args.c                               \
-      build_points.c                           \
-      build_modtran_input.c                    \
-      calculate_point_atmospheric_parameters.c \
-      calculate_pixel_atmospheric_parameters.c \
-      lst.c
-OBJ = $(SRC:.c=.o)
+      calculate_atmospheric_parameters.c
+OBJ1 = $(SRC1:.c=.o)
 
 # Define the object libraries
 EXLIB = -L$(ESPALIB) -l_espa_raw_binary -l_espa_common \
@@ -47,24 +35,24 @@ MATHLIB = -lm
 LOADLIB = $(EXLIB) $(MATHLIB)
 
 # Define the executable
-EXE = lst_intermediate_data
+EXE1 = lst_point_atmos_parms
 
 # Target for the executable
-all: $(EXE)
+all: $(EXE1)
 
-$(EXE): $(OBJ) $(INC)
-	$(CC) $(EXTRA) -o $(EXE) $(OBJ) $(LOADLIB)
+$(EXE1): $(OBJ1) $(INC1)
+	$(CC) $(EXTRA) -o $(EXE1) $(OBJ1) $(LOADLIB)
 
 install:
 	install -d $(link_path)
 	install -d $(lst_install_path)
-	install -m 755 $(EXE) $(lst_install_path)
-	ln -sf $(lst_link_source_path)/$(EXE) $(link_path)/$(EXE)
+	install -m 755 $(EXE1) $(lst_install_path)
+	ln -sf $(lst_link_source_path)/$(EXE1) $(link_path)/$(EXE1)
 
 clean:
-	$(RM) -f *.o $(EXE)
+	$(RM) -f *.o $(EXE1)
 
-$(OBJ): $(INC)
+$(OBJ1): $(INC1)
 
 .c.o:
 	$(CC) $(NCFLAGS) -c $<
