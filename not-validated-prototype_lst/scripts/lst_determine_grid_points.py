@@ -16,9 +16,10 @@ import os
 import sys
 import logging
 import math
-import numpy as np
 from argparse import ArgumentParser
 from collections import namedtuple
+
+import numpy as np
 from osgeo import gdal, osr
 
 from espa import Metadata
@@ -92,7 +93,7 @@ def retrieve_command_line_arguments():
         sys.exit(1)  # EXIT FAILURE
 
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:

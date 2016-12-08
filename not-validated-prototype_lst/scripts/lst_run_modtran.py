@@ -58,7 +58,7 @@ def retrieve_command_line_arguments():
 
     # Report the version and exit
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     if args.modtran_data_path is None:

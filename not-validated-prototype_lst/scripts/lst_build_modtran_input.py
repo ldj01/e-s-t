@@ -24,6 +24,8 @@ import lst_utilities as util
 
 from lst_grid_points import read_grid_points
 
+GRID_ELEVATION_NAME = 'grid_elevations.txt'
+
 
 class InvalidNarrDataPointError(Exception):
     """Exception for invalid NARR data points
@@ -137,7 +139,7 @@ def retrieve_command_line_arguments():
         sys.exit(1)  # EXIT FAILURE
 
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:
@@ -160,7 +162,7 @@ def load_modtran_template_file(data_path, filename):
 
     Args:
         data_path <str>: The directory for LST data files
-        filename <str>: he filename to load
+        filename <str>: The filename to load
 
     Args:
         <str>: The contents of the requested file
@@ -195,14 +197,13 @@ def load_narr_pressure_file(parameter, layer):
     point_values = None
     with open(filename, 'r') as data_fd:
         point_values = [[float(data_fd.readline())
-                         for dummy1 in xrange(NARR_ROWS)]
-                        for dummy2 in xrange(NARR_COLS)]
-
+                         for dummy1 in xrange(NARR_COLS)]
+                        for dummy2 in xrange(NARR_ROWS)]
     return point_values
 
 
 def load_narr_pressure_layers(parameters, layers):
-    """Loads all the parameters and presssure layes
+    """Loads all the parameters and presssure layers
 
     Args:
         parameters [<str>]: All the parameters to load
@@ -303,7 +304,7 @@ def determine_geometric_hgt(data, point, layer, time):
     """
 
     # Geopotential height at time
-    hgt = data[HGT_PARMS[time]][layer][point.narr_col][point.narr_row]
+    hgt = data[HGT_PARMS[time]][layer][point.narr_row-1][point.narr_col-1]
 
     if hgt == INVALID_NARR_DATA_VALUE:
         raise InvalidNarrDataPointError('Invalid NARR data point value [HGT]')
@@ -351,13 +352,13 @@ def determine_rh_temp(data, point, layer, time):
     """
 
     # Specific humidity at time
-    spfh = data[SPFH_PARMS[time]][layer][point.narr_col][point.narr_row]
+    spfh = data[SPFH_PARMS[time]][layer][point.narr_row-1][point.narr_col-1]
 
     if spfh == INVALID_NARR_DATA_VALUE:
         raise InvalidNarrDataPointError('Invalid NARR data point value [SPFH]')
 
     # Temperature at time
-    temp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]
+    temp = data[TMP_PARMS[time]][layer][point.narr_row-1][point.narr_col-1]
 
     if temp == INVALID_NARR_DATA_VALUE:
         raise InvalidNarrDataPointError('Invalid NARR data point value [TMP]')
@@ -592,6 +593,7 @@ def determine_base_layers_for_elev(layers, values, elevation):
 
     # Remaining elements are the pressure layers above so add them
     for layer in layers[index_above:]:
+
         b_layers.append(PressureLayerInfo(hgt=values[layer].hgt,
                                           pressure=float(layer),
                                           temp=values[layer].temp,
@@ -628,7 +630,8 @@ def determine_all_layers_for_elev(std_atmos, layers, values, elevation):
             break
 
         layer_index += 1
-    second_index = first_index + 1
+
+    second_index = first_index + 2
 
     '''
     If there are more than 2 layers above the highest NARR layer,
@@ -666,6 +669,7 @@ def determine_all_layers_for_elev(std_atmos, layers, values, elevation):
 
     # Add the remaining standard atmosphere layers
     for layer in std_atmos[second_index:]:
+
         s_layers.append(PressureLayerInfo(hgt=layer.hgt,
                                           pressure=layer.pressure,
                                           temp=layer.temp,
@@ -696,7 +700,7 @@ def write_tape5_file(filename, head_data, body_data, tail_data):
 
 def generate_for_temp_alb_pairs(hgt_path, temp_head_data, body_data,
                                 tail_data):
-    """Generates all of the tape5 files for the tempurature and albedo pairs
+    """Generates all of the tape5 files for the temperature and albedo pairs
 
     Args:
         hgt_path <str>: Path to the height directory to place the temperature
@@ -774,11 +778,12 @@ def generate_tape5_for_elevation(std_atmos, layers, head_template, tail_data,
                                 tail_data=tail_data)
 
 
-def determine_elevations(elevations, height):
+def determine_elevations(grid_elevation_file, elevations, height):
     """Determine a list of adjusted elevations to use
 
     Args:
-        elevations [<float>]: Initial list of elelvations
+        grid_elevation_file <file>: File where 0 elevations are to be written
+        elevations [<float>]: Initial list of elevations
         height <float>: Height for the bottom pressure layer
 
     Returns
@@ -795,15 +800,19 @@ def determine_elevations(elevations, height):
     else:
         new_elevations[0] = height
 
+    # Write the first elevation to the elevation file.
+    grid_elevation_file.write(str('{0:05.8f}'.format(new_elevations[0])) + '\n')
+
     return new_elevations
 
 
-def generate_tape5_files_for_point(std_atmos, data, point,
+def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
                                    interp_factor, doy_str,
                                    head_template, tail_template):
     """Generate tape5 file for the current point
 
     Args:
+        grid_elevation_file <file>: File where 0 elevations are to be written
         std_atmos [StdAtmosInfo]: The standard atmosphere
         data <dict>: Data structure for the parameters and pressure layers
         point <GridPointInfo>: The current point information
@@ -834,7 +843,8 @@ def generate_tape5_files_for_point(std_atmos, data, point,
                                             layers=PRESSURE_LAYERS,
                                             interp_factor=interp_factor)
 
-    elevations = determine_elevations(elevations=GROUND_ALT,
+    elevations = determine_elevations(grid_elevation_file,
+                                      elevations=GROUND_ALT,
                                       height=values[PRESSURE_LAYERS[0]].hgt)
 
     for elevation in elevations:
@@ -873,15 +883,18 @@ def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
     interp_factor = (float((acq_date - t0_date).seconds) /
                      float((t1_date - t0_date).seconds))
 
-    for point in grid_points:
-        if point.run_modtran:
-            generate_tape5_files_for_point(std_atmos=std_atmos,
-                                           data=data,
-                                           point=point,
-                                           interp_factor=interp_factor,
-                                           doy_str=doy_str,
-                                           head_template=head_template,
-                                           tail_template=tail_template)
+    with open(GRID_ELEVATION_NAME, 'w') as grid_elevation_file:
+        for point in grid_points:
+            if point.run_modtran:
+                generate_tape5_files_for_point(grid_elevation_file,
+                                               std_atmos=std_atmos,
+                                               data=data,
+                                               point=point,
+                                               interp_factor=interp_factor,
+                                               doy_str=doy_str,
+                                               head_template=head_template,
+                                               tail_template=tail_template)
+    grid_elevation_file.close()
 
 
 def main():

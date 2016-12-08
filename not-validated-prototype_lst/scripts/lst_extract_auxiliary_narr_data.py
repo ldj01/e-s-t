@@ -70,7 +70,7 @@ def retrieve_command_line_arguments():
         sys.exit(1)  # EXIT FAILURE
 
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:

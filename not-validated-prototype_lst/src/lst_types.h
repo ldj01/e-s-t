@@ -2,43 +2,56 @@
 #ifndef LST_TYPES_H
 #define LST_TYPES_H
 
-
 #include <limits.h>
 
+typedef struct {
+    int8_t index;
+    int8_t run_modtran;
+    uint8_t row;
+    uint8_t col;
+    uint16_t narr_row;
+    uint16_t narr_col;
+    float lon;
+    float lat;
+    float map_x;
+    float map_y;
+} GRID_POINT;
 
-typedef struct
-{
-    char path[PATH_MAX];
-    char command[PATH_MAX];
-    double latitude;
-    double longitude;
-    double height;
-} MODTRAN_INFO;
+
+typedef struct {
+    int count;
+    int rows;
+    int cols;
+    GRID_POINT *points;
+} GRID_POINTS;
 
 
-typedef struct
-{
-    double buffered_coords[4];
+typedef struct {
+    double elevation;
+    double transmission;
+    double upwelled_radiance;
+    double downwelled_radiance;
+} MODTRAN_ELEVATION;
 
-    int min_row;
-    int max_row;
-    int min_col;
-    int max_col;
 
-    int num_rows;
-    int num_cols;
-    int num_points;
-    int num_modtran_runs;
+typedef struct {
+    int count;
+    int ran_modtran;
+    uint8_t row;
+    uint8_t col;
+    uint16_t narr_row;
+    uint16_t narr_col;
+    double lon;
+    double lat;
+    double map_x;
+    double map_y;
+    MODTRAN_ELEVATION *elevations;
+} MODTRAN_POINT;
 
-    MODTRAN_INFO *modtran_runs;
 
-    double *row;
-    double *col;
-    double *lat;
-    double *lon;
-    double *utm_easting;
-    double *utm_northing;
-} REANALYSIS_POINTS;
-
+typedef struct {
+    int count;
+    MODTRAN_POINT *points;
+} MODTRAN_POINTS;
 
 #endif /* LST_TYPES_H */

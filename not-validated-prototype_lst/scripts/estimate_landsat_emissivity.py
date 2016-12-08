@@ -368,7 +368,8 @@ def snow_and_ndsi_locations(src_info, no_data_value):
     swir1_data = swir1_data * src_info.toa.swir1.scale_factor
 
     # NDSI ---------------------------------------------------------------
-    ndsi_data = ((green_data - swir1_data) / (green_data + swir1_data))
+    with np.errstate(divide='ignore'):
+        ndsi_data = ((green_data - swir1_data) / (green_data + swir1_data))
 
     # Cleanup no data locations
     ndsi_data[green_no_data_locations] = no_data_value
@@ -662,9 +663,9 @@ def generate_tiles(src_info, coefficients, url, wkt,
 
         (aster_b13_data, aster_b14_data, aster_ndvi_data,
          samps, lines, transform) = (
-            extract_aster_data(url=url,
-                               filename=filename,
-                               intermediate=intermediate))
+             extract_aster_data(url=url,
+                                filename=filename,
+                                intermediate=intermediate))
 
         generate_estimated_emis_tile(coefficients=coefficients,
                                      tile_name=ls_emis_tile_name,
@@ -1063,10 +1064,10 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     (ls_emis_data, ls_emis_gap_locations, ls_emis_no_data_locations,
      aster_ndvi_data, aster_ndvi_gap_locations,
      aster_ndvi_no_data_locations) = (
-        extract_warped_data(ls_emis_warped_name=ls_emis_warped_name,
-                            aster_ndvi_warped_name=aster_ndvi_warped_name,
-                            no_data_value=no_data_value,
-                            intermediate=intermediate))
+         extract_warped_data(ls_emis_warped_name=ls_emis_warped_name,
+                             aster_ndvi_warped_name=aster_ndvi_warped_name,
+                             no_data_value=no_data_value,
+                             intermediate=intermediate))
 
     logger.info('Normalizing Landsat and ASTER NDVI')
     # Normalize Landsat NDVI by max value
@@ -1205,7 +1206,7 @@ def retrieve_command_line_arguments():
 
     # Report the version and exit
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified

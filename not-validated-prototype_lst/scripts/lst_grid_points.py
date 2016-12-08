@@ -30,7 +30,7 @@ GridPointInfo = namedtuple('GridPointInfo',
                             'lat', 'lon',
                             'map_y', 'map_x'))
 
-GRID_POINT_FMT = 'BBBBBBffff'
+GRID_POINT_FMT = 'BBBBHHffff'
 GRID_POINT_HEADER_NAME = 'grid_points.hdr'
 GRID_POINT_BINARY_NAME = 'grid_points.bin'
 
@@ -56,7 +56,7 @@ def write_grid_points(grid_points, grid_rows, grid_cols):
         buffer_size = '\0' * point_struct.size * len(grid_points)
         point_buffer = array.array('c', buffer_size)
 
-        index= 0
+        index = 0
         for point in grid_points:
             point_struct.pack_into(point_buffer, index * point_struct.size,
                                    point['index'],
@@ -101,7 +101,7 @@ def read_grid_points():
             logger.debug('Reading point {}'.format(position))
             point_buffer = bytearray(binary_fd.read(point_struct.size))
             (index, run_modtran, row, col, narr_row, narr_col,
-            lon, lat, map_x, map_y) = point_struct.unpack(point_buffer)
+             lon, lat, map_x, map_y) = point_struct.unpack(point_buffer)
 
             grid_points.append(GridPointInfo(index=index,
                                              run_modtran=run_modtran,

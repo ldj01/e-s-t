@@ -16,7 +16,6 @@ import os
 import sys
 import logging
 from argparse import ArgumentParser
-from collections import namedtuple
 
 from lst_grid_points import read_grid_points
 

@@ -19,15 +19,15 @@ import glob
 import shutil
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser
-from multiprocessing import Pool
 
 import lst_utilities as util
 
-from lst_grid_points import (read_grid_points,
-                             GRID_POINT_HEADER_NAME,
+from lst_grid_points import (GRID_POINT_HEADER_NAME,
                              GRID_POINT_BINARY_NAME)
 
 from lst_build_modtran_input import PARAMETERS
+
+import build_lst_data
 
 
 def retrieve_command_line_arguments():
@@ -64,7 +64,7 @@ def retrieve_command_line_arguments():
 
     # Report the version and exit
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
@@ -338,15 +338,34 @@ def main():
                 process_count=process_count,
                 debug=args.debug)
 
-    # TODO TODO TODO
-    # TODO TODO TODO
-    # Calculate point atmospheric parameters
-    # Calculate pixel atmospheric parameters
-    # ???? intermediate=args.intermediate,
-    # ???? Generate Intermediate Products
-    # ???? Generate Land Surface Temperature Product
-    # TODO TODO TODO
-    # TODO TODO TODO
+    # Generate the thermal, upwelled, and downwelled radiance bands as well as
+    # the atmospheric transmittance band
+    cmd = ['lst_atmospheric_parameters', '--xml', args.xml_filename]
+    if args.debug:
+        cmd.append('--debug')
+
+    cmd = ' '.join(cmd)
+    output = ''
+    try:
+        logger.info('Calling [{0}]'.format(cmd))
+        output = util.System.execute_cmd(cmd)
+    except Exception:
+        logger.error('Failed creating atmospheric parameters and generating '
+                     'intermediate data')
+        raise
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+    # Generate Land Surface Temperature band
+    try:
+        current_processor = build_lst_data.BuildLSTData( \
+            xml_filename=args.xml_filename)
+        current_processor.generate_data()
+    except Exception:
+        logger.error('Failed processing Land Surface Temperature')
+        raise
+
 
     if not args.debug:
         cleanup_intermediate_data()

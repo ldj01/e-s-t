@@ -15,7 +15,7 @@ RM = rm
 EXTRA = -Wall $(EXTRA_OPTIONS)
 
 # Define the include files
-INC1 = utilities.h 2d_array.h calculate_atmospheric_parameters.h
+INC1 = utilities.h 2d_array.h calculate_atmospheric_parameters.h input.h output.h intermediate_data.h
 INCDIR  = -I. -I$(XML2INC) -I$(ESPAINC)
 NCFLAGS = $(EXTRA) $(INCDIR)
 
@@ -23,6 +23,9 @@ NCFLAGS = $(EXTRA) $(INCDIR)
 SRC1 = \
       utilities.o                              \
       2d_array.c                               \
+      input.c                                  \
+      output.c                                 \
+      intermediate_data.c                      \
       calculate_atmospheric_parameters.c
 OBJ1 = $(SRC1:.c=.o)
 
@@ -35,7 +38,7 @@ MATHLIB = -lm
 LOADLIB = $(EXLIB) $(MATHLIB)
 
 # Define the executable
-EXE1 = lst_point_atmos_parms
+EXE1 = lst_atmospheric_parameters
 
 # Target for the executable
 all: $(EXE1)

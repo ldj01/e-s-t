@@ -4,6 +4,8 @@
 #include <math.h>
 #include <getopt.h>
 #include <errno.h>
+#include <string.h>
+#include <float.h>
 
 
 #include "const.h"
@@ -11,19 +13,24 @@
 #include "utilities.h"
 #include "input.h"
 #include "lst_types.h"
+#include "output.h"
+#include "intermediate_data.h"
+#include "calculate_atmospheric_parameters.h"
 
+/*****************************************************************************
+DESCRIPTION: Using values produced by MODTRAN runs at grid points, calculate
+atmospheric transmission, upwelled radiance, and downwelled radiance for each
+pixel in the Landsat scene.  Also, create bands with these values.  A thermal
+radiance band is also created based on a Landsat thermal band and parameters.
+*****************************************************************************/
 
-#define NUM_ELEVATIONS 9
-
+/* calculate_point_atmospheric_parameters functions */
 
 /*****************************************************************************
 METHOD:  planck_eq
 
 PURPOSE: Using Planck's equation to calculate radiance at each wavelength for
          current temperature.
-
-RETURN: SUCCESS
-        FAILURE
 
 HISTORY:
 Date        Programmer       Reason
@@ -35,7 +42,7 @@ void planck_eq
     double *wavelength, /* I: Each wavelength */
     int num_elements,   /* I: Number of wavelengths to calculate */
     double temperature, /* I: The temperature to calculate for */
-    double *bb_radiance /* I: the blackbody results for each wavelength */
+    double *bb_radiance /* O: the blackbody results for each wavelength */
 )
 {
     int i;
@@ -65,7 +72,7 @@ void planck_eq
                                             * temperature))
                                    - 1.0));
 
-        /* convert to W/cm^2 sr micron to match modtran units */
+        /* Convert to W/cm^2 sr micron to match modtran units */
         /* br / (100 * 100) == br * 10e-5 */
         bb_radiance[i] *= 10e-5;
     }
@@ -174,9 +181,6 @@ MODULE:  splint
 
 PURPOSE: splint uses the cubic spline generated with spline to interpolate
          values in the XY table
-
-RETURN: SUCCESS
-        FAILURE
 
 HISTORY:
 Date        Programmer       Reason
@@ -408,7 +412,7 @@ int calculate_lt
        wavelength for the current temperature */
     planck_eq (spectral_response[0], num_srs, temperature, blackbody_radiance);
 
-    /* multiply the calculated planck radiance by the spectral response and
+    /* Multiply the calculated planck radiance by the spectral response and
        integrate over wavelength to get one number for current temp */
     for (i = 0; i < num_srs; i++)
     {
@@ -421,7 +425,7 @@ int calculate_lt
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* divide above result by integral of spectral response function */
+    /* Divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
 
     /* Free allocated memory */
@@ -436,7 +440,6 @@ int calculate_lt
 MODULE:  linear_interpolate_over_modtran
 
 PURPOSE: Simulate IDL (interpol) function for LST.
-
 *****************************************************************************/
 void linear_interpolate_over_modtran
 (
@@ -542,18 +545,18 @@ int calculate_lobs
         RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
     }
 
-    /* integrate spectral response over wavelength */
+    /* Integrate spectral response over wavelength */
     if (int_tabulated (spectral_response[0], spectral_response[1], num_srs,
                        &rs_integral) != SUCCESS)
     {
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* interpolate MODTRAN radiance to Landsat wavelengths */
+    /* Interpolate MODTRAN radiance to Landsat wavelengths */
     linear_interpolate_over_modtran (modtran, index, spectral_response[0],
                                      num_entries, num_srs, temp_rad);
 
-    /* multiply the calculated radiance by the spectral response and integrate
+    /* Multiply the calculated radiance by the spectral response and integrate
        over wavelength to get one number for current temperature */
     for (i = 0; i < num_srs; i++)
     {
@@ -566,7 +569,7 @@ int calculate_lobs
         RETURN_ERROR ("Calling int_tabulated\n", FUNC_NAME, FAILURE);
     }
 
-    /* divide above result by integral of spectral response function */
+    /* Divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
 
     /* Free allocated memory */
@@ -581,7 +584,6 @@ int calculate_lobs
 METHOD:  matrix_transpose_2x2
 
 PURPOSE: Transposes a 2x2 matrix, producing a 2x2 result.
-
 *****************************************************************************/
 void matrix_transpose_2x2(double *A, double *out)
 {
@@ -612,7 +614,6 @@ void matrix_transpose_2x2(double *A, double *out)
 METHOD:  matrix_inverse_2x2
 
 PURPOSE: Inverts a 2x2 matrix, producing a 2x2 result.
-
 *****************************************************************************/
 void matrix_inverse_2x2(double *A, double *out)
 {
@@ -647,7 +648,6 @@ void matrix_inverse_2x2(double *A, double *out)
 METHOD:  matrix_multiply_2x2_2x2
 
 PURPOSE: Multiply a 2x2 matrix with a 2x2 matrix, producing a 2x2 result.
-
 *****************************************************************************/
 void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
 {
@@ -683,7 +683,6 @@ void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
 METHOD:  matrix_multiply_2x2_2x1
 
 PURPOSE: Multiply a 2x2 matrix with a 2x1 matrix, producing a 2x1 result.
-
 *****************************************************************************/
 void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 {
@@ -709,57 +708,6 @@ void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 }
 
 
-typedef struct {
-    int8_t index;
-    int8_t run_modtran;
-    int8_t row;
-    int8_t col;
-    int8_t narr_row;
-    int8_t narr_col;
-    float lon;
-    float lat;
-    float map_x;
-    float map_y;
-} GRID_POINT;
-
-
-typedef struct {
-    int count;
-    int rows;
-    int cols;
-    GRID_POINT *points;
-} GRID_POINTS;
-
-
-typedef struct {
-    double elevation;
-    double transmission;
-    double upwelled_radiance;
-    double downwelled_radiance;
-} MODTRAN_ELEVATION;
-
-
-typedef struct {
-    int count;
-    int ran_modtran;
-    int8_t row;
-    int8_t col;
-    int8_t narr_row;
-    int8_t narr_col;
-    double lon;
-    double lat;
-    double map_x;
-    double map_y;
-    MODTRAN_ELEVATION *elevations;
-} MODTRAN_POINT;
-
-
-typedef struct {
-    int count;
-    MODTRAN_POINT *points;
-} MODTRAN_POINTS;
-
-
 /*****************************************************************************
 METHOD:  calculate_point_atmospheric_parameters
 
@@ -774,22 +722,14 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 9/29/2014   Song Guo         Original Development
 *****************************************************************************/
-#define L4_TM_SRS_COUNT (171)
-#define L5_TM_SRS_COUNT (171)
-#define L7_TM_SRS_COUNT (125)
-#define L8_OLITIRS_SRS_COUNT (101)
-#define MAX_SRS_COUNT (L5_TM_SRS_COUNT)
-/* This emissivity/albedo is for water */
-#define WATER_ALBEDO (0.1)
-#define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
-#define INV_WATER_ALBEDO (1.0 / WATER_ALBEDO)
-int calc_point_atmos_params
+int calculate_point_atmospheric_parameters
 (
-    GRID_POINTS *points,     /* I: The coordinate points */
-    double **modtran_results /* O: Atmospheric parameters from modtran */
+    Input_Data_t *input,       /* I: Input structure */
+    GRID_POINTS *grid_points,  /* I: The coordinate points */
+    MODTRAN_POINTS *modtran_results /* I/O: Atmospheric parameters from 
+                                   MODTRAN */
 )
 {
-#ifdef OLD
     char FUNC_NAME[] = "calculate_point_atmospheric_parameters";
 
     FILE *fd;
@@ -797,7 +737,6 @@ int calc_point_atmos_params
 
     int i;
     int j;
-    int k;
     int entry;
 
     double **spectral_response = NULL;
@@ -809,10 +748,10 @@ int calc_point_atmos_params
     int index;
     int num_entries;   /* Number of MODTRAN output results to read and use */
     int num_srs;       /* Number of spectral response values available */
-    int result_loc;
 
     char *lst_data_dir = NULL;
-    char current_file[PATH_MAX];
+    char current_file[PATH_MAX]; /* Used for MODTRAN info (input), MODTRAN data
+                          (input), and atmospheric parameters (output) files */
     char srs_file_path[PATH_MAX];
     char msg[PATH_MAX];
 
@@ -826,7 +765,7 @@ int calc_point_atmos_params
     double lu;  /* Upwelled Radiance */
     double ld;  /* Downwelled Radiance */
 
-    /* Variables to hold matricies and the results for the operations perfomed
+    /* Variables to hold matrices and the results for the operations perfomed
        on them */
     double X_2x2[4];
     double Xt_2x2[4];
@@ -835,6 +774,10 @@ int calc_point_atmos_params
     double Y_2x1[2];
     double Xt_Y_2x1[4];
     double A_2x1[2];
+
+    /* Temperature and albedo */
+    int temperature[3] = { 273, 310, 000 };
+    double albedo[3] = { 0.0, 0.0, 0.1 };
 
 
     lst_data_dir = getenv ("LST_DATA_DIR");
@@ -891,6 +834,7 @@ int calc_point_atmos_params
         RETURN_ERROR ("invalid instrument type", FUNC_NAME, FAILURE);
     }
 
+    /* Read the selected spectral response file */
     snprintf (msg, sizeof (msg),
               "Reading Spectral Response File [%s]", srs_file_path);
     LOG_MESSAGE (msg, FUNC_NAME);
@@ -936,7 +880,7 @@ int calc_point_atmos_params
     matrix_multiply_2x2_2x2(Xt_2x2, X_2x2, Xt_X_2x2);
     matrix_inverse_2x2(Xt_X_2x2, Inv_Xt_X_2x2);
 
-    /* Output information about the used points, primarily usefull for
+    /* Output information about the used points, primarily useful for
        plotting them against the scene */
     used_points_fd = fopen ("used_points.txt", "w");
     if (used_points_fd == NULL)
@@ -945,39 +889,36 @@ int calc_point_atmos_params
                       FUNC_NAME, FAILURE);
     }
 
-    /* Iterate through all points and heights */
+    /* Iterate through all grid points and heights */
     counter = 0;
-    for (i = 0; i < points->num_points; i++)
+    for (i = 0; i < grid_points->count; i++)
     {
+        /* Don't process the points that didn't have a MODTRAN run. */
+        if (!modtran_results->points[i].ran_modtran)
+        {
+            continue;
+        }
+
         fprintf (used_points_fd, "\"%d\"|\"%f\"|\"%f\"\n",
-                 i, points->utm_easting[i], points->utm_northing[i]);
+                 i, grid_points->points[i].map_x, grid_points->points[i].map_y);
 
         for (j = 0; j < NUM_ELEVATIONS; j++)
         {
-            result_loc = i * NUM_ELEVATIONS + j;
-
-            /* put results into MODTRAN results array */
-            modtran_results[result_loc][MGPE_LATITUDE] =
-                points->modtran_runs[counter].latitude;
-            modtran_results[result_loc][MGPE_LONGITUDE] =
-                points->modtran_runs[counter].longitude;
-            modtran_results[result_loc][MGPE_HEIGHT] =
-                points->modtran_runs[counter].height;
-
             /* Read the lst_modtran.info file for the 000 execution
                (when MODTRAN is run at 0K)
                We read the zero_temp from this file, and also the record count
                The record count is the same for all three associated runs */
-            /* The 000 file is always the "counter+2" element in the array
-               at this point in the code */
-            snprintf (current_file, sizeof (current_file),
-                      "%s/lst_modtran.info",
-                      points->modtran_runs[counter+2].path);
+            snprintf(current_file, sizeof(current_file), 
+                "%03d_%03d_%03d_%03d/%1.3f/000/0.1/lst_modtran.hdr",
+                grid_points->points[i].row, grid_points->points[i].col,
+                grid_points->points[i].narr_row,
+                grid_points->points[i].narr_col,
+                modtran_results->points[i].elevations[j].elevation);
 
             fd = fopen (current_file, "r");
             if (fd == NULL)
             {
-                RETURN_ERROR ("Can't open current_file file",
+                RETURN_ERROR ("Can't open MODTRAN information file",
                               FUNC_NAME, FAILURE);
             }
             /* Retrieve the temperature from this lowest atmospheric layer */
@@ -987,7 +928,7 @@ int calc_point_atmos_params
                               " reading TARGET_PIXEL_SURFACE_TEMPERATURE",
                               FUNC_NAME, FAILURE);
             }
-            /* determine number of entries in current file */
+            /* Determine number of entries in current file */
             if (fscanf (fd, "%*s %d%*c", &num_entries) != 1)
             {
                 RETURN_ERROR ("End of file (EOF) is met before"
@@ -996,8 +937,8 @@ int calc_point_atmos_params
             }
             fclose (fd);
 
-            /* for each height, read in radiance information for three
-               modtran runs, columns of array are organized:
+            /* For each height, read in radiance information for three
+               MODTRAN runs.  Columns of array are organized as follows:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
             current_data =
                 (double **)allocate_2d_array(num_entries, 4, sizeof(double));
@@ -1007,18 +948,23 @@ int calc_point_atmos_params
                               FUNC_NAME, FAILURE);
             }
 
-            /* iterate through the three pairs of parameters */
+            /* Iterate through the three pairs of parameters */
             for (index = 1; index < 4; index++)
             {
-                /* define current file */
-                snprintf (current_file, sizeof (current_file),
-                          "%s/lst_modtran.dat",
-                          points->modtran_runs[counter].path);
+                /* Define MODTRAN data file */
+                snprintf(current_file, sizeof(current_file), 
+                    "%03d_%03d_%03d_%03d/%1.3f/%03d/%1.1f/lst_modtran.data",
+                    grid_points->points[i].row, grid_points->points[i].col,
+                    grid_points->points[i].narr_row,
+                    grid_points->points[i].narr_col,
+                    modtran_results->points[i].elevations[j].elevation,
+                    temperature[index - 1],
+                    albedo[index - 1]);
 
                 fd = fopen (current_file, "r");
                 if (fd == NULL)
                 {
-                    RETURN_ERROR ("Can't open current_file file",
+                    RETURN_ERROR ("Can't open MODTRAN data file",
                                   FUNC_NAME, FAILURE);
                 }
                 for (entry = 0; entry < num_entries; entry++)
@@ -1047,7 +993,7 @@ int calc_point_atmos_params
                 counter++;
             }
 
-            /* parameters from 3 modtran runs
+            /* Parameters from 3 MODTRAN runs
                Lobs = Lt*tau + Lu; m = tau; b = Lu; */
             if (calculate_lobs (current_data, spectral_response,
                                 num_entries, num_srs, 1, &y_0)
@@ -1065,9 +1011,9 @@ int calc_point_atmos_params
                               FUNC_NAME, FAILURE);
             }
 
-            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y
-               from the IDL code base.
-               Partially implemented above and used here. */
+            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y  from
+               the IDL code base.  Partially implemented above and used here. */
+               
             Y_2x1[0] = y_0;
             Y_2x1[1] = y_1;
 
@@ -1077,8 +1023,8 @@ int calc_point_atmos_params
             tau = A_2x1[1]; /* Transmittance */
             lu = A_2x1[0];  /* Upwelled Radiance */
 
-            /* determine Lobs and Lt when
-               modtran was run at 0K - calculate downwelled */
+            /* Determine Lobs and Lt when MODTRAN was run at 0K - calculate 
+               downwelled */
             if (calculate_lt (zero_temp, spectral_response, num_srs,
                               &temp_radiance_0) != SUCCESS)
             {
@@ -1094,21 +1040,20 @@ int calc_point_atmos_params
                               FUNC_NAME, FAILURE);
             }
 
-            /* Calculate the downwelled radiance
-               These are all equivalent */
-            /* Ld = (((Lobs - Lu) / tau)
-                     - (Lt * WATER_EMISSIVITY)) / (1.0 - WATER_EMISSIVITY) */
-            /* Ld = (((Lobs - Lu) / tau)
-                     - (Lt * WATER_EMISSIVITY)) / WATER_ALBEDO */
-            /* Ld = (((Lobs - Lu) / tau)
+            /* Calculate the downwelled radiance. These are all equivalent:
+               Ld = (((Lobs - Lu) / tau)
+                     - (Lt * WATER_EMISSIVITY)) / (1.0 - WATER_EMISSIVITY)
+               Ld = (((Lobs - Lu) / tau)
+                     - (Lt * WATER_EMISSIVITY)) / WATER_ALBEDO
+               Ld = (((Lobs - Lu) / tau)
                      - (Lt * WATER_EMISSIVITY)) * INV_WATER_ALBEDO */
             ld = (((obs_radiance_0 - lu) / tau)
                   - (temp_radiance_0 * WATER_EMISSIVITY)) * INV_WATER_ALBEDO;
 
             /* Place results into MODTRAN results array */
-            modtran_results[result_loc][MGPE_TRANSMISSION] = tau;
-            modtran_results[result_loc][MGPE_UPWELLED_RADIANCE] = lu;
-            modtran_results[result_loc][MGPE_DOWNWELLED_RADIANCE] = ld;
+            modtran_results->points[i].elevations[j].transmission = tau;
+            modtran_results->points[i].elevations[j].upwelled_radiance = lu;
+            modtran_results->points[i].elevations[j].downwelled_radiance = ld;
 
             /* Free the allocated memory in the loop */
             if (free_2d_array ((void **) current_data) != SUCCESS)
@@ -1118,7 +1063,7 @@ int calc_point_atmos_params
             }
             current_data = NULL;
         } /* END - NUM_ELEVATIONS loop */
-    } /* END - num_points loop */
+    } /* END - count loop */
     fclose (used_points_fd);
 
     /* Free allocated memory */
@@ -1129,7 +1074,8 @@ int calc_point_atmos_params
     }
     spectral_response = NULL;
 
-    /* Output the results to a file */
+    /* Write atmospheric transmission, upwelled radiance, and downwelled 
+       radiance for each elevation for each point to a file */
     snprintf (current_file, sizeof (current_file),
               "atmospheric_parameters.txt");
     snprintf (msg, sizeof (msg),
@@ -1141,18 +1087,1011 @@ int calc_point_atmos_params
         RETURN_ERROR ("Can't open atmospheric_parameters.txt file",
                       FUNC_NAME, FAILURE);
     }
-    for (k = 0; k < points->num_points * NUM_ELEVATIONS; k++)
+    for (i = 0; i < grid_points->count; i++)
     {
-        fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
-                 modtran_results[k][MGPE_LATITUDE],
-                 modtran_results[k][MGPE_LONGITUDE],
-                 modtran_results[k][MGPE_HEIGHT],
-                 modtran_results[k][MGPE_TRANSMISSION],
-                 modtran_results[k][MGPE_UPWELLED_RADIANCE],
-                 modtran_results[k][MGPE_DOWNWELLED_RADIANCE]);
+        /* Only write parameters for grid points where MODTRAN was run */
+        if (!modtran_results->points[i].ran_modtran)
+        {
+            continue;
+        }
+
+        for (j = 0; j < NUM_ELEVATIONS; j++)
+        {
+            fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
+                 modtran_results->points[i].lat,
+                 modtran_results->points[i].lon,
+                 modtran_results->points[i].elevations[j].elevation,
+                 modtran_results->points[i].elevations[j].transmission,
+                 modtran_results->points[i].elevations[j].upwelled_radiance,
+                 modtran_results->points[i].elevations[j].downwelled_radiance);
+        }
     }
     fclose (fd);
+
+    return SUCCESS;
+}
+
+
+/******************************************************************************
+METHOD:  qsort_grid_compare_function
+
+PURPOSE: A qsort routine that can be used with the GRID_ITEM items to sort by
+         distance
+
+RETURN: int: -1 (a<b), 1 (b<a), 0 (a==b) 
+******************************************************************************/
+int qsort_grid_compare_function
+(
+    const void *grid_item_a,
+    const void *grid_item_b
+)
+{
+    double a = (*(GRID_ITEM*)grid_item_a).distance;
+    double b = (*(GRID_ITEM*)grid_item_b).distance;
+
+    if (a < b)
+        return -1;
+    else if (b < a)
+        return 1;
+
+    return 0;
+}
+
+
+/******************************************************************************
+METHOD:  distance_in_utm
+
+PURPOSE: Calculate distances between UTM coordiantes
+
+RETURN: double - The distance.
+
+NOTE: SR(x) = (scale_factor / cos ((x - false_easting) / equatorial_radius))
+
+NOTE: Simpson's Rule is applied for integrating the longitudinal distance
+      from easting of first point to easting of second point.
+
+      SR(x)dx ~= ((e2 - e0) / 6)
+                 * (SR(e0) + 4 * SR((e0 + e2) / 2) + SR(e2))
+
+      Where:
+          e0 = easting of starting point
+          e2 = easting of stopping point
+******************************************************************************/
+double distance_in_utm
+(
+    double e0,
+    double n0,
+    double e2,
+    double n2
+)
+{
+    /* The UTM coordinates we are using have the 500000 false easting applied
+       to them, so we need to remove that before applying the distance
+       calculation. */
+    double e0_adj;
+    double e1_term;
+    double e2_adj;
+
+    double sr_e0;
+    double sr_e1;
+    double sr_e2;
+
+    double edist;
+
+    e0_adj = e0 - UTM_FALSE_EASTING;
+    e2_adj = e2 - UTM_FALSE_EASTING;
+    e1_term = (e0_adj + e2_adj) * INV_TWO;
+
+    sr_e0 = UTM_SCALE_FACTOR / (cos (e0_adj * INV_UTM_EQUATORIAL_RADIUS));
+    sr_e1 = UTM_SCALE_FACTOR / (cos (e1_term * INV_UTM_EQUATORIAL_RADIUS));
+    sr_e2 = UTM_SCALE_FACTOR / (cos (e2_adj * INV_UTM_EQUATORIAL_RADIUS));
+
+    edist = ((e2 - e0) * INV_SIX) * (sr_e0 + 4.0 * sr_e1 + sr_e2);
+
+    return sqrt (edist * edist + (n2 - n0) * (n2 - n0));
+}
+
+
+/******************************************************************************
+METHOD:  interpolate_to_height
+
+PURPOSE: Interpolate to height of current pixel
+******************************************************************************/
+void interpolate_to_height
+(
+    MODTRAN_POINT modtran_point, /* I: results from MODTRAN runs for a point */
+    double interpolate_to,    /* I: current landsat pixel height */
+    double *at_height         /* O: interpolated height for point */
+)
+{
+    int parameter;
+    int elevation;
+    int below = 0;
+    int above = 0;
+
+    double below_parameters[AHP_NUM_PARAMETERS];
+    double above_parameters[AHP_NUM_PARAMETERS];
+
+    double slope;
+    double intercept;
+
+    double above_height;
+    double inv_height_diff; /* To remove the multiple divisions */
+
+    /* Find the height to use that is below the interpolate_to height */
+    for (elevation = 0; elevation < NUM_ELEVATIONS; elevation++)
+    {
+        if (modtran_point.elevations[elevation].elevation < interpolate_to)
+        {
+            below = elevation; /* Last match will always be the one we want */
+        }
+    }
+
+    /* Find the height to use that is equal to or above the interpolate_to
+       height.  It will always be the same or the next height */ 
+    above = below; /* Start with the same */
+    if (above != (NUM_ELEVATIONS - 1))
+    {
+        /* Not the last height */
+
+        /* Check to make sure that we are not less that the below height,
+           indicating that our interpolate_to height is below the first
+           height */
+        if (! (interpolate_to < modtran_point.elevations[above].elevation))
+        {
+            /* Use the next height, since it will be equal to or above our
+               interpolate_to height */
+            above++;
+        }
+        /* Else - We are at the first height, so use that for both above and
+                  below */
+    }
+    /* Else - We are at the last height, so use that for both above and
+              below */
+
+    below_parameters[AHP_TRANSMISSION] =
+        modtran_point.elevations[below].transmission;
+    below_parameters[AHP_UPWELLED_RADIANCE] =
+        modtran_point.elevations[below].upwelled_radiance;
+    below_parameters[AHP_DOWNWELLED_RADIANCE] =
+        modtran_point.elevations[below].downwelled_radiance;
+
+    if (above == below)
+    {
+        /* Use the below parameters since the same */
+        at_height[AHP_TRANSMISSION] =
+            below_parameters[AHP_TRANSMISSION];
+        at_height[AHP_UPWELLED_RADIANCE] =
+            below_parameters[AHP_UPWELLED_RADIANCE];
+        at_height[AHP_DOWNWELLED_RADIANCE] =
+            below_parameters[AHP_DOWNWELLED_RADIANCE];
+    }
+    else
+    {
+        /* Interpolate between the heights for each parameter */
+        above_height = modtran_point.elevations[above].elevation;
+        inv_height_diff = 1.0 / (above_height
+                                 - modtran_point.elevations[below].elevation);
+
+        above_parameters[AHP_TRANSMISSION] =
+            modtran_point.elevations[above].transmission;
+        above_parameters[AHP_UPWELLED_RADIANCE] =
+            modtran_point.elevations[above].upwelled_radiance;
+        above_parameters[AHP_DOWNWELLED_RADIANCE] =
+            modtran_point.elevations[above].downwelled_radiance;
+
+        for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
+        {
+            slope = (above_parameters[parameter] - below_parameters[parameter])
+                    * inv_height_diff;
+
+            intercept = above_parameters[parameter] - slope * above_height;
+
+            at_height[parameter] = slope * interpolate_to + intercept;
+        }
+    }
+}
+
+
+/******************************************************************************
+METHOD:  interpolate_to_location
+
+PURPOSE: Interpolate to location of current pixel
+******************************************************************************/
+void interpolate_to_location
+(
+    GRID_POINTS *points,         /* I: The coordinate points */
+    int *vertices,               /* I: The vertices for the points to use */
+    double **at_height,          /* I: current height atmospheric results */
+    double interpolate_easting,  /* I: interpolate to easting */
+    double interpolate_northing, /* I: interpolate to northing */
+    double *parameters           /* O: interpolated pixel atmospheric 
+                                       parameters */
+)
+{
+    int point;
+    int parameter;
+
+    double inv_h[NUM_CELL_POINTS];
+    double w[NUM_CELL_POINTS];
+    double total = 0.0;
+
+    /* Shepard's method */
+    for (point = 0; point < NUM_CELL_POINTS; point++)
+    {
+        inv_h[point] = 1.0 / sqrt (((points->points[vertices[point]].map_x
+                                     - interpolate_easting)
+                                    * (points->points[vertices[point]].map_x
+                                       - interpolate_easting))
+                                   +
+                                   ((points->points[vertices[point]].map_y
+                                     - interpolate_northing)
+                                    * (points->points[vertices[point]].map_y
+                                       - interpolate_northing)));
+
+        total += inv_h[point];
+    }
+
+    /* Determine the weights for each vertex */
+    for (point = 0; point < NUM_CELL_POINTS; point++)
+    {
+        w[point] = inv_h[point] / total;
+    }
+
+    /* For each parameter apply each vertex's weighted value */
+    for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
+    {
+        parameters[parameter] = 0.0;
+        for (point = 0; point < NUM_CELL_POINTS; point++)
+        {
+            parameters[parameter] += (w[point] * at_height[point][parameter]);
+        }
+    }
+}
+
+
+/*****************************************************************************
+METHOD:  determine_grid_point_distances
+
+PURPOSE: Determines the distances for the current set of grid points.
+
+NOTE: The indexes of the grid points are assumed to be populated.
+*****************************************************************************/
+void determine_grid_point_distances
+(
+    GRID_POINTS *points,       /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    int num_grid_points,       /* I: The number of grid points to operate on */
+    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
+                                       point */
+)
+{
+    int point;
+
+    /* Populate the distances to the grid points */
+    for (point = 0; point < num_grid_points; point++)
+    {
+        grid_points[point].distance = distance_in_utm (
+            points->points[grid_points[point].index].map_x,
+            points->points[grid_points[point].index].map_y,
+            easting, northing);
+    }
+}
+
+
+/*****************************************************************************
+METHOD:  determine_center_grid_point
+
+PURPOSE: Determines the index of the center point from the current set of grid
+         points.
+
+NOTE: The indexes of the grid points are assumed to be populated.
+
+RETURN: type = int
+    Value  Description
+    -----  -------------------------------------------------------------------
+    index  The index of the center point
+*****************************************************************************/
+int determine_center_grid_point
+(
+    GRID_POINTS *points,       /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    int num_grid_points,       /* I: The number of grid points to operate on */
+    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
+                                       point */
+)
+{
+    determine_grid_point_distances (points, easting, northing,
+                                    num_grid_points, grid_points);
+
+    /* Sort them to find the closest one */
+    qsort (grid_points, num_grid_points, sizeof (GRID_ITEM),
+           qsort_grid_compare_function);
+
+    return grid_points[0].index;
+}
+
+
+/*****************************************************************************
+METHOD:  determine_first_center_grid_point
+
+PURPOSE: Determines the index of the first center point to use for the current
+         line.  Only called when the fist valid point for a line is
+         encountered.  The point is determined from all of the available
+         points.
+
+RETURN: type = int
+    Value  Description
+    -----  -------------------------------------------------------------------
+    index  The index of the center point
+*****************************************************************************/
+int determine_first_center_grid_point
+(
+    GRID_POINTS *points,       /* I: All the available points */
+    double easting,            /* I: Easting of the current line/sample */
+    double northing,           /* I: Northing of the current line/sample */
+    GRID_ITEM *grid_points     /* I/O: Memory passed in, populated and
+                                       sorted to determine the center grid
+                                       point */
+)
+{
+    int point;
+
+    /* Assign the point indexes for all grid points */
+    for (point = 0; point < points->count; point++)
+    {
+        grid_points[point].index = point;
+    }
+
+    return determine_center_grid_point (points, easting, northing,
+                                        points->count, grid_points);
+}
+
+
+/*****************************************************************************
+METHOD:  calculate_pixel_atmospheric_parameters
+
+PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
+         each Landsat pixel
+
+RETURN: SUCCESS
+        FAILURE
+*****************************************************************************/
+int calculate_pixel_atmospheric_parameters
+(
+    Input_Data_t *input,       /* I: input structure */
+    GRID_POINTS *points,       /* I: The coordinate points */
+    char *xml_filename,        /* I: XML filename */
+    MODTRAN_POINTS *modtran_results /* I: results from MODTRAN runs */
+)
+{
+    char FUNC_NAME[] = "calculate_pixel_atmospheric_parameters";
+
+    int line;
+    int sample;
+    int status;
+
+    bool first_sample;
+
+    double easting;
+    double northing;
+
+    GRID_ITEM *grid_points = NULL;
+
+    int vertex;
+    int current_index;
+    int center_point;
+    int cell_vertices[NUM_CELL_POINTS];
+
+    double **at_height = NULL;
+    double parameters[AHP_NUM_PARAMETERS];
+    double avg_distance_ll;
+    double avg_distance_ul;
+    double avg_distance_ur;
+    double avg_distance_lr;
+
+    Intermediate_Data_t inter;
+
+    int16_t *elevation_data = NULL; /* input elevation data in meters */
+
+    double current_height;
+    char msg[MAX_STR_LEN];
+
+    /* Use local variables for cleaner code */
+    int num_cols = points->cols;
+    int num_points = points->count;
+    int pixel_count = input->lines * input->samples;
+    int pixel_line_loc;
+    int pixel_loc;
+
+    /* Open the intermedate data files */
+    if (open_intermediate(input, &inter) != SUCCESS)
+    {
+        RETURN_ERROR("Opening intermediate data files", FUNC_NAME, FAILURE);
+    }
+
+    /* Allocate memory for the intermedate data */
+    if (allocate_intermediate(&inter, pixel_count) != SUCCESS)
+    {
+        RETURN_ERROR("Allocating memory for intermediate data",
+                     FUNC_NAME, FAILURE);
+    }
+
+    /* Allocate memory for elevation */
+    elevation_data = calloc(pixel_count, sizeof(int16_t));
+    if (elevation_data == NULL)
+    {
+        RETURN_ERROR("Allocating elevation_data memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Allocate memory for at_height */
+    at_height = (double **) allocate_2d_array (NUM_CELL_POINTS,
+                                               AHP_NUM_PARAMETERS,
+                                               sizeof (double));
+    if (at_height == NULL)
+    {
+        RETURN_ERROR ("Allocating at_height memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Allocate memory to hold the grid_points to the first sample of data for
+       the current line */
+    grid_points = malloc (num_points * sizeof (GRID_ITEM));
+    if (grid_points == NULL)
+    {
+        RETURN_ERROR ("Allocating grid_points memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Read thermal and elevation data into memory */
+    if (read_input(input, inter.band_thermal, elevation_data, pixel_count)
+        != SUCCESS)
+    {
+        RETURN_ERROR ("Reading thermal and elevation bands", FUNC_NAME,
+                      FAILURE);
+    }
+
+    /* Show some status messages */
+    LOG_MESSAGE("Iterate through all pixels in Landsat scene", FUNC_NAME);
+    snprintf(msg, sizeof(msg), "Pixel Count = %d", pixel_count);
+    LOG_MESSAGE(msg, FUNC_NAME);
+    snprintf(msg,  sizeof(msg),"Lines = %d, Samples = %d",
+             input->lines, input->samples);
+    LOG_MESSAGE(msg, FUNC_NAME);
+
+    /* Loop through each line in the image */
+    for (line = 0; line < input->lines; line++)
+    {
+        /* Print status on every 1000 lines */
+        if (!(line % 1000))
+        {
+            printf ("Processing line %d\n", line);
+            fflush (stdout);
+        }
+
+        pixel_line_loc = line * input->samples;
+
+        /* Set first_sample to be true */
+        first_sample = true;
+        for (sample = 0; sample < input->samples; sample++)
+        {
+            pixel_loc = pixel_line_loc + sample;
+
+            if (inter.band_thermal[pixel_loc] != LST_NO_DATA_VALUE)
+            {
+                /* Determine UTM coordinates for current line/sample */
+                easting = input->meta.ul_map_corner.x
+                    + (sample * input->x_pixel_size);
+                northing = input->meta.ul_map_corner.y
+                    - (line * input->y_pixel_size);
+
+                if (first_sample)
+                {
+                    /* Determine the first center point from all of the
+                       available points */
+                    center_point = determine_first_center_grid_point(
+                                       points, easting, northing,
+                                       grid_points);
+
+                    /* Set first_sample to be false */
+                    first_sample = false;
+                }
+                else
+                {
+                    /* Determine the center point from the current 9 grid
+                       points for the current line/sample */
+                    center_point = determine_center_grid_point(
+                                       points, easting, northing,
+                                       NUM_GRID_POINTS, grid_points);
+                }
+
+                /* Fix the index values, since the points are from a new line
+                   or were messed up during determining the center point */
+                grid_points[CC_GRID_POINT].index = center_point;
+                grid_points[LL_GRID_POINT].index = center_point - 1 - num_cols;
+                grid_points[LC_GRID_POINT].index = center_point - 1;
+                grid_points[UL_GRID_POINT].index = center_point - 1 + num_cols;
+                grid_points[UC_GRID_POINT].index = center_point + num_cols;
+                grid_points[UR_GRID_POINT].index = center_point + 1 + num_cols;
+                grid_points[RC_GRID_POINT].index = center_point + 1;
+                grid_points[LR_GRID_POINT].index = center_point + 1 - num_cols;
+                grid_points[DC_GRID_POINT].index = center_point - num_cols;
+
+                /* Fix the distances, since the points are from a new line or
+                   were messed up during determining the center point */
+                determine_grid_point_distances (points, easting, northing,
+                                                NUM_GRID_POINTS, grid_points);
+
+                /* Determine the average distances for each quadrant around
+                   the center point. We only need to use the three outer grid 
+                   points */
+                avg_distance_ll = (grid_points[DC_GRID_POINT].distance
+                                   + grid_points[LL_GRID_POINT].distance
+                                   + grid_points[LC_GRID_POINT].distance)
+                                  / 3.0;
+
+                avg_distance_ul = (grid_points[LC_GRID_POINT].distance
+                                   + grid_points[UL_GRID_POINT].distance
+                                   + grid_points[UC_GRID_POINT].distance)
+                                  / 3.0;
+
+                avg_distance_ur = (grid_points[UC_GRID_POINT].distance
+                                   + grid_points[UR_GRID_POINT].distance
+                                   + grid_points[RC_GRID_POINT].distance)
+                                  / 3.0;
+
+                avg_distance_lr = (grid_points[RC_GRID_POINT].distance
+                                   + grid_points[LR_GRID_POINT].distance
+                                   + grid_points[DC_GRID_POINT].distance)
+                                  / 3.0;
+
+                /* Determine which quadrant is closer and setup the cell
+                   vertices to interpolate over based on that */
+                if (avg_distance_ll < avg_distance_ul
+                    && avg_distance_ll < avg_distance_ur
+                    && avg_distance_ll < avg_distance_lr)
+                { /* LL Cell */
+                    cell_vertices[LL_POINT] = center_point - 1 - num_cols;
+                }
+                else if (avg_distance_ul < avg_distance_ll
+                    && avg_distance_ul < avg_distance_ur
+                    && avg_distance_ul < avg_distance_lr)
+                { /* UL Cell */
+                    cell_vertices[LL_POINT] = center_point - 1;
+                }
+                else if (avg_distance_ur < avg_distance_ll
+                    && avg_distance_ur < avg_distance_ul
+                    && avg_distance_ur < avg_distance_lr)
+                { /* UR Cell */
+                    cell_vertices[LL_POINT] = center_point;
+                }
+                else
+                { /* LR Cell */
+                    cell_vertices[LL_POINT] = center_point - num_cols;
+                }
+
+                /* UL Point */
+                cell_vertices[UL_POINT] = cell_vertices[LL_POINT] + num_cols;
+                /* UR Point */
+                cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
+                /* LR Point */
+                cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+
+#if OUTPUT_CELL_DESIGNATION_BAND
+                inter.band_cell[pixel_loc] = cell_vertices[LL_POINT];
 #endif
+
+                /* Convert height from m to km -- Same as 1.0 / 1000.0 */
+                current_height = (double) elevation_data[pixel_loc] * 0.001;
+
+                /* Interpolate three parameters to that height at each of the
+                   four closest points */
+                for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
+                {
+                    current_index = cell_vertices[vertex];
+
+                    /* Interpolate three atmospheric parameters to current
+                       height */
+                    interpolate_to_height(
+                        modtran_results->points[current_index],
+                        current_height, at_height[vertex]);
+                }
+
+                /* Interpolate parameters at appropriate height to location of
+                   current pixel */
+                interpolate_to_location(points, cell_vertices, at_height,
+                                        easting, northing, &parameters[0]);
+
+                /* Convert radiances to W*m^(-2)*sr(-1) */
+                inter.band_upwelled[pixel_loc] =
+                    parameters[AHP_UPWELLED_RADIANCE] * 10000.0;
+                inter.band_downwelled[pixel_loc] =
+                    parameters[AHP_DOWNWELLED_RADIANCE] * 10000.0;
+                inter.band_transmittance[pixel_loc] =
+                    parameters[AHP_TRANSMISSION];
+            } /* END - if not FILL */
+            else
+            {
+                inter.band_upwelled[pixel_loc] = LST_NO_DATA_VALUE;
+                inter.band_downwelled[pixel_loc] = LST_NO_DATA_VALUE;
+                inter.band_transmittance[pixel_loc] = LST_NO_DATA_VALUE;
+
+#if OUTPUT_CELL_DESIGNATION_BAND
+                inter.band_cell[pixel_loc] = 0;
+#endif
+            }
+        } /* END - for sample */
+
+    } /* END - for line */
+
+    /* Write out the temporary intermediate output files */
+    if (write_intermediate(&inter, pixel_count) != SUCCESS)
+    {
+        sprintf (msg, "Writing to intermediate data files");
+        RETURN_ERROR(msg, FUNC_NAME, FAILURE);
+    }
+
+    /* Free allocated memory */
+    free(grid_points);
+    free(elevation_data);
+
+    status = free_2d_array((void **)at_height);
+    if (status != SUCCESS)
+    {
+        ERROR_MESSAGE("Freeing memory: at_height\n", FUNC_NAME);
+    }
+
+    free_intermediate(&inter);
+
+    /* Close the intermediate binary files */
+    if (close_intermediate(&inter) != SUCCESS)
+    {
+        sprintf (msg, "Closing file intermediate data files");
+        RETURN_ERROR(msg, FUNC_NAME, FAILURE);
+    }
+
+    /* Add the LST intermediate bands to the metadata file */
+    if (add_lst_band_product(xml_filename,
+                             input->reference_band_name,
+                             inter.thermal_filename,
+                             LST_THERMAL_RADIANCE_PRODUCT_NAME,
+                             LST_THERMAL_RADIANCE_BAND_NAME,
+                             LST_THERMAL_RADIANCE_SHORT_NAME,
+                             LST_THERMAL_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST thermal radiance band product", 
+            FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->reference_band_name,
+                             inter.transmittance_filename,
+                             LST_ATMOS_TRANS_PRODUCT_NAME,
+                             LST_ATMOS_TRANS_BAND_NAME,
+                             LST_ATMOS_TRANS_SHORT_NAME,
+                             LST_ATMOS_TRANS_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST atmospheric transmission band "
+            "product", FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->reference_band_name,
+                             inter.upwelled_filename,
+                             LST_UPWELLED_RADIANCE_PRODUCT_NAME,
+                             LST_UPWELLED_RADIANCE_BAND_NAME,
+                             LST_UPWELLED_RADIANCE_SHORT_NAME,
+                             LST_UPWELLED_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST upwelled radiance band product", 
+            FUNC_NAME);
+    }
+
+    if (add_lst_band_product(xml_filename,
+                             input->reference_band_name,
+                             inter.downwelled_filename,
+                             LST_DOWNWELLED_RADIANCE_PRODUCT_NAME,
+                             LST_DOWNWELLED_RADIANCE_BAND_NAME,
+                             LST_DOWNWELLED_RADIANCE_SHORT_NAME,
+                             LST_DOWNWELLED_RADIANCE_LONG_NAME,
+                             LST_RADIANCE_UNITS,
+                             0.0, 0.0) != SUCCESS)
+    {
+        ERROR_MESSAGE ("Failed adding LST downwelled radiance band product", 
+            FUNC_NAME);
+    }
+
+    return SUCCESS;
+}
+
+/* Setup and cleanup functions */
+
+/*****************************************************************************
+Method:  load_grid_points_hdr
+
+Description:  Loads the grid points header information.
+
+Notes:
+    1. The grid point header file must be present in the current working 
+       directory.
+
+RETURN: SUCCESS
+        FAILURE
+*****************************************************************************/
+int load_grid_points_hdr
+(
+    GRID_POINTS *grid_points
+)
+{
+    char FUNC_NAME[] = "load_grid_points_hdr";
+    FILE *grid_fd = NULL;
+    int status;
+    char header_filename[] = "grid_points.hdr";
+    char errmsg[PATH_MAX];
+
+    /* Open the grid header file. */
+    grid_fd = fopen(header_filename, "r");
+    if (grid_fd == NULL)
+    {
+        snprintf(errmsg, sizeof(errmsg), "Failed opening %s", header_filename);
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    /* Read the grid header file. */
+    errno = 0;
+    status = fscanf(grid_fd, "%d\n%d\n%d", &grid_points->count,
+                    &grid_points->rows, &grid_points->cols);
+    if (status != 3 || errno != 0)
+    {
+        fclose(grid_fd);
+        snprintf(errmsg, sizeof(errmsg), "Failed reading %s", header_filename);
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    fclose(grid_fd);
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  load_grid_points
+
+Description:  Loads the grid points into a data structure.
+
+Notes:
+    1. The grid point files must be present in the current working directory.
+
+RETURN: SUCCESS
+        FAILURE
+*****************************************************************************/
+int load_grid_points
+(
+    GRID_POINTS *grid_points
+)
+{
+    char FUNC_NAME[] = "load_grid_points";
+
+    FILE *grid_fd = NULL;
+
+    int status;
+
+    char binary_filename[] = "grid_points.bin";
+    char errmsg[PATH_MAX];
+
+    /* Initialize the points */
+    grid_points->points = NULL;
+
+    if (load_grid_points_hdr(grid_points) != SUCCESS)
+    {
+        RETURN_ERROR("Failed loading grid point header information",
+                     FUNC_NAME, FAILURE);
+    }
+
+    grid_points->points = malloc(grid_points->count * sizeof(GRID_POINT));
+    if (grid_points->points == NULL)
+    {
+        RETURN_ERROR("Failed allocating memory for grid points",
+                     FUNC_NAME, FAILURE);
+    }
+
+    /* Open the grid point file */
+    grid_fd = fopen(binary_filename, "rb");
+    if (grid_fd == NULL)
+    {
+        snprintf(errmsg, sizeof(errmsg), "Failed opening %s", binary_filename);
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    /* Read the grid points */
+    status = fread(grid_points->points, sizeof(GRID_POINT),
+                   grid_points->count, grid_fd);
+    if (status != grid_points->count || errno != 0)
+    {
+        fclose(grid_fd);
+        snprintf(errmsg, sizeof(errmsg), "Failed reading %s", binary_filename);
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    fclose(grid_fd);
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  load_elevations
+
+Description:  Loads the grid elevations into a data structure.
+
+Notes:
+    1. The grid elevation file must be present in the current working directory.
+    2. The grid elevation entries should be in sync with the grid file.
+
+RETURN: SUCCESS
+        FAILURE
+*****************************************************************************/
+int load_elevations
+(
+    MODTRAN_POINTS *modtran_points
+)
+{
+    char FUNC_NAME[] = "load_elevations";
+
+    FILE *elevation_fd = NULL;
+
+    int status;
+    int index;   /* Index into point structure */
+
+    char elevation_filename[] = "grid_elevations.txt";
+    char errmsg[PATH_MAX];
+
+    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", elevation_filename);
+
+    elevation_fd = fopen(elevation_filename, "r");
+    if (elevation_fd == NULL)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    /* Read the elevations into the 0 elevation positions in the MODTRAN 
+       point structure.  The file and structure should have the same order. */
+    index = 0;
+    for (index = 0; index < modtran_points->count; index++)
+    {
+        /* Keep looking for a modtran point that was actually run. */
+        if (modtran_points->points[index].ran_modtran == 0)
+        {
+            continue; 
+        }
+
+        status = fscanf(elevation_fd, "%lf\n", 
+            &(modtran_points->points[index].elevations[0].elevation));
+        if (status <= 0)
+        {
+            RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+        }
+    }
+
+    fclose(elevation_fd);
+
+    return SUCCESS;
+}
+
+
+/*****************************************************************************
+Method:  free_grid_points
+
+Description:  Free allocated memory for the grid points.
+*****************************************************************************/
+void free_grid_points
+(
+    GRID_POINTS *grid_points
+)
+{
+    free(grid_points->points);
+    grid_points->points = NULL;
+}
+
+/*****************************************************************************
+Method:  free_modtran_points
+
+Description:  Free allocated memory for the MODTRAN points.
+*****************************************************************************/
+void free_modtran_points
+(
+    MODTRAN_POINTS *modtran_points
+)
+{
+    int index;     /* Index into MODTRAN points structure */
+
+    for (index = 0; index < modtran_points->count; index++)
+    {
+        free(modtran_points->points[index].elevations);
+        modtran_points->points[index].elevations = NULL;
+    }
+
+    free(modtran_points->points);
+    modtran_points->points = NULL;
+}
+
+
+/*****************************************************************************
+Method:  initialize_modtran_points
+
+Description:  Allocate the memory need to hold the MODTRAN results and
+              initialize known values.
+
+RETURN: SUCCESS
+        FAILURE
+*****************************************************************************/
+int initialize_modtran_points
+(
+    GRID_POINTS *grid_points,      /* I: The coordinate points */
+    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
+)
+{
+    char FUNC_NAME[] = "initialize_modtran_points";
+
+    double gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1,
+                                      2.6, 3.1, 3.6, 4.05 };
+    int index;
+    int elevation_index;           /* Index into elevations */
+
+    modtran_points->count = grid_points->count;
+
+    modtran_points->points = malloc(modtran_points->count *
+                                    sizeof(MODTRAN_POINT));
+    if (modtran_points->points == NULL)
+    {
+        RETURN_ERROR("Failed allocating memory for modtran points",
+                     FUNC_NAME, FAILURE);
+    }
+
+    for (index = 0; index < modtran_points->count; index++)
+    {
+        modtran_points->points[index].count = NUM_ELEVATIONS;
+        modtran_points->points[index].ran_modtran =
+            grid_points->points[index].run_modtran;
+        modtran_points->points[index].row = grid_points->points[index].row;
+        modtran_points->points[index].col = grid_points->points[index].col;
+        modtran_points->points[index].narr_row =
+            grid_points->points[index].narr_row;
+        modtran_points->points[index].narr_col =
+            grid_points->points[index].narr_col;
+        modtran_points->points[index].lon = grid_points->points[index].lon;
+        modtran_points->points[index].lat = grid_points->points[index].lat;
+        modtran_points->points[index].map_x = grid_points->points[index].map_x;
+        modtran_points->points[index].map_y = grid_points->points[index].map_y;
+
+        modtran_points->points[index].elevations =
+            malloc(NUM_ELEVATIONS * sizeof(MODTRAN_ELEVATION));
+        if (modtran_points->points[index].elevations == NULL)
+        {
+            RETURN_ERROR("Failed allocating memory for modtran point"
+                         " elevations", FUNC_NAME, FAILURE);
+        }
+
+        /* Iterate over the elevations and assign the elevation values. */
+        for (elevation_index = 0; elevation_index < NUM_ELEVATIONS; 
+            elevation_index++)
+        {
+            modtran_points->points[index].elevations[elevation_index]
+                .elevation = gndalt[elevation_index];
+        }
+    }
+
+    /* Load the first elevation values if needed. */
+    if (load_elevations(modtran_points) != SUCCESS)
+    {
+        RETURN_ERROR("calling load_elevations", FUNC_NAME, EXIT_FAILURE);
+    }
 
     return SUCCESS;
 }
@@ -1165,12 +2104,12 @@ Description: Display help/usage information to the user.
 ****************************************************************************/
 void usage()
 {
-    printf("Land Surface Temperature - lst_atmos_parms\n");
+    printf("Land Surface Temperature - lst_atmospheric_parameters\n");
     printf("\n");
     printf("Generates interpolated atmospheric parameters covering the scene"
            " data.\n");
     printf("\n");
-    printf("usage: lst_atmos_parms"
+    printf("usage: lst_atmospheric_parameters"
            " --xml=<filename>"
            " [--debug]\n");
     printf("\n");
@@ -1181,9 +2120,10 @@ void usage()
     printf ("    --debug: should debug output be generated?"
             " (default is false)\n");
     printf ("\n");
-    printf ("lst_atmos_parms --help will print the usage statement\n");
+    printf ("lst_atmospheric_parameters --help will print the ");
+    printf ("usage statement\n");
     printf ("\n");
-    printf ("Example: lst_atmos_parms"
+    printf ("Example: lst_atmospheric_parameters"
             " --xml=LE07_L1T_028031_20041227_20160513_01_T1.xml\n");
     printf ("Note: This application must run from the directory"
             " where the input data is located.\n\n");
@@ -1286,167 +2226,6 @@ int get_args
 }
 
 
-int load_grid_points_hdr(GRID_POINTS *grid_points)
-{
-    char FUNC_NAME[] = "load_grid_points_hdr";
-
-    FILE *grid_fd = NULL;
-
-    int status;
-
-    char header_filename[] = "grid_points.hdr";
-    char errmsg[PATH_MAX];
-
-    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", header_filename);
-
-    grid_fd = fopen(header_filename, "r");
-    if (grid_fd == NULL)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    errno = 0;
-    status = fscanf(grid_fd, "%d\n%d\n%d", &grid_points->count,
-                    &grid_points->rows, &grid_points->cols);
-    if (status != 3 || errno != 0)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-Method:  load_grid_points
-
-Description:  Loads the grid points into a data structure.
-
-Notes:
-    1. The grid point files must be present in the current working directory.
-*****************************************************************************/
-int load_grid_points(GRID_POINTS *grid_points)
-{
-    char FUNC_NAME[] = "load_grid_points";
-
-    FILE *grid_fd = NULL;
-
-    int status;
-
-    char binary_filename[] = "grid_points.bin";
-    char errmsg[PATH_MAX];
-
-    /* Initialize the points */
-    grid_points->points = NULL;
-
-    if (load_grid_points_hdr(grid_points) != SUCCESS)
-    {
-        RETURN_ERROR("Failed loading grid point header information",
-                     FUNC_NAME, FAILURE);
-    }
-
-    grid_points->points = malloc(grid_points->count * sizeof(GRID_POINT));
-    if (grid_points->points == NULL)
-    {
-        RETURN_ERROR("Failed allocating memory for grid points",
-                     FUNC_NAME, FAILURE);
-    }
-
-    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", binary_filename);
-
-    grid_fd = fopen(binary_filename, "rb");
-    if (grid_fd == NULL)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    status = fread(grid_points->points, sizeof(GRID_POINT),
-                   grid_points->count, grid_fd);
-    if (status != grid_points->count || errno != 0)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-Method:  free_grid_points
-
-Description:  Free allocated memory for the grid pointd.
-*****************************************************************************/
-void free_grid_points(GRID_POINTS *grid_points)
-{
-    free(grid_points->points);
-    grid_points->points = NULL;
-}
-
-
-/*****************************************************************************
-Method:  initialize_modtran_points
-
-Description:  Allocate the memory need to hold the Modtran results and
-              initialize known values.
-*****************************************************************************/
-int initialize_modtran_points
-(
-    GRID_POINTS *grid_points,        /* I: The coordinate points */
-    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
-)
-{
-    char FUNC_NAME[] = "initialize_modtran_points";
-
-    int index;
-
-    modtran_points->count = grid_points->count;
-
-    modtran_points->points = malloc(modtran_points->count *
-                                    sizeof(MODTRAN_POINT));
-    if (modtran_points->points == NULL)
-    {
-        RETURN_ERROR("Failed allocating memory for modtran points",
-                     FUNC_NAME, FAILURE);
-    }
-
-    for (index = 0; index < modtran_points->count; index++)
-    {
-        modtran_points->points[index].count = NUM_ELEVATIONS;
-        modtran_points->points[index].ran_modtran =
-            grid_points->points[index].run_modtran;
-        modtran_points->points[index].row =
-            grid_points->points[index].row;
-        modtran_points->points[index].col =
-            grid_points->points[index].col;
-        modtran_points->points[index].narr_row =
-            grid_points->points[index].narr_row;
-        modtran_points->points[index].narr_col =
-            grid_points->points[index].narr_col;
-        modtran_points->points[index].lon =
-            grid_points->points[index].lon;
-        modtran_points->points[index].lat =
-            grid_points->points[index].lat;
-        modtran_points->points[index].map_x =
-            grid_points->points[index].map_x;
-        modtran_points->points[index].map_y =
-            grid_points->points[index].map_y;
-
-        modtran_points->points[index].elevations =
-            malloc(NUM_ELEVATIONS * sizeof(MODTRAN_ELEVATION));
-        if (modtran_points->points[index].elevations == NULL)
-        {
-            RETURN_ERROR("Failed allocating memory for modtran point"
-                         " elevations", FUNC_NAME, FAILURE);
-        }
-
-        /* TODO TODO TODO - Iterate over the elevations and assign the
-                            elevation values */
-    }
-
-    return SUCCESS;
-}
-
-
 /*****************************************************************************
 Method:  main
 
@@ -1457,14 +2236,12 @@ int main(int argc, char *argv[])
     char FUNC_NAME[] = "main";
 
     Espa_internal_meta_t xml_metadata;  /* XML metadata structure */
-
-    char msg_str[MAX_STR_LEN];
-    char xml_filename[PATH_MAX];        /* input XML filename */
-
-    bool debug;                         /* debug flag for debug output */
-
-    GRID_POINTS grid_points;
-    MODTRAN_POINTS modtran_points;
+    char xml_filename[PATH_MAX];        /* Input XML filename */
+    bool debug;                         /* Debug flag for debug output */
+    Input_Data_t *input = NULL;         /* Input data and meta data */
+    GRID_POINTS grid_points;            /* NARR grid points */
+    MODTRAN_POINTS modtran_points;      /* Points that are processed through
+                                           MODTRAN */
 
     /* Read the command-line arguments */
     if (get_args(argc, argv, xml_filename, &debug)
@@ -1473,40 +2250,84 @@ int main(int argc, char *argv[])
         RETURN_ERROR("calling get_args", FUNC_NAME, EXIT_FAILURE);
     }
 
+    /* Validate the input metadata file */
+    if (validate_xml_file(xml_filename) != SUCCESS)
+    {
+        /* Error messages already written */
+        return EXIT_FAILURE;
+    }
+
+    /* Initialize the metadata structure */
+    init_metadata_struct(&xml_metadata);
+
+    /* Parse the metadata file into our internal metadata structure; also
+       allocates space as needed for various pointers in the global and band
+       metadata */
+    if (parse_metadata(xml_filename, &xml_metadata) != SUCCESS)
+    {
+        /* Error messages already written */
+        return EXIT_FAILURE;
+    }
+
+    /* Open input file, read metadata, and set up buffers */
+    input = open_input(&xml_metadata);
+    if (input == NULL)
+    {
+        RETURN_ERROR("opening input files", FUNC_NAME, EXIT_FAILURE);
+    }
+
+    /* Free metadata */
+    free_metadata(&xml_metadata);
+
     /* Load the grid points */
     if (load_grid_points(&grid_points) != SUCCESS)
     {
         RETURN_ERROR("calling load_grid_points", FUNC_NAME, EXIT_FAILURE);
     }
 
-    int initialize_modtran_points
-(
-    GRID_POINTS *grid_points,        /* I: The coordinate points */
-    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
-)
-
-    /* Cleanup */
-    free_grid_points(&grid_points);
-
-    /* Calculate point atmospheric parameters from the Modtran runs */
-    if (calc_point_atmos_params(&grid_points, &modtran_points) != SUCCESS)
+    /* Allocate and initialize the memory need to hold the MODTRAN results */
+    if (initialize_modtran_points(&grid_points, &modtran_points) != SUCCESS)
     {
-        RETURN_ERROR("calling load_modtran_points", FUNC_NAME, EXIT_FAILURE);
+        RETURN_ERROR("calling initializing_modtran_points", FUNC_NAME, 
+            EXIT_FAILURE);
     }
 
+    /* Generate parameters for each height and NARR point */
+    if (calculate_point_atmospheric_parameters(input, &grid_points, 
+        &modtran_points) != SUCCESS)
+    {
+        RETURN_ERROR("calling calculate_point_atmospheric_parameters",
+            FUNC_NAME, EXIT_FAILURE);
+    }
 
     /* Process the grid points */
     printf("%d %d %d\n", grid_points.count, grid_points.rows, grid_points.cols);
-    printf("%d %d %d\n", grid_points.points[0].index, grid_points.points[0].row, grid_points.points[0].col);
-    printf("%d %d %d\n", grid_points.points[1].index, grid_points.points[1].row, grid_points.points[1].col);
-    printf("%d %d %d\n", grid_points.points[2].index, grid_points.points[2].row, grid_points.points[2].col);
-    printf("%d %d %d\n", grid_points.points[3].index, grid_points.points[3].row, grid_points.points[3].col);
-    printf("%d %d %d\n", grid_points.points[15].index, grid_points.points[15].row, grid_points.points[15].col);
+    printf("%d %d %d\n", grid_points.points[0].index, grid_points.points[0].row,
+        grid_points.points[0].col);
+    printf("%d %d %d\n", grid_points.points[1].index, grid_points.points[1].row,
+        grid_points.points[1].col);
+    printf("%d %d %d\n", grid_points.points[2].index, grid_points.points[2].row,
+        grid_points.points[2].col);
+    printf("%d %d %d\n", grid_points.points[3].index, grid_points.points[3].row,
+        grid_points.points[3].col);
+    printf("%d %d %d\n", grid_points.points[15].index, 
+       grid_points.points[15].row, grid_points.points[15].col);
 
+    /* Using the values made at the grid points, generate atmospheric 
+       parameters for each Landsat pixel */ 
+    if (calculate_pixel_atmospheric_parameters(input, &grid_points, 
+        xml_filename, &modtran_points) != SUCCESS)
+    {
+        RETURN_ERROR("calling calculate_pixel_atmospheric_parameters", 
+            FUNC_NAME, EXIT_FAILURE);
+    }
 
-    /* TODO TODO TODO - Create the interpolated atmospheric bands */
+    /* Free the grid and MODTRAN points */
+    free_grid_points(&grid_points);
+    free_modtran_points(&modtran_points);
 
-    /* TODO TODO TODO - Free the modtran_points */
+    /* Close the input file and free the structure */
+    close_input(input);
 
     return EXIT_SUCCESS;
 }

@@ -35,18 +35,33 @@ typedef struct
 } Intermediate_Data_t;
 
 
-int open_intermediate(Input_Data_t *input,
-                      Intermediate_Data_t *inter);
+int open_intermediate
+(
+    Input_Data_t *input,
+    Intermediate_Data_t *inter
+);
 
-int write_intermediate(Intermediate_Data_t *inter,
-                       int pixel_count);
+int write_intermediate
+(
+    Intermediate_Data_t *inter,
+    int pixel_count
+);
 
-int close_intermediate(Intermediate_Data_t *inter);
+int close_intermediate
+(
+    Intermediate_Data_t *inter
+);
 
-int allocate_intermediate(Intermediate_Data_t *inter,
-                          int pixel_count);
+int allocate_intermediate
+(
+    Intermediate_Data_t *inter,
+    int pixel_count
+);
 
-void free_intermediate(Intermediate_Data_t *inter);
+void free_intermediate
+(
+    Intermediate_Data_t *inter
+);
 
 
 #endif /* INTERMEDIATE_DATA_H */

@@ -15,11 +15,10 @@
 
   RETURN VALUE:  None
 *****************************************************************************/
-int
-open_band
+int open_band
 (
     char *filename,          /* I: input filename */
-    Input_Data_t *input,     /* IO: updated with information from XML */
+    Input_Data_t *input,     /* I/O: updated with information from XML */
     Input_Bands_e band_index /* I: index to place the band into */
 )
 {
@@ -45,8 +44,7 @@ open_band
 
 
 /*****************************************************************************
-
-Description: 'OpenInput' sets up the 'input' data structure, opens the
+Description: 'open_input' sets up the 'input' data structure, opens the
              input raw binary files for read access.
 
 Input Parameters:
@@ -56,13 +54,12 @@ Output Parameters:
     (returns)      'input' data structure or NULL when an error occurs
 
 *****************************************************************************/
-Input_Data_t *
-open_input
+Input_Data_t *open_input
 (
     Espa_internal_meta_t *metadata
 )
 {
-    char FUNC_NAME[] = "OpenInput";
+    char FUNC_NAME[] = "open_input";
     Input_Data_t *input = NULL;
     int index;
 
@@ -107,8 +104,10 @@ open_input
       SUCCESS  No errors were encountered.
       ERROR    An error was encountered.
 *****************************************************************************/
-int
-close_input (Input_Data_t *input)
+int close_input 
+(
+    Input_Data_t *input
+)
 {
     char FUNC_NAME[] = "close_input";
     int index;
@@ -145,6 +144,9 @@ close_input (Input_Data_t *input)
     if (had_issue)
         return ERROR;
 
+    free(input->meta.product_id);
+    free(input);
+
     return SUCCESS;
 }
 
@@ -160,8 +162,7 @@ close_input (Input_Data_t *input)
       true     Success with reading all of the bands into memory.
       false    Failed to read a band into memory.
 *****************************************************************************/
-int
-read_input
+int read_input
 (
     Input_Data_t *input,
     float *band_thermal,
@@ -169,7 +170,7 @@ read_input
     int pixel_count
 )
 {
-    char FUNC_NAME[] = "read_bands_into_memory";
+    char FUNC_NAME[] = "read_input";
     int count;
     int index;
     uint8_t *thermal_uint8 = NULL;
@@ -192,7 +193,7 @@ read_input
             free(thermal_int16);
 
             RETURN_ERROR("Failed reading thermal band data",
-                         FUNC_NAME, FAILURE);
+            FUNC_NAME, FAILURE);
         }
 
         /* Copy the data to the output buffer manually while converting to
@@ -278,10 +279,7 @@ read_input
 }
 
 
-#define DATE_STRING_LEN (50)
-#define TIME_STRING_LEN (50)
 #define INVALID_INSTRUMENT_COMBO ("invalid instrument/satellite combination")
-
 
 /*****************************************************************************
 Description: 'GetXMLInput' pulls input values from the XML structure.
@@ -299,13 +297,13 @@ Design Notes:
     1. This replaces the previous GetInputMeta so the input values are pulled
        from the XML file instead of the HDF and MTL files.
 *****************************************************************************/
-bool
-GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
+bool GetXMLInput
+(
+    Input_Data_t *input, 
+    Espa_internal_meta_t *metadata
+)
 {
     char FUNC_NAME[] = "GetXMLInput";
-    char acq_date[DATE_STRING_LEN + 1];
-    char acq_time[TIME_STRING_LEN + 1];
-    char date_time[MAX_STR_LEN];
     char msg[MAX_STR_LEN];
     int index;
     Espa_global_meta_t *global = &metadata->global; /* pointer to global meta */
@@ -314,7 +312,6 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
        the ESPA internal format for the input L1G/T products. */
     input->meta.satellite = SAT_NULL;
     input->meta.instrument = INST_NULL;
-    input->meta.acq_date.fill = true;
     input->thermal_rad_gain = GAIN_BIAS_FILL;
     input->thermal_rad_bias = GAIN_BIAS_FILL;
 
@@ -373,7 +370,7 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
 
         /* Specify the band name for the thermal band to use */
         snprintf (input->reference_band_name,
-                  sizeof (input->reference_band_name), "band6");
+                  sizeof (input->reference_band_name), "b6");
     }
     else if (input->meta.instrument == INST_ETM)
     {
@@ -384,7 +381,7 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
 
         /* Specify the band name for the thermal band to use */
         snprintf (input->reference_band_name,
-                  sizeof (input->reference_band_name), "band61");
+                  sizeof (input->reference_band_name), "b61");
     }
     else if (input->meta.instrument == INST_OLI_TIRS)
     {
@@ -395,10 +392,8 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
 
         /* Specify the band name for the thermal band to use */
         snprintf (input->reference_band_name,
-                  sizeof (input->reference_band_name), "band10");
+                  sizeof (input->reference_band_name), "b10");
     }
-
-    input->meta.zone = global->proj_info.utm_zone;
 
     for (index = 0; index < metadata->nbands; index++)
     {
@@ -453,7 +448,7 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
         }
     }
 
-    /* Get the scene ID */
+    /* Get the product ID */
     input->meta.product_id = strdup(metadata->global.product_id);
 
     /* Get the map projection coordinates */
@@ -463,45 +458,6 @@ GetXMLInput (Input_Data_t *input, Espa_internal_meta_t *metadata)
     input->meta.lr_map_corner.x = metadata->global.proj_info.lr_corner[0];
     input->meta.lr_map_corner.y = metadata->global.proj_info.lr_corner[1];
     input->meta.lr_map_corner.is_fill = true;
-
-    /* Get the geographic coordinates */
-    input->meta.ul_geo_corner.lat = metadata->global.ul_corner[0];
-    input->meta.ul_geo_corner.lon = metadata->global.ul_corner[1];
-    input->meta.ul_geo_corner.is_fill = true;
-    input->meta.lr_geo_corner.lat = metadata->global.lr_corner[0];
-    input->meta.lr_geo_corner.lon = metadata->global.lr_corner[1];
-    input->meta.lr_geo_corner.is_fill = true;
-
-    /* Get the bounding coordinates */
-    input->meta.bounding_coords[ESPA_NORTH] =
-        metadata->global.bounding_coords[ESPA_NORTH];
-    input->meta.bounding_coords[ESPA_SOUTH] =
-        metadata->global.bounding_coords[ESPA_SOUTH];
-    input->meta.bounding_coords[ESPA_EAST] =
-        metadata->global.bounding_coords[ESPA_EAST];
-    input->meta.bounding_coords[ESPA_WEST] =
-        metadata->global.bounding_coords[ESPA_WEST];
-
-    /* Convert the acquisition date/time values */
-    snprintf (acq_date, sizeof (acq_date), "%s", global->acquisition_date);
-    snprintf (acq_time, sizeof (acq_time), "%s", global->scene_center_time);
-
-    /* Make sure the acquisition time is not too long (i.e. contains too
-       many decimal points for the date/time routines).  The time should be
-       hh:mm:ss.ssssssZ (see DATE_FORMAT_DATEA_TIME in date.h) which is 16
-       characters long.  If the time is longer than that, just chop it off. */
-    if (strlen (acq_time) > 16)
-    {
-        acq_time[15] = 'Z';
-        acq_time[16] = '\0';
-    }
-
-    snprintf (date_time, sizeof (date_time),
-              "%sT%s", acq_date, acq_time);
-    if (!DateInit (&input->meta.acq_date, date_time, DATE_FORMAT_DATEA_TIME))
-    {
-        RETURN_ERROR ("converting acquisition date/time", FUNC_NAME, false);
-    }
 
     return true;
 }

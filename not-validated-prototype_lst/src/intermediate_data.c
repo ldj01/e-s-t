@@ -4,10 +4,20 @@
 #include "utilities.h"
 #include "intermediate_data.h"
 
+/*****************************************************************************
+ NAME:  open_intermediate
 
-int
-open_intermediate(Input_Data_t *input,
-                  Intermediate_Data_t *inter)
+ PURPOSE: Open intermediate files (thermal radiance, upwelled radiance,
+          downwelled radiance, and transmittance). 
+
+ RETURN VALUE: SUCCESS
+               FAILURE
+*****************************************************************************/
+int open_intermediate
+(
+    Input_Data_t *input,
+    Intermediate_Data_t *inter
+)
 {
     char *FUNC_NAME = "open_intermediate";
     char msg[PATH_MAX];
@@ -94,9 +104,20 @@ open_intermediate(Input_Data_t *input,
 }
 
 
-int
-write_intermediate(Intermediate_Data_t *inter,
-                   int pixel_count)
+/*****************************************************************************
+ NAME:  write_intermediate
+
+ PURPOSE: Write intermediate files (thermal radiance, upwelled radiance,
+          downwelled radiance, and transmittance). 
+
+ RETURN VALUE: SUCCESS
+               FAILURE
+*****************************************************************************/
+int write_intermediate
+(
+    Intermediate_Data_t *inter,
+    int pixel_count
+)
 {
     char *FUNC_NAME = "close_intermediate";
     char msg[PATH_MAX];
@@ -158,8 +179,19 @@ write_intermediate(Intermediate_Data_t *inter,
 }
 
 
-int
-close_intermediate(Intermediate_Data_t *inter)
+/*****************************************************************************
+ NAME:  close_intermediate
+
+ PURPOSE: Close intermediate files (thermal radiance, upwelled radiance,
+          downwelled radiance, and transmittance). 
+
+ RETURN VALUE: SUCCESS
+               FAILURE
+*****************************************************************************/
+int close_intermediate
+(
+    Intermediate_Data_t *inter
+)
 {
     char *FUNC_NAME = "close_intermediate";
     char msg[PATH_MAX];
@@ -211,9 +243,20 @@ close_intermediate(Intermediate_Data_t *inter)
 }
 
 
-int
-allocate_intermediate(Intermediate_Data_t *inter,
-                      int pixel_count)
+/*****************************************************************************
+ NAME:  allocate_intermediate
+
+ PURPOSE: Allocate space for intermediate files (thermal radiance, upwelled 
+          radiance, downwelled radiance, and transmittance). 
+
+ RETURN VALUE: SUCCESS
+               FAILURE
+*****************************************************************************/
+int allocate_intermediate
+(
+    Intermediate_Data_t *inter,
+    int pixel_count
+)
 {
     char *FUNC_NAME = "allocate_intermediate";
     char msg[PATH_MAX];
@@ -272,8 +315,16 @@ allocate_intermediate(Intermediate_Data_t *inter,
 }
 
 
-void
-free_intermediate(Intermediate_Data_t *inter)
+/*****************************************************************************
+ NAME:  free_intermediate
+
+ PURPOSE: Free space for intermediate files (thermal radiance, upwelled 
+          radiance, downwelled radiance, and transmittance). 
+*****************************************************************************/
+void free_intermediate
+(
+    Intermediate_Data_t *inter
+)
 {
     free(inter->band_thermal);
     inter->band_thermal = NULL;

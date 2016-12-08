@@ -3,8 +3,7 @@
 #define OUTPUT_H
 
 
-int
-add_lst_band_product
+int add_lst_band_product
 (
     char *xml_filename,
     char *reference_band_name,

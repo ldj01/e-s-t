@@ -72,7 +72,8 @@
 
    Only required because a 2d-array was used instead of a data structure.
 */
-typedef enum {
+typedef enum
+{
     MGPE_LATITUDE = 0,
     MGPE_LONGITUDE,
     MGPE_HEIGHT,

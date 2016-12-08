@@ -10,7 +10,6 @@
 #include <ctype.h>
 
 
-#include "date.h"
 #include "espa_metadata.h"
 #include "parse_metadata.h"
 #include "write_metadata.h"
@@ -64,21 +63,12 @@ typedef struct
     Satellite_t satellite;      /* Satellite */
     Instrument_t instrument;    /* Instrument */
     char *product_id;           /* ProductID */
-    Date_t acq_date;            /* Acq. date/time (scene center) */
-    int zone;                   /* UTM zone number */
     Map_coord_t ul_map_corner;  /* Map projection coordinates of the upper
                                    left corner of the pixel in the upper left
                                    corner of the image */
     Map_coord_t lr_map_corner;  /* Map projection coordinates of the lower
                                    right corner of the pixel in the lower right
                                    corner of the image */
-    Geo_coord_t ul_geo_corner;  /* Geo projection coordinates of the upper
-                                   left corner of the pixel in the upper left
-                                   corner of the image */
-    Geo_coord_t lr_geo_corner;  /* Geo projection coordinates of the lower
-                                   right corner of the pixel in the lower right
-                                   corner of the image */
-    double bounding_coords[4];  /* Bounding Coordinates */
 } Input_meta_t;
 
 
@@ -93,7 +83,6 @@ typedef struct
     char reference_band_name[30];
     char *band_name[MAX_INPUT_BANDS];
     FILE *band_fd[MAX_INPUT_BANDS];
-    float scale_factor[MAX_INPUT_BANDS];
     int fill_value[MAX_INPUT_BANDS];
     float thermal_rad_gain;       /* Thermal radiance gain */
     float thermal_rad_bias;       /* Thermal radiance bias */
@@ -101,17 +90,29 @@ typedef struct
 
 
 /* Prototypes */
-Input_Data_t *open_input(Espa_internal_meta_t *metadata);
+Input_Data_t *open_input
+(
+    Espa_internal_meta_t *metadata
+);
 
-int close_input(Input_Data_t *input);
+int close_input
+(
+    Input_Data_t *input
+);
 
-int read_input(Input_Data_t *input_data,
-               float *band_thermal,
-               int16_t *band_elevation,
-               int pixel_count);
+int read_input
+(
+    Input_Data_t *input_data,
+    float *band_thermal,
+    int16_t *band_elevation,
+    int pixel_count
+);
 
-bool GetXMLInput(Input_Data_t *input,
-                 Espa_internal_meta_t *metadata);
+bool GetXMLInput
+(
+    Input_Data_t *input,
+    Espa_internal_meta_t *metadata
+);
 
 
 #endif

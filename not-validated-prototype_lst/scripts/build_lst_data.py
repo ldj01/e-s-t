@@ -31,17 +31,11 @@
 
 import os
 import sys
-import glob
 import logging
-import math
-import requests
-import commands
 import datetime
-import numpy as np
-from cStringIO import StringIO
 from argparse import ArgumentParser
 from osgeo import gdal, osr
-from time import sleep
+import numpy as np
 
 
 # Import the metadata api found in the espa-product-formatter project
@@ -84,6 +78,14 @@ class BuildLSTData(object):
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
 
+        # Setup names
+        self.thermal_name = ''
+        self.transmittance_name = ''
+        self.upwelled_name = ''
+        self.downwelled_name = ''
+        self.emissivity_name = ''
+        self.satellite = ''
+
     def retrieve_metadata_information(self):
         '''
         Description:
@@ -93,7 +95,7 @@ class BuildLSTData(object):
         # Read the XML metadata
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
         # Grab the global metadata object
-        gm = espa_xml.get_global_metadata()
+        global_metadata = espa_xml.get_global_metadata()
         # Grab the bands metadata object
         bands = espa_xml.get_bands()
 
@@ -143,10 +145,10 @@ class BuildLSTData(object):
                             ' in the input data')
 
         # Save for later
-        self.satellite = gm.satellite
+        self.satellite = global_metadata.satellite
 
         del bands
-        del gm
+        del global_metadata
         del espa_xml
 
     def generate_data(self):
@@ -171,22 +173,23 @@ class BuildLSTData(object):
         # Landsat Radiance at sensor for thermal band
         self.logger.info('Loading intermediate thermal band data [{0}]'
                          .format(self.thermal_name))
-        ds = gdal.Open(self.thermal_name)
-        x_dim = ds.RasterXSize  # They are all the same size
-        y_dim = ds.RasterYSize
-        thermal_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+        dataset = gdal.Open(self.thermal_name)
+        x_dim = dataset.RasterXSize  # They are all the same size
+        y_dim = dataset.RasterYSize
+
+        thermal_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric transmittance
         self.logger.info('Loading intermediate transmittance band data [{0}]'
                          .format(self.transmittance_name))
-        ds = gdal.Open(self.transmittance_name)
-        trans_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+        dataset = gdal.Open(self.transmittance_name)
+        trans_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric path radiance - upwelled radiance
         self.logger.info('Loading intermediate upwelled band data [{0}]'
                          .format(self.upwelled_name))
-        ds = gdal.Open(self.upwelled_name)
-        upwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+        dataset = gdal.Open(self.upwelled_name)
+        upwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         self.logger.info('Calculating surface radiance')
         # Surface radiance
@@ -211,22 +214,24 @@ class BuildLSTData(object):
         # Downwelling sky irradiance
         self.logger.info('Loading intermediate downwelled band data [{0}]'
                          .format(self.downwelled_name))
-        ds = gdal.Open(self.downwelled_name)
-        downwelled_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+        dataset = gdal.Open(self.downwelled_name)
+        downwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, \
+            y_dim)
 
         # Landsat emissivity estimated from ASTER GED data
         self.logger.info('Loading intermediate emissivity band data [{0}]'
                          .format(self.emissivity_name))
-        ds = gdal.Open(self.emissivity_name)
-        emissivity_data = ds.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
+        dataset = gdal.Open(self.emissivity_name)
+        emissivity_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, \
+            y_dim)
 
         # Save for the output product
         ds_srs = osr.SpatialReference()
-        ds_srs.ImportFromWkt(ds.GetProjection())
-        ds_transform = ds.GetGeoTransform()
+        ds_srs.ImportFromWkt(dataset.GetProjection())
+        ds_transform = dataset.GetGeoTransform()
 
         # Memory cleanup
-        del ds
+        del dataset
 
         # Estimate Earth-emitted radiance by subtracting off the reflected
         # downwelling component
@@ -275,15 +280,14 @@ class BuildLSTData(object):
 
         bt_data = np.loadtxt(os.path.join(self.lst_data_dir, bt_name),
                              dtype=float, delimiter=' ')
-        bt_radiance_LUT = bt_data[:, 1]
-        bt_temp_LUT = bt_data[:, 0]
+        bt_radiance_lut = bt_data[:, 1]
+        bt_temp_lut = bt_data[:, 0]
 
         self.logger.info('Generating LST results')
-        lst_data = np.interp(radiance_emitted, bt_radiance_LUT, bt_temp_LUT)
+        lst_data = np.interp(radiance_emitted, bt_radiance_lut, bt_temp_lut)
 
-        # Scale the result and convert it to an int16
+        # Scale the result
         lst_data = lst_data * MULT_FACTOR
-        lst_fata = lst_data.astype(np.int16)
 
         # Add the fill and scan gaps back into the results, since they may
         # have been lost
@@ -376,8 +380,8 @@ class BuildLSTData(object):
         bands.add_band(lst_band)
 
         # Write the XML metadata file out
-        with open(self.xml_filename, 'w') as fd:
-            metadata_api.export(fd, espa_xml)
+        with open(self.xml_filename, 'w') as metadata_fd:
+            metadata_api.export(metadata_fd, espa_xml)
 
         # Memory cleanup
         del lst_band
@@ -386,7 +390,7 @@ class BuildLSTData(object):
         del lst_data
 
 
-if __name__ == '__main__':
+def main():
     '''
     Description:
         Generate Landsat EMIS and ASTER NDVI from ASTER GED tiles for the
@@ -394,9 +398,9 @@ if __name__ == '__main__':
     '''
 
     # Build the command line argument parser
-    description = ('Reads intermediate data generated previously and combines'
-                   ' them into the Land Surface Temperature product')
-    parser = ArgumentParser(description=description)
+    parser = ArgumentParser(description='Reads intermediate data generated'
+                                        ' previously and combines them into'
+                                        ' the Land Surface Temperature product')
 
     # ---- Add parameters ----
     # Required parameters
@@ -422,7 +426,7 @@ if __name__ == '__main__':
 
     # Report the version and exit
     if args.version:
-        print(util.Version.version_text())
+        print util.Version.version_text()
         sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
@@ -449,3 +453,6 @@ if __name__ == '__main__':
         sys.exit(1)  # EXIT FAILURE
 
     sys.exit(0)  # EXIT SUCCESS
+
+if __name__ == '__main__':
+    main()
