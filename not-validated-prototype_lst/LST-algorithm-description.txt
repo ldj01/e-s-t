@@ -30,32 +30,123 @@ Algorithm Authors:
 ==============================================================================
 Algorithm Description - Overview:
 
-TODO TODO TODO - See DSWE for an example.
+        1) Create a Landsat emissivity band based on Landsat top of 
+           atmosphere reflectance, ASTER emissivity and ASTER NDVI data.
+ 
+        2) Read NARR atmospheric data at grid points over the Landsat scene.
+
+        3) Use the atmospheric data to generate MODTRAN runs for multiple
+           elevations and temperature/albedo pairs at each grid point.
+
+        4) Use the MODTRAN results to generate transmission, upwelled 
+           radiance, and downwelled radiance at each grid point and elevation.
+
+        5) Interpolate the nearby grid point values to create similar values
+           for each pixel at the height of the pixel.
+
+        6) Use all of the previously-generated bands to make a land surface
+           temperature band.
 
 ==============================================================================
 Algorithm Description - Inputs:
 
-    Primary sources of the input are:
+    The primary sources of input to the algorithm are:
 
-        L1T thermal band retrieved from LPGS L1T products
-        NARR grib formatted data
+        Landsat L1T thermal band retrieved from LPGS L1T products
+        NARR (North American Regional Reanalysis) grib formatted data
         ASTER Emissivity and NDVI data
+        Landsat TOA (top of atmosphere) reflectance bands
         GLS2000 derived DEM (same as what Landsat uses)
 
-    The L1T thermal band .....................................
+    The L1T thermal band is used to create a thermal radiance band. 
 
-    The NARR data provides ...................................
+    The NARR data provides a 32 km grid of atmospheric data at 29 pressure
+        levels.  The data that is used includes geopotential height, 
+        temperature, and specific humidity at multiple pressure levels.
+        The NARR data is used to generate inputs to MODTRAN which is used
+        to calculate atmospheric transmission, upwelled radiance, and 
+        downwelled radiance at the grid points at multiple elevations.
 
-    The Emissivity ...........................................
+    The ASTER emissivity and NDVI data, as well as the Landsat TOA data
+        from multiple bands, are used to create an emissivity band matching
+        the Landsat scene. 
 
-    The DEM is utilized to adjust for the correct height during the
-    interpolation step.
-
+    The DEM is used to adjust for the correct height during the interpolation
+        step.
 
 ==============================================================================
 Algorithm Description - Detailed:
 
-TODO TODO TODO - See DSWE for an example.
+        1) Read Landsat top of atmosphere reflectance green, red, NIR, SWIR1,
+           and brightness temperature bands for the scene.  Generate a 
+           Landsat NDVI layer from the red and NIR bands.  Generate NDSI and
+           snow layers from the green and SWIR bands.  Get projection 
+           information from the brightness temperature band.  
 
+        2) Retrieve ASTER emissivity and NDVI data, and warp them to match
+           the Landsat scene. 
 
+        3) Calculate the Landsat emissivity layer using the ASTER emissivity
+           values, ASTER NDVI values, Landsat NDVI band, NDSI band, and snow
+           locations.  Write the Landsat emissivity layer to a file. 
+
+        4) Determine grid of points based on NARR data coverage and Landsat 
+           scene coverage plus a buffer to allow points outside the scene to 
+           be used since they are needed during later interpolation steps for
+           pixels near the scene edges.
+
+        5) Extract NARR data at grid points for multiple pressure levels:
+
+            - temperature
+            - geopotential height
+            - specific humidity
+
+        6) Convert geopotential height to geometric height.
+
+        7) Convert specific humidity to relative humidity.
+
+        8) Interpolate geometric height and relative humidity before and after 
+           the Landsat scene time to match the scene time.
+
+        9) Create MODTRAN "tape5" format input files at each grid point for 
+           9 elevations, and 3 temperature/albedo pairs per elevation.  The
+           input for each MODTRAN run includes the geometric height, relative 
+           humidity, temperature, and pressure.
+
+       10) Run MODTRAN to generate temperature, wavelength, and radiance values.
+
+       11) Read the MODTRAN results.  Also read satellite-specific spectral 
+           response files.  Use them to calculate transmission, upwelled
+           radiance, and downwelled radiance at each height for each grid
+           point.
+
+       12) For each pixel in the Landsat scene, find the closest set of 
+	   4 surrounding grid points.  Interpolate the 3 parameters 
+           (transmission, upwelled and downwelled radiance) at these
+           surrounding grid points to the spatial location and height
+           of the Landsat pixel. 
+
+       13) Create band files for atmospheric transmission, upwelled radiance,
+           and downwelled radiance based on the computed per-pixel layers. 
+
+       14) Use the Landsat L1T thermal band to derive a thermal radiance
+           layer, and write a band file for that layer.
+
+       15) Read the emissivity, thermal radiance, atmospheric transmission, 
+           upwelled radiance, and downwelled radiance bands.
+
+       16) Calculate surface_radiance:
+
+           (thermal_radiance - upwelled_radiance) / atmospheric_transmission
+
+       17) Calculate Earth-emitted radiance:
+
+           surface_radiance - (1.0 - emissivity) * downwelled_radiance
+
+       18) Use a satellite-specific brightness temperature lookup table with 
+           radiance and temperature to linearly interpolate Earth-emitted
+           radiance values to derive land surface temperature.
+
+       19) Scale the land surface temperature value to include 1/10 degree 
+           precision in the integer product. 
 

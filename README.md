@@ -1,29 +1,31 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
 ## Land Surface Temperature 0.1.0 Release Notes
-Release Date: August 2016
+Release Date: August 2016 TBD
 
-See git tag [2016_Aug]
+See git tag [2016_Aug] TBD
 
-This project contains application source scode for producing Land Surface Temperature products.
+This project contains application source code for producing Land Surface Temperature products.
 
 ## Product Descriptions
 See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/provisional/land_surface_temperature) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
 
 ## Release Notes
-* Version change
-* TODO TODO TODO TODO TODO TODO TODO TODO TODO
-* TODO TODO TODO TODO TODO TODO TODO TODO TODO
-* TODO TODO TODO TODO TODO TODO TODO TODO TODO
-* TODO TODO TODO TODO TODO TODO TODO TODO TODO
+* Version change - TBD
+* The software was significantly restructured to only process the needed 
+  points through MODTRAN 
+* Some modules were converted from C to Python  
+* Some modules were consolidated into fewer files
+* C module memory handling was improved using suggestions from Valgrind 
+* Python module formatting was updated using suggestions from Pylint
 
 ## Installation
 
 ### Dependencies
-* ESPA raw binary libraries, tools, and it's dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
+* ESPA raw binary libraries, tools, and its dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
 * Python 2.7+ and Numpy/GDAL
 * [GDAL](http://www.gdal.org/) 1.11.1
-  - The command line tools are utilized for some of the processing steps.
+  - The GDAL command line tools are utilized for some of the processing steps.
 
 ### Environment Variables
 * Required for building this software (For an example see setup-build-environment.sh)
@@ -73,7 +75,7 @@ See `land_surface_temperature.py --help` for command line details.
 ### Data Processing Requirements
 This version of the Land Surface Temperature application requires the input products to be in the ESPA internal file format.
 
-The following input data are required to generate the spectral indicies products:
+The following input data are required to generate the Land Surface Temperature product:
 * Top of Atmosphere Reflectance (TOA)
   - TOA products can be generated using the [LEDAPS](https://github.com/USGS-EROS/espa-surface-reflectance) or [L8_SR](https://github.com/USGS-EROS/espa-surface-reflectance) software found in our [espa-surface-reflectance](https://github.com/USGS-EROS/espa-surface-reflectance) project.  Or through our ondemand processing system [ESPA](https://espa.cr.usgs.gov), be sure to select the ENVI output format.
 * Elevation
@@ -81,7 +83,7 @@ The following input data are required to generate the spectral indicies products
 * ASTER GED
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
 * North American Regional Reanalysis (NARR)
-  - NARR data, it would be best to utilize the `lst_aux_data` software provided in this project to download and build your own archive for the dates you require.
+  - For NARR data, it would be best to utilize the `lst_aux_data` software provided in this project to download and build your own archive for the dates you require.
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.
