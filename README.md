@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
 ## Land Surface Temperature 0.1.0 Release Notes
-Release Date: August 2016 TBD
+Release Date: January 2017
 
-See git tag [2016_Aug] TBD
+See git tag [2017_Jan]
 
 This project contains application source code for producing Land Surface Temperature products.
 
@@ -11,7 +11,7 @@ This project contains application source code for producing Land Surface Tempera
 See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/provisional/land_surface_temperature) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
 
 ## Release Notes
-* Version change - TBD
+* Version change
 * The software was significantly restructured to only process the needed 
   points through MODTRAN 
 * Some modules were converted from C to Python  

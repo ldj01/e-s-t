@@ -1,3 +1,2 @@
-This is planned to be updated during the next release cycle.
-
-However most of the information can be found in the top-level README.
+This algorithm-specific README will be used if multiple LST algorithms are 
+implemented.  Currently the top-level README has the required information.
