@@ -45,7 +45,7 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='The XML metadata file to use')
 
-    parser.add_argument('--intermediate',
+    parser.add_argument('--keep-intermediate-data',
                         action='store_true', dest='intermediate',
                         required=False, default=False,
                         help='Keep any intermediate products generated')
@@ -367,7 +367,7 @@ def main():
         raise
 
 
-    if not args.debug:
+    if not args.intermediate:
         cleanup_intermediate_data()
 
     logger.info('*** LST Generate Products - Complete ***')
