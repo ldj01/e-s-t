@@ -94,11 +94,6 @@ def parse_cmd_line():
                            help='Input XML metadata file',
                            metavar='FILE')
 
-    parse_xml.add_argument('--keep-intermediate-data',
-                        action='store_true', dest='intermediate',
-                        required=False, default=False,
-                        help='Keep any intermediate products generated')
-
     (temp, extra_args) = parse_xml.parse_known_args()
 
     return temp.xml_filename
