@@ -21,15 +21,15 @@ install:
 	install -d $(link_path)
 	install -d $(lst_install_path)
 	@for script in $(SCRIPTS); do \
-            cmd="install -m 755 $$script $(lst_install_path)"; \
+            cmd="install -m 755 $$script $(lst_auxiliary_install_path)"; \
             echo "$$cmd"; $$cmd; \
-            cmd="ln -sf $(lst_link_source_path)/$$script $(link_path)/$$script"; \
+            cmd="ln -sf $(lst_auxiliary_link_source_path)/$$script $(link_path)/$$script"; \
             echo "$$cmd"; $$cmd; \
         done
 	@for module in $(MODULES); do \
-            cmd="install -m 644 $$module $(lst_install_path)"; \
+            cmd="install -m 644 $$module $(lst_auxiliary_install_path)"; \
             echo "$$cmd"; $$cmd; \
-            cmd="ln -sf $(lst_link_source_path)/$$module $(link_path)/$$module"; \
+            cmd="ln -sf $(lst_auxiliary_link_source_path)/$$module $(link_path)/$$module"; \
             echo "$$cmd"; $$cmd; \
         done
 
