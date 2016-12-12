@@ -19,7 +19,7 @@ all:
 #-----------------------------------------------------------------------------
 install:
 	install -d $(link_path)
-	install -d $(lst_install_path)
+	install -d $(lst_auxiliary_install_path)
 	@for script in $(SCRIPTS); do \
             cmd="install -m 755 $$script $(lst_auxiliary_install_path)"; \
             echo "$$cmd"; $$cmd; \
