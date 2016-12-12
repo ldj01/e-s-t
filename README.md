@@ -1,6 +1,6 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.1.0 Release Notes
+## Land Surface Temperature 0.1.1 Release Notes
 Release Date: January 2017
 
 See git tag [2017_Jan]
