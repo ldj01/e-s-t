@@ -40,6 +40,10 @@ def retrieve_command_line_arguments():
                                         ' calls other executables for LST'
                                         ' generation')
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
+
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -55,11 +59,6 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Keep any debugging data')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     # Parse the command line parameters
     args = parser.parse_args()
 
@@ -68,10 +67,6 @@ def retrieve_command_line_arguments():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)  # EXIT FAILURE
-
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
@@ -96,7 +91,10 @@ def build_aux_filenames(aux_path, parm, date, date_type):
     """Builds a filename set based on date and time
 
     Args:
-        TODO TODO TODO
+        aux_path <str>: Path to base auxiliary (NARR) data
+        parm <str>: NARR parameter to extract
+        date <datetime>: Date and time of parameter to extract 
+        date_type <str>: Type of date - time 0/1 (before/after scene center)
 
     Returns:
         <AuxFilenameSet>: The set of filenames
@@ -123,7 +121,10 @@ def aux_filenames(aux_path, parms, t0_date, t1_date):
     """Builds t0 and t1 filename sets for each parameter
 
     Args:
-        TODO TODO TODO
+        aux_path <str>: Path to base auxiliary (NARR) data
+        parm <list[str]>: List of NARR parameters to extract
+        t0_date <datetime>: Time 0 before scene center
+        t1_date <datetime>: Time 1 after scene center
 
     Returns:
         list(<AuxFilenameSet>): A list of the filename sets
@@ -140,7 +141,8 @@ def extract_from_grib(aux_set):
     """Extracts the information from the grib file into a directory
 
     Args:
-        TODO TODO TODO
+        aux_set <AuxFilenameSet>: Information needed to extract auxiliary data 
+                                  from 1 file
     """
 
     logger = logging.getLogger(__name__)
@@ -179,7 +181,8 @@ def extract_narr_aux_data(espa_metadata, aux_path):
     """Extracts the required NARR data from the auxiliary archive
 
     Args:
-        TODO TODO TODO
+        espa_metadata <espa.Metadata>: The metadata structure for the scene
+        aux_path <str>: Path to base auxiliary (NARR) data
     """
 
     logger = logging.getLogger(__name__)
@@ -204,7 +207,7 @@ def extract_narr_aux_data(espa_metadata, aux_path):
 
 
 def main():
-    """Core processing for ther application
+    """Core processing for the application
     """
 
     # Command Line Arguments

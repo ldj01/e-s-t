@@ -34,6 +34,10 @@ def retrieve_command_line_arguments():
     parser = ArgumentParser(description='Runs MODTRAN on a pre-determined'
                                         ' set of points')
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
+
     parser.add_argument('--modtran_data_path',
                         action='store', dest='modtran_data_path',
                         required=False, default=None,
@@ -49,17 +53,7 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Output debug messages and/or keep debug data')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     args = parser.parse_args()
-
-    # Report the version and exit
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     if args.modtran_data_path is None:
         raise Exception('--modtran_data_path must be specified on the'
@@ -71,7 +65,7 @@ def retrieve_command_line_arguments():
     return args
 
 
-class Tape6rocessingError(Exception):
+class Tape6ProcessingError(Exception):
     """Exception specifically for Tape6 errors"""
     pass
 
@@ -81,7 +75,7 @@ TAPE6_SEARCH_STR = 'AREA-AVERAGED GROUND TEMPERATURE [K]'
 
 
 def extract_target_surface_temp():
-    """Swim in the pool using the path
+    """Extract area-averaged ground temperature from MODTRAN tape6 file
 
     Returns:
         <float>: Target surface temperature value
@@ -105,8 +99,8 @@ def extract_target_surface_temp():
                 break
 
     if value is None:
-        raise Tape6rocessingError('Unable to find [{}] in tape6 file'
-                                  .format(TAPE6_SEARCH_STR))
+        raise Tape6ProcessingError('Unable to find [{}] in tape6 file'
+                                   .format(TAPE6_SEARCH_STR))
 
     return value
 
@@ -159,7 +153,7 @@ TAPE5 = 'tape5'
 
 
 def process_point_dir((point_path, modtran_data_path)):
-    """Swim in the pool using the path
+    """Run MODTRAN for a point and parse/format the results for later use
 
     Args:
         path <str>: The path to a directory containing a tape5 file

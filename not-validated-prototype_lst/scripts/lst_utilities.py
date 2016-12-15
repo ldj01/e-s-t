@@ -21,9 +21,6 @@ import requests
 from osgeo import gdal, osr
 
 
-#import metadata_api
-
-
 class Version(object):
     '''
     Description:

@@ -110,6 +110,10 @@ def retrieve_command_line_arguments():
     parser = ArgumentParser(description='Builds MODTRAN input data files for'
                                         ' a pre-determined set of points')
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
+
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -125,11 +129,6 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Output debug messages and/or keep debug data')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     args = parser.parse_args()
 
     # Command line arguments are required so print the help if none were
@@ -137,10 +136,6 @@ def retrieve_command_line_arguments():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)  # EXIT FAILURE
-
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')

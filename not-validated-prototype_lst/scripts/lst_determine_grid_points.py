@@ -64,6 +64,10 @@ def retrieve_command_line_arguments():
                                         ' points and required information'
                                         ' suitable for MODTRAN execution.')
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
+
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -79,11 +83,6 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Output debug messages and/or keep debug data')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     args = parser.parse_args()
 
     # Command line arguments are required so print the help if none were
@@ -91,10 +90,6 @@ def retrieve_command_line_arguments():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)  # EXIT FAILURE
-
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     if args.xml_filename is None:
         raise Exception('--xml must be specified on the command line')
@@ -223,7 +218,7 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
 
 
 def check_within_bounds(data_bounds, lon, lat):
-    """
+    """Checks that location values are within specified boundaries
 
     Args:
         data_bounds <DataBoundInfo>: Contains adjusted data boundry

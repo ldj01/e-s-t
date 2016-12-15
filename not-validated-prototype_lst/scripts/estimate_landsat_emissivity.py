@@ -1172,6 +1172,10 @@ def retrieve_command_line_arguments():
     description = ('Estimates Landsat Emissivity from ASTER GED data')
     parser = ArgumentParser(description=description)
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temparature - Version 0.1.1')
+
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -1197,17 +1201,7 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Turn debug messaging on')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     args = parser.parse_args()
-
-    # Report the version and exit
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
@@ -1272,7 +1266,8 @@ def main():
 
     # Check logging level
     debug_level = logging.INFO
-    if args.version:
+
+    if args.debug:
         debug_level = logging.DEBUG
 
     # Configure logging

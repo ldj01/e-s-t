@@ -81,9 +81,9 @@ The following input data are required to generate the Land Surface Temperature p
 * Elevation
   - Elevation data is expected to be in the same projection and image dimensions as the TOA products and in the ENVI file format.  The filename is also expected be `<sceneid>_dem.img`: where <b>sceneid</b> is the Landsat Scene ID of the data being processed.
 * ASTER GED
-  - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  However it will automatically be retrieved for you as needed and cleaned up.
+  - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  External users will need to set up an alternate ASTER GED data retrieval method.  One potential method is to create a NASA Earthdata account has [described here] (http://e4ftl01.cr.usgs.gov/ASTT), and update the automated LST procedure to supply the login information before accessing the ASTER GED data.
 * North American Regional Reanalysis (NARR)
-  - For NARR data, it would be best to utilize the `lst_aux_data` software provided in this project to download and build your own archive for the dates you require.
+  - For NARR data, it would be best to utilize the `lst_auxiliary_data` software provided in this project to download and build your own archive for the dates you require.
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.

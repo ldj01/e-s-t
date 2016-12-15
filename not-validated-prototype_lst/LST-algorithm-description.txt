@@ -68,8 +68,8 @@ Algorithm Description - Inputs:
         downwelled radiance at the grid points at multiple elevations.
 
     The ASTER emissivity and NDVI data, as well as the Landsat TOA data
-        from multiple bands, are used to create an emissivity band matching
-        the Landsat scene. 
+        from multiple bands, are used to simulate a Landsat emissivity band 
+        matching the Landsat scene. 
 
     The DEM is used to adjust for the correct height during the interpolation
         step.
@@ -86,9 +86,10 @@ Algorithm Description - Detailed:
         2) Retrieve ASTER emissivity and NDVI data, and warp them to match
            the Landsat scene. 
 
-        3) Calculate the Landsat emissivity layer using the ASTER emissivity
-           values, ASTER NDVI values, Landsat NDVI band, NDSI band, and snow
-           locations.  Write the Landsat emissivity layer to a file. 
+        3) Calculate a simulated Landsat emissivity layer using the ASTER 
+           emissivity values, ASTER NDVI values, Landsat NDVI band, NDSI band, 
+           and snow locations.  Write the simulated Landsat emissivity layer 
+           to a file. 
 
         4) Determine grid of points based on NARR data coverage and Landsat 
            scene coverage plus a buffer to allow points outside the scene to 

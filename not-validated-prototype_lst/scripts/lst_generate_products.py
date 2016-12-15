@@ -40,6 +40,10 @@ def retrieve_command_line_arguments():
     parser = ArgumentParser(description='Runs MODTRAN on a pre-determined'
                                         ' set of points')
 
+    parser.add_argument('--version',
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
+
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
                         required=False, default=None,
@@ -55,17 +59,7 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Output debug messages and/or keep debug data')
 
-    parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
-
     args = parser.parse_args()
-
-    # Report the version and exit
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
@@ -100,7 +94,7 @@ def retrieve_cfg(cfg_filename):
     """Retrieve the configuration for the cron
 
     Returns:
-        cfg <ConfigParser>: Configuration for ESPA cron
+        cfg_filename <str>: Name of the configuration file
 
     Raises:
         Exception(<str>)
@@ -253,9 +247,7 @@ def cleanup_intermediate_data():
     """
 
     # File cleanup
-    cleanup_list = [GRID_POINT_HEADER_NAME,
-                    GRID_POINT_BINARY_NAME
-                   ]
+    cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME]
 
     for filename in cleanup_list:
         if os.path.exists(filename):
@@ -359,13 +351,12 @@ def main():
 
     # Generate Land Surface Temperature band
     try:
-        current_processor = build_lst_data.BuildLSTData( \
+        current_processor = build_lst_data.BuildLSTData(
             xml_filename=args.xml_filename)
         current_processor.generate_data()
     except Exception:
         logger.error('Failed processing Land Surface Temperature')
         raise
-
 
     if not args.intermediate:
         cleanup_intermediate_data()

@@ -193,7 +193,8 @@ class BuildLSTData(object):
 
         self.logger.info('Calculating surface radiance')
         # Surface radiance
-        surface_radiance = (thermal_data - upwelled_data) / trans_data
+        with np.errstate(invalid='ignore'):
+            surface_radiance = (thermal_data - upwelled_data) / trans_data
 
         # Fix the no data locations
         no_data_locations = np.where(thermal_data == self.no_data_value)
@@ -215,15 +216,15 @@ class BuildLSTData(object):
         self.logger.info('Loading intermediate downwelled band data [{0}]'
                          .format(self.downwelled_name))
         dataset = gdal.Open(self.downwelled_name)
-        downwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, \
-            y_dim)
+        downwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim,
+                                                               y_dim)
 
         # Landsat emissivity estimated from ASTER GED data
         self.logger.info('Loading intermediate emissivity band data [{0}]'
                          .format(self.emissivity_name))
         dataset = gdal.Open(self.emissivity_name)
-        emissivity_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, \
-            y_dim)
+        emissivity_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim,
+                                                               y_dim)
 
         # Save for the output product
         ds_srs = osr.SpatialReference()
@@ -411,9 +412,8 @@ def main():
 
     # Optional parameters
     parser.add_argument('--version',
-                        action='store_true', dest='version',
-                        required=False, default=False,
-                        help='Reports the version of the software')
+                        action='version',
+                        version='Land Surface Temperature - Version 0.1.1')
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -423,11 +423,6 @@ def main():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)  # EXIT FAILURE
-
-    # Report the version and exit
-    if args.version:
-        print util.Version.version_text()
-        sys.exit(0)  # EXIT SUCCESS
 
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:

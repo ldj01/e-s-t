@@ -4,6 +4,7 @@
 
 #include "lst_types.h"
 #include "input.h"
+#include "espa_geoloc.h"
 
 #define L4_TM_SRS_COUNT (171)
 #define L5_TM_SRS_COUNT (171)
@@ -15,7 +16,6 @@
 #define WATER_EMISSIVITY (1.0 - WATER_ALBEDO)
 #define INV_WATER_ALBEDO (1.0 / WATER_ALBEDO)
 
-#define INV_UTM_EQUATORIAL_RADIUS (1.0 / UTM_EQUATORIAL_RADIUS)
 #define INV_TWO (0.5)
 #define INV_SIX (1.0 / 6.0)
 
@@ -78,6 +78,7 @@ int calculate_pixel_atmospheric_parameters
     Input_Data_t *input,       /* I: input structure */
     GRID_POINTS *points,       /* I: The coordinate points */
     char *xml_filename,        /* I: XML filename */
+    Espa_internal_meta_t xml_metadata, /* I: XML metadata */
     MODTRAN_POINTS *modtran_results /* I: results from MODTRAN runs */
 );
 
