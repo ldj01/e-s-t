@@ -93,8 +93,11 @@ def get_cfg_file_path(filename):
 def retrieve_cfg(cfg_filename):
     """Retrieve the configuration for the cron
 
-    Returns:
+    Args:
         cfg_filename <str>: Name of the configuration file
+
+    Returns:
+        cfg <ConfigParser>: Configuration for ESPA cron
 
     Raises:
         Exception(<str>)

@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
 '''
-    File: lst_build_modtran_input.py
+    File: determine_missing_narr.py
 
-    Purpose: Builds a directory structure of points and required information
-             for input to MODTRAN.
+    Purpose: For a set of grid points, determines whether there is missing 
+             NARR data for those points. 
 
     Project: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -69,7 +69,7 @@ GROUND_ALT = [0.0, 0.6, 1.1,
 
 # We can use strings for these in this code to make things simpler for
 # directory creation
-# The temperatures we run each elevation through
+# The temperatures we run each elevation through, in Kelvin
 TEMPERATURES = ['273', '310', '000']
 # The albedo associated with each temperature (1:1 relationship)
 ALBEDOS = ['0.0', '0.0', '0.1']
@@ -94,8 +94,8 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    parser = ArgumentParser(description='Builds MODTRAN input data files for'
-                                        ' a pre-determined set of points')
+    parser = ArgumentParser(description='Determines if there is missing NARR'
+                                        ' data for a set of grid points')
 
     parser.add_argument('--data_path',
                         action='store', dest='data_path',
@@ -159,7 +159,7 @@ def load_narr_pressure_file(parameter, layer):
 
 
 def load_narr_pressure_layers(parameters, layers):
-    """Loads all the parameters and presssure layes
+    """Loads all the parameters and pressure layers
 
     Args:
         parameters [<str>]: All the parameters to load
@@ -180,7 +180,14 @@ def load_narr_pressure_layers(parameters, layers):
 
 
 def check_hgt(data, point, layer, time):
-    """Determines"""
+    """Displays the height data for a grid point at a pressure layer and time
+
+    Args:
+        data <dict>: NARR data that will be checked 
+        point <GridPointInfo>: grid point to check  
+        layer <str>: pressure layer to check 
+        time <int>: time to check (time 0 or time 1)
+    """
 
     # Geopotential height at time
     hgt = data[HGT_PARMS[time]][layer][point.narr_col][point.narr_row]
@@ -192,7 +199,15 @@ def check_hgt(data, point, layer, time):
 
 
 def check_spfh(data, point, layer, time):
-    """Determines"""
+    """Displays the specific humidity data for a grid point at a pressure 
+       layer and time
+
+    Args:
+        data <dict>: NARR data that will be checked 
+        point <GridPointInfo>: grid point to check  
+        layer <str>: pressure layer to check 
+        time <int>: time to check (time 0 or time 1)
+    """
 
     # Specific humidity at time
     spfh = data[SPFH_PARMS[time]][layer][point.narr_col][point.narr_row]
@@ -204,7 +219,15 @@ def check_spfh(data, point, layer, time):
 
 
 def check_temp(data, point, layer, time):
-    """Determines"""
+    """Displays the temperature data for a grid point at a pressure layer
+       and time
+
+    Args:
+        data <dict>: NARR data that will be checked 
+        point <GridPointInfo>: grid point to check  
+        layer <str>: pressure layer to check 
+        time <int>: time to check (time 0 or time 1)
+    """
 
     # Temperature at time
     temp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]

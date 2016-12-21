@@ -227,7 +227,7 @@ def check_within_bounds(data_bounds, lon, lat):
         lat <float>: The latitude to check
 
     Returns:
-        <boo>:  True - If within the bounds
+        <bool>: True - If within the bounds
                 False - If not within the bounds
     """
 
@@ -281,7 +281,7 @@ def is_in_data(gdal_objs, point):
                            coordinates file
 
     Returns:
-        <boo>:  True - If within the data bounds
+        <bool>: True - If within the data bounds
                 False - If not within the data bounds
     """
 

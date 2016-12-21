@@ -196,6 +196,8 @@ def retrieve_metadata_information(espa_metadata):
     bi_swir1 = None
     bi_bt = None
 
+    satellite = espa_metadata.xml_object.global_metadata.satellite
+
     # Find the TOA bands to extract information from
     for band in espa_metadata.xml_object.bands.band:
         if (band.get('product') == 'toa_refl' and
@@ -214,12 +216,20 @@ def retrieve_metadata_information(espa_metadata):
                 band.get('name') == 'toa_band5'):
             bi_swir1 = get_band_info(band)
 
-        if (band.get('product') == 'toa_bt' and
-                band.get('category') == 'image'):
-            bi_bt = get_band_info(band)
+        if satellite == 'LANDSAT_8':
+            if (band.get('product') == 'toa_bt' and
+                    band.get('name') == 'toa_band11'):
+                bi_bt = get_band_info(band)
 
-            # Get the output proj4 string
-            proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
+                # Get the output proj4 string
+                proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
+        else:
+            if (band.get('product') == 'toa_bt' and
+                    band.get('name') == 'toa_band6'):
+                bi_bt = get_band_info(band)
+
+                # Get the output proj4 string
+                proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
 
     # Error if we didn't find the required TOA bands in the data
     if bi_green is None:
@@ -506,8 +516,8 @@ def generate_estimated_emis_tile(coefficients, tile_name,
     Args:
         coefficients <CoefficientInfo>: coefficients for the math
         tile_name <str>: Filename to create for the tile
-        aster_b13_data <numpy.2darray>: Band 13 ASTER tile data
-        aster_b14_data <numpy.2darray>: Band 14 ASTER tile data
+        aster_b13_data <numpy.2darray>: Unscaled band 13 ASTER tile data
+        aster_b14_data <numpy.2darray>: Unscaled band 14 ASTER tile data
         samps <int>: Samples in the data
         lines <int>: Lines in the data
         transform <2x3:float>: GDAL Affine transformation matrix
@@ -575,7 +585,7 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
 
     Args:
         tile_name <str>: Filename to create for the tile
-        ndvi_data <numpy.2darray>: NDVI Band ASTER tile data
+        ndvi_data <numpy.2darray>: Unscaled NDVI Band ASTER tile data
         samps <int>: Samples in the data
         lines <int>: Lines in the data
         transform <2x3:float>: GDAL Affine transformation matrix
