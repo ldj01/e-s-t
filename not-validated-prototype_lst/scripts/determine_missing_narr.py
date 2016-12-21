@@ -180,7 +180,7 @@ def load_narr_pressure_layers(parameters, layers):
 
 
 def check_hgt(data, point, layer, time):
-    """Displays the height data for a grid point at a pressure layer and time
+    """Reports invalid height data for a grid point at a pressure layer and time
 
     Args:
         data <dict>: NARR data that will be checked 
@@ -199,7 +199,7 @@ def check_hgt(data, point, layer, time):
 
 
 def check_spfh(data, point, layer, time):
-    """Displays the specific humidity data for a grid point at a pressure 
+    """Reports invalid specific humidity data for a grid point at a pressure 
        layer and time
 
     Args:
@@ -219,7 +219,7 @@ def check_spfh(data, point, layer, time):
 
 
 def check_temp(data, point, layer, time):
-    """Displays the temperature data for a grid point at a pressure layer
+    """Reports invalid temperature data for a grid point at a pressure layer
        and time
 
     Args:
