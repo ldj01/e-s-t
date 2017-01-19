@@ -175,7 +175,7 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
     """
 
     # Adjustment is specific to NARR data resolution in meters
-    adjustment = 32000 * 1.0
+    adjustment = 32000 * 1.5
 
     north_lat = float(espa_metadata.xml_object.
                       global_metadata.bounding_coordinates.north)

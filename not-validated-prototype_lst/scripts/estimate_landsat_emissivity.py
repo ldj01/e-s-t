@@ -949,7 +949,7 @@ def add_emissivity_band_to_xml(espa_metadata, filename, sensor_code,
                                ' in the input data')
 
     emis_band = maker.band()
-    emis_band.set('product', 'lst_temp')
+    emis_band.set('product', 'lst_intermediate')
     emis_band.set('source', source_product)
     emis_band.set('name', 'landsat_emis')
     emis_band.set('category', 'image')

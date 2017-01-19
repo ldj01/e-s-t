@@ -107,23 +107,23 @@ class BuildLSTData(object):
 
         # Find the TOA bands to extract information from
         for band in bands.band:
-            if (band.product == 'lst_temp' and
+            if (band.product == 'lst_intermediate' and
                     band.name == 'lst_thermal_radiance'):
                 self.thermal_name = band.get_file_name()
 
-            if (band.product == 'lst_temp' and
+            if (band.product == 'lst_intermediate' and
                     band.name == 'lst_atmospheric_transmittance'):
                 self.transmittance_name = band.get_file_name()
 
-            if (band.product == 'lst_temp' and
+            if (band.product == 'lst_intermediate' and
                     band.name == 'lst_upwelled_radiance'):
                 self.upwelled_name = band.get_file_name()
 
-            if (band.product == 'lst_temp' and
+            if (band.product == 'lst_intermediate' and
                     band.name == 'lst_downwelled_radiance'):
                 self.downwelled_name = band.get_file_name()
 
-            if (band.product == 'lst_temp' and
+            if (band.product == 'lst_intermediate' and
                     band.name == 'landsat_emis'):
                 self.emissivity_name = band.get_file_name()
 

@@ -54,6 +54,11 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Keep any intermediate products generated')
 
+    parser.add_argument('--keep-temporary-data',
+                        action='store_true', dest='temporary',
+                        required=False, default=False,
+                        help='Keep any temporary files generated')
+
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
                         required=False, default=False,
@@ -245,16 +250,27 @@ def run_modtran(modtran_data_path, process_count, debug):
             logger.info(output)
 
 
-def cleanup_intermediate_data():
-    """Cleanup/remove all the LST temporary data
+def cleanup_temporary_data():
+    """Cleanup/remove all the LST temporary files and directories 
     """
 
+    GRID_POINT_ELEVATION_NAME = 'grid_elevations.txt'
+    ATMOSPHERE_PARAMETERS_NAME = 'atmospheric_parameters.txt'
+    USED_POINTS_NAME = 'used_points.txt'
+    EMISSIVITY_HEADER_NAME = '*_emis.img.aux.xml'
+
     # File cleanup
-    cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME]
+    cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME, 
+                    GRID_POINT_ELEVATION_NAME, ATMOSPHERE_PARAMETERS_NAME,
+                    USED_POINTS_NAME]
 
     for filename in cleanup_list:
         if os.path.exists(filename):
             os.unlink(filename)
+
+    # Cleanup file pattern.
+    for filename in glob.glob(EMISSIVITY_HEADER_NAME):
+        os.unlink(filename)
 
     # Directory cleanup
     for directory in glob.glob('[0-9][0-9][0-9]_[0-9][0-9][0-9]_'
@@ -262,7 +278,28 @@ def cleanup_intermediate_data():
         shutil.rmtree(directory)
 
     for directory in PARAMETERS:
-        shutil.rmtree(directory)
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+
+
+def cleanup_intermediate_bands():
+    """Cleanup/remove the intermediate bands used to make the LST band
+    """
+
+    # File cleanup
+    EMISSIVITY_PATTERN = '*_landsat_emis.*'
+    ATMOSPHERIC_TRANSMITTANCE_PATTERN = '*_lst_atmospheric_transmittance.*'
+    DOWNWELLED_RADIANCE_PATTERN = '*_lst_downwelled_radiance.*'
+    UPWELLED_RADIANCE_PATTERN = '*_lst_upwelled_radiance.*'
+    THERMAL_RADIANCE_PATTERN = '*_lst_thermal_radiance.*'
+
+    # Cleanup file patterns.
+    cleanup_list = [EMISSIVITY_PATTERN, ATMOSPHERIC_TRANSMITTANCE_PATTERN,
+                    DOWNWELLED_RADIANCE_PATTERN, UPWELLED_RADIANCE_PATTERN,
+                    THERMAL_RADIANCE_PATTERN]
+    for pattern in cleanup_list:
+        for filename in glob.glob(pattern):
+            os.unlink(filename)
 
 
 PROC_CFG_FILENAME = 'processing.conf'
@@ -361,8 +398,12 @@ def main():
         logger.error('Failed processing Land Surface Temperature')
         raise
 
+    # Clean up files and directories according to user selections.
+    if not args.temporary:
+        cleanup_temporary_data()
+
     if not args.intermediate:
-        cleanup_intermediate_data()
+        cleanup_intermediate_bands()
 
     logger.info('*** LST Generate Products - Complete ***')
 
