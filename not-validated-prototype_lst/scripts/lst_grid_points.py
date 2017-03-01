@@ -30,7 +30,7 @@ GridPointInfo = namedtuple('GridPointInfo',
                             'lat', 'lon',
                             'map_y', 'map_x'))
 
-GRID_POINT_FMT = 'BBBBHHffff'
+GRID_POINT_FMT = 'HBBBHHffff'
 GRID_POINT_HEADER_NAME = 'grid_points.hdr'
 GRID_POINT_BINARY_NAME = 'grid_points.bin'
 
@@ -41,7 +41,7 @@ def write_grid_points(grid_points, grid_rows, grid_cols):
     Binary is used so tha precision in the floats is not lost.
 
     Args:
-        grid_points [<PointInfo>]: The list of gird points
+        grid_points [<PointInfo>]: The list of grid points
     """
 
     with open(GRID_POINT_HEADER_NAME, 'w') as ascii_fd:
@@ -78,7 +78,7 @@ def read_grid_points():
     """Read grid points from the binary file back into a structure
 
     Returns:
-        grid_points [<GridPointInfo>]: The list of gird points
+        grid_points [<GridPointInfo>]: The list of grid points
     """
 
     logger = logging.getLogger(__name__)

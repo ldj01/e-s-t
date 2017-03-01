@@ -5,7 +5,7 @@
 #include <limits.h>
 
 typedef struct {
-    int8_t index;
+    int16_t index;
     int8_t run_modtran;
     uint8_t row;
     uint8_t col;
