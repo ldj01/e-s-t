@@ -218,14 +218,14 @@ def retrieve_metadata_information(espa_metadata):
 
         if satellite == 'LANDSAT_8':
             if (band.get('product') == 'toa_bt' and
-                    band.get('name') == 'toa_band11'):
+                    band.get('name') == 'bt_band11'):
                 bi_bt = get_band_info(band)
 
                 # Get the output proj4 string
                 proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
         else:
             if (band.get('product') == 'toa_bt' and
-                    band.get('name') == 'toa_band6'):
+                    band.get('name') == 'bt_band6'):
                 bi_bt = get_band_info(band)
 
                 # Get the output proj4 string
