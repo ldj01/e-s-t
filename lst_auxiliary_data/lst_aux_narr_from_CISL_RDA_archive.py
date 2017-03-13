@@ -41,14 +41,13 @@ from lst_aux_version import VERSION_TEXT
 from lst_aux_logging import LoggingFilter, ExceptionFormatter
 import lst_aux_config as config
 from lst_aux_http_session import HttpSession
+from lst_aux_parameters import NARR_VARIABLES
 
 from lst_auxiliary_utilities import System
 
 
 logger = None
 
-
-NARR_VARIABLES = ['HGT', 'TMP', 'SPFH']
 
 
 def setup_logging(args):
@@ -89,6 +88,14 @@ def determine_name_list(cfg, s_date, e_date):
     """Determines all of the base filenames to process based on the dates
        provided
 
+    Args:
+        cfg <ConfigInfo>: Configuration information
+        s_date <datetime>: Starting date
+        e_date <datetime>: Ending date
+
+    Returns:
+        <list>: Yields a list of base filenames to process
+
     Notes:
         Files typically contain 3 days.
         Special assumptions are coded for the end of the month; which
@@ -113,6 +120,38 @@ def determine_name_list(cfg, s_date, e_date):
             c_date += days_3
 
 
+def create_grib_hdr(grib_file, variable, hdr_name):
+    """Create an inventory/header file for the specified grib file
+
+    Args:
+        grib_file <str>: Name of the source grib file to get the header
+        variable <str>: Variable to extract fro mthe grib file
+        hdr_name <str>: Name of the header file to create
+    """
+
+    cmd = ['wgrib', grib_file, '|', 'grep', variable, '>', hdr_name]
+    output = System.execute_cmd(' '.join(cmd))
+    if output is not None and len(output) > 0:
+        logger.debug(output)
+
+
+def create_grib_file(grib_file, hdr_name, grb_name):
+    """Create extract the header specified information into a new grib file
+
+    Args:
+        grib_file <str>: Name of the source grib file to get the data from
+        hdr_name <str>: Name of the header file for what to extract
+        grb_name <str>: Name of the grib file to create
+    """
+
+    cmd = ['cat', hdr_name, '|',
+           'wgrib', grib_file, '-i', '-grib', '-o', grb_name]
+    output = System.execute_cmd(' '.join(cmd))
+    if output is not None and len(output) > 0:
+        logger.debug('Grib Contents ({})'
+                     .format(', '.join(output.split())))
+
+
 def process_grib_for_variable(cfg, variable, grib_file):
     """Extract the specified variable from the grib file and archive it
     """
@@ -135,25 +174,13 @@ def process_grib_for_variable(cfg, variable, grib_file):
     logger.debug('Grb Name [{}]'.format(grb_name))
 
     # Create inventory/header file to extract the variable data
-    cmd = ['wgrib', grib_file, '|', 'grep', variable, '>', hdr_name]
-    cmd = ' '.join(cmd)
-    output = System.execute_cmd(cmd)
-    if output is not None and len(output) > 0:
-        logger.debug(output)
+    create_grib_hdr(grib_file, variable, hdr_name)
 
-    # Create grib files for each variable
-    cmd = ['cat', hdr_name, '|',
-           'wgrib', grib_file, '-i', '-grib', '-o', grb_name]
-    cmd = ' '.join(cmd)
-    output = System.execute_cmd(cmd)
-    if output is not None and len(output) > 0:
-        logger.debug('Grib Contents ({})'
-                     .format(', '.join(output.split())))
+    # Create grib file for the variable
+    create_grib_file(grib_file, hdr_name, grb_name)
 
     # Create new inventory/header file for the variable
-    cmd = ['wgrib', grb_name, '|', 'grep', variable, '>', hdr_name]
-    cmd = ' '.join(cmd)
-    output = System.execute_cmd(cmd)
+    create_grib_hdr(grb_name, variable, hdr_name)
 
     # Determine the directory to place the data and create it if it does
     # not exist
