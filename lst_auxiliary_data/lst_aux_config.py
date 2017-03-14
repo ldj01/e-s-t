@@ -9,7 +9,7 @@ from collections import namedtuple
 from lst_aux_exception import AuxiliaryError
 
 
-class AuxliliaryConfigError(AuxiliaryError):
+class AuxiliaryConfigError(AuxiliaryError):
     """Config errors
     """
     pass
@@ -23,13 +23,13 @@ def config_file_full_path():
     """Build the full path to the config file
 
     Raises:
-        AuxliliaryConfigError(message)
+        AuxiliaryConfigError(message)
     """
 
     # Use the users home directory as the base source directory for
     # configuration
     if 'HOME' not in os.environ:
-        raise AuxliliaryConfigError('[HOME] not found in environment')
+        raise AuxiliaryConfigError('[HOME] not found in environment')
     home_dir = os.environ.get('HOME')
 
     # Build the full path to the configuration file
@@ -42,13 +42,13 @@ def read_config():
     """Reads a config file
 
     Raises:
-        AuxliliaryConfigError(message)
+        AuxiliaryConfigError(message)
     """
 
     config_path = config_file_full_path()
 
     if not os.path.isfile(config_path):
-        raise AuxliliaryConfigError('Missing configuration file [{}]'
+        raise AuxiliaryConfigError('Missing configuration file [{}]'
                                     .format(config_path))
 
     # Create the object and load the configuration
@@ -83,7 +83,7 @@ def get_config():
     """Gets the configuration and converts it
 
     Raises:
-        AuxliliaryConfigError(message)
+        AuxiliaryConfigError(message)
     """
 
     cfg = read_config()

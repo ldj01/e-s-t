@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-    PURPOSE: Retieves archived NARR3D files from the CISL RDA for the dates
+    PURPOSE: Retrieves archived NARR3D files from the CISL RDA for the dates
              requested.  Extracts the variables LST requires (HGT, TMP, SPFH)
              and repackages them into our internal location and filenames.
 
@@ -42,8 +42,7 @@ from lst_aux_logging import LoggingFilter, ExceptionFormatter
 import lst_aux_config as config
 from lst_aux_http_session import HttpSession
 from lst_aux_parameters import NARR_VARIABLES
-
-from lst_auxiliary_utilities import System
+from lst_aux_utilities import System
 
 
 logger = None
@@ -125,7 +124,7 @@ def create_grib_hdr(grib_file, variable, hdr_name):
 
     Args:
         grib_file <str>: Name of the source grib file to get the header
-        variable <str>: Variable to extract fro mthe grib file
+        variable <str>: Variable to extract from the grib file
         hdr_name <str>: Name of the header file to create
     """
 
@@ -136,7 +135,7 @@ def create_grib_hdr(grib_file, variable, hdr_name):
 
 
 def create_grib_file(grib_file, hdr_name, grb_name):
-    """Create extract the header specified information into a new grib file
+    """Extract the specified information into a new grib file
 
     Args:
         grib_file <str>: Name of the source grib file to get the data from

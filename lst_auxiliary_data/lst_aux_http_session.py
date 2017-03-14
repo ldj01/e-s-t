@@ -4,6 +4,7 @@
 import logging
 import requests
 from contextlib import closing
+from time import sleep
 
 
 logger = logging.getLogger(__name__)
