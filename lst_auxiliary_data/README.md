@@ -1,4 +1,4 @@
-## Land Surface Temperature Auxiliary Archive Generation 0.0.4 Release Notes
+## Land Surface Temperature Auxiliary Archive Generation 0.0.5 Release Notes
 Release Date: March 2017
 
 See git tag [land_surface_temperature-version_0.0.5]
@@ -27,7 +27,7 @@ This script is used to update the archive on a daily basis from http://ftp.cpc.n
   - requests: ```pip install requests``` 
 
 ### Configuration Files
-* lst_auxiliary.config placed into the executable installation location.  Typically ```$PREFIX/bin```.  See [example](example-lst_auxiliary.config) file.
+* lst_auxiliary.config is placed in the configuration file location ```$HOME/.usgs/espa```.  See [example](example-lst_auxiliary.config) file.
 
 ### Environment Variables
 * Required for installing this software
