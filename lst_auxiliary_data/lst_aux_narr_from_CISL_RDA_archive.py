@@ -236,7 +236,7 @@ def archive_aux_data(args, cfg):
         if not args.dev_skip_download:
             session.http_transfer_file(data_url, filename)
 
-            # Extract the tar'd data
+        # Extract the tar'd data
         cmd = ['tar', '-xvf', filename]
         cmd = ' '.join(cmd)
         output = System.execute_cmd(cmd)
@@ -295,7 +295,7 @@ def get_command_line_arguments():
                         action='store_true',
                         dest='debug',
                         default=False,
-                        help='display error information')
+                        help='provides debug logging')
 
     parser.add_argument('--start-date',
                         action='store', dest='start_date',
@@ -370,7 +370,7 @@ def determine_date_range(args):
 
 
 def main():
-    """Provides the setup and executaion of the processor for the application
+    """Provides the setup and execution of the processor for the application
     """
 
     args = get_command_line_arguments()

@@ -1,7 +1,7 @@
-## Land Surface Temperature Auxiliary Archive Generation 0.0.5 Release Notes
+## Land Surface Temperature Auxiliary Archive Generation 0.1.3 Release Notes
 Release Date: March 2017
 
-See git tag [land_surface_temperature-version_0.0.5]
+See git tag [lst-rit-v0.1.3]
 
 The scripts in this directory facilitate building an archive of NARR data utilized by the Land Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the NARR data, even for the reduced files this software produces and archives.
 
