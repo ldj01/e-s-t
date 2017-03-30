@@ -9,9 +9,16 @@
 TOP = ..
 include $(TOP)/make.config
 
-SCRIPTS = build_narr_aux_archive_from_CISL_RDA.py \
-          update_narr_aux_data.py
-MODULES = lst_auxiliary_utilities.py
+SCRIPTS = lst_aux_narr_from_CISL_RDA_archive.py \
+          lst_aux_update_narr_data.py
+MODULES = lst_aux_utilities.py \
+          lst_aux_config.py \
+          lst_aux_exception.py \
+          lst_aux_parameters.py \
+          lst_aux_http_session.py \
+          lst_aux_version.py \
+          lst_aux_logging.py
+
 
 #-----------------------------------------------------------------------------
 all:

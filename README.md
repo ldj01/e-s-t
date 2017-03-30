@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.1.1 Release Notes
-Release Date: January 2017
+## Land Surface Temperature 0.1.3 Release Notes
+Release Date: March 2017
 
-See git tag [2017_Jan]
+See git tag [lst-rit-v0.1.3]
 
 This project contains application source code for producing Land Surface Temperature products.
 
@@ -12,12 +12,9 @@ See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/p
 
 ## Release Notes
 * Version change
-* The software was significantly restructured to only process the needed 
-  points through MODTRAN 
-* Some modules were converted from C to Python  
-* Some modules were consolidated into fewer files
-* C module memory handling was improved using suggestions from Valgrind 
-* Python module formatting was updated using suggestions from Pylint
+* The software was updated to handle the denser auxiliary data points for
+  far-North scenes
+* The auxiliary data management software was updated to use new libraries 
 
 ## Installation
 
