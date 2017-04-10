@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
     double elevation;
+    double elevation_directory;
     double transmission;
     double upwelled_radiance;
     double downwelled_radiance;

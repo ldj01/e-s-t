@@ -795,8 +795,12 @@ def determine_elevations(grid_elevation_file, elevations, height):
     else:
         new_elevations[0] = height
 
-    # Write the first elevation to the elevation file.
-    grid_elevation_file.write(str('{0:05.8f}'.format(new_elevations[0])) + '\n')
+    # Write the first elevation to the elevation file.  Write it with more
+    # precision for science calculations and less to exactly match the
+    # directory name
+    grid_elevation_file.write(str('{0:05.8f}'.format(new_elevations[0])) + ' ' \
+                             + str('{0:05.3f}'.format(new_elevations[0])) \
+                             + '\n')
 
     return new_elevations
 
