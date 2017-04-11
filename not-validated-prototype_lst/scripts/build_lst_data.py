@@ -330,7 +330,7 @@ class BuildLSTData(object):
         # Add the estimated Land Surface Temperature product to the metadata
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
         bands = espa_xml.get_bands()
-        sensor_code = product_id[0:3]
+        sensor_code = product_id[0:4]
 
         # Find the TOA Band 1 to use for the specific band details
         base_band = None

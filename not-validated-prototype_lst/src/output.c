@@ -128,8 +128,8 @@ int add_lst_band_product
     bmeta = tmp_meta.band;
 
     snprintf (bmeta[0].short_name, sizeof (bmeta[0].short_name),
-              "%s", in_meta.band[src_index].short_name);
-    bmeta[0].short_name[3] = '\0';
+              "%s", in_meta.global.product_id);
+    bmeta[0].short_name[4] = '\0';
     strcat (bmeta[0].short_name, short_name);
     snprintf (bmeta[0].product, sizeof (bmeta[0].product), "%s",
               product_name);
