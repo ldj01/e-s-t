@@ -50,7 +50,7 @@ $(EXE1): $(OBJ1) $(INC1)
 install:
 	install -d $(link_path)
 	install -d $(lst_install_path)
-	install -m 755 $(EXE1) $(lst_install_path)
+	install -m 755 $(EXE1) $(lst_install_path) || exit 1
 	ln -sf $(lst_link_source_path)/$(EXE1) $(link_path)/$(EXE1)
 
 clean:
