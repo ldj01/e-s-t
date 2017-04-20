@@ -1041,6 +1041,8 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     lines = dataset.RasterYSize
     del dataset
 
+    # Initialize coefficients.
+    ASTER_GED_WATER = 0.988
     coefficients = sensor_coefficients(espa_metadata.xml_object
                                        .global_metadata.satellite)
 
@@ -1091,11 +1093,22 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                              no_data_value=no_data_value,
                              intermediate=intermediate))
 
+    # Find water locations using the value of water in ASTER GED
+    water_locations = np.where(ls_emis_data > ASTER_GED_WATER)
+
+    # Replace NDVI values greater than 1 with 1
+    ls_ndvi_data[ls_ndvi_data > 1.0] = 1
+    aster_ndvi_data[aster_ndvi_data > 1.0] = 1
+
     logger.info('Normalizing Landsat and ASTER NDVI')
     # Normalize Landsat NDVI by max value
     max_ls_ndvi = ls_ndvi_data.max()
+    min_ls_ndvi = ls_ndvi_data.min()
     logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
     ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
+
+    # Calculate fractional vegetation cover
+    fv_L = 1.0 - (max_ls_ndvi - ls_ndvi_data) / (max_ls_ndvi - min_ls_ndvi)
 
     if intermediate:
         logger.info('Writing Landsat NDVI NORM MAX raster')
@@ -1127,24 +1140,46 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                                       gdal.GDT_Float32)
 
     # Soil - From prototype code variable name
-    logger.info('Calculating EMIS Final')
-    with np.errstate(divide='ignore'):
-        ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
-                         (1.0 - aster_ndvi_data))
+    logger.info('Calculating bare soil component')
 
-    # Memory cleanup
-    del aster_ndvi_data
-    del ls_emis_data
+    # Get pixels with significant bare soil component 
+    bare_locations = np.where(aster_ndvi_data < 0.5)
+
+    # Only calculate soil component for these pixels
+    ls_emis_bare = (ls_emis_data[bare_locations] \
+        - 0.975 * aster_ndvi_data[bare_locations]) \
+        / (1 - aster_ndvi_data[bare_locations])
+
+    # Calculate veg adjustment with Landsat
+    logger.info('Calculating EMIS Final')
 
     # Adjust estimated Landsat EMIS for vegetation and snow, to generate
     # the final Landsat EMIS data
     logger.info('Adjusting estimated EMIS for vegetation')
     ls_emis_final = (coefficients.vegetation_coeff * ls_ndvi_data +
-                     ls_emis_final * (1.0 - ls_ndvi_data))
+                     ls_emis_data * (1.0 - ls_ndvi_data))
+
+    # Memory cleanup
+    del aster_ndvi_data
+    del ls_emis_data
+
+    # Add soil component pixels
+    ls_emis_final[bare_locations] = ls_emis_bare
+
+    # Set fill values on granule edge to nan
+    fill_locations = np.where(np.isnan(fv_L))
+    ls_emis_final[fill_locations] = np.nan
+
+    # Final check for emissivity values greater than 1.  Reset values greater
+    # than 1 to nominal veg/water value (should be very few, if any)
+    ls_emis_final[ls_emis_final > 1.0] = ASTER_GED_WATER
 
     # Medium snow
     logger.info('Adjusting estimated EMIS for snow')
     ls_emis_final[snow_locations] = coefficients.snow_emissivity
+
+    # Reset water values
+    ls_emis_final[water_locations] = ASTER_GED_WATER 
 
     # Memory cleanup
     del ls_ndvi_data
