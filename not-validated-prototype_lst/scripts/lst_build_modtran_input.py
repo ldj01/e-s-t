@@ -112,7 +112,7 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--version',
                         action='version',
-                        version='Land Surface Temperature - Version 0.2.0')
+                        version=util.Version.version_text())
 
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
@@ -798,9 +798,7 @@ def determine_elevations(grid_elevation_file, elevations, height):
     # Write the first elevation to the elevation file.  Write it with more
     # precision for science calculations and less to exactly match the
     # directory name
-    grid_elevation_file.write(str('{0:05.8f}'.format(new_elevations[0])) + ' ' \
-                             + str('{0:05.3f}'.format(new_elevations[0])) \
-                             + '\n')
+    grid_elevation_file.write('{0:05.8f} {0:05.3f}\n'.format(new_elevations[0]))
 
     return new_elevations
 

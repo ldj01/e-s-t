@@ -413,7 +413,7 @@ def main():
     # Optional parameters
     parser.add_argument('--version',
                         action='version',
-                        version='Land Surface Temperature - Version 0.2.0')
+                        version=util.Version.version_text())
 
     # Parse the command line arguments
     args = parser.parse_args()

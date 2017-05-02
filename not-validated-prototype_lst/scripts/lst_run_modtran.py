@@ -36,7 +36,7 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--version',
                         action='version',
-                        version='Land Surface Temperature - Version 0.2.0')
+                        version=util.Version.version_text())
 
     parser.add_argument('--modtran_data_path',
                         action='store', dest='modtran_data_path',

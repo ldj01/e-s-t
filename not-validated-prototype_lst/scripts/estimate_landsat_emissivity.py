@@ -1146,9 +1146,9 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     bare_locations = np.where(aster_ndvi_data < 0.5)
 
     # Only calculate soil component for these pixels
-    ls_emis_bare = (ls_emis_data[bare_locations] \
-        - 0.975 * aster_ndvi_data[bare_locations]) \
-        / (1 - aster_ndvi_data[bare_locations])
+    ls_emis_bare = ((ls_emis_data[bare_locations]
+                     - 0.975 * aster_ndvi_data[bare_locations])
+                    / (1 - aster_ndvi_data[bare_locations]))
 
     # Calculate veg adjustment with Landsat
     logger.info('Calculating EMIS Final')
@@ -1231,7 +1231,7 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--version',
                         action='version',
-                        version='Land Surface Temparature - Version 0.2.0')
+                        version=util.Version.version_text())
 
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
