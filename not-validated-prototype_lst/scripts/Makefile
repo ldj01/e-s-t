@@ -32,12 +32,12 @@ install:
 	install -d $(lst_install_path)
 	@for file in $(SCRIPTS); do \
             echo "  installing $$file"; \
-            install -m 755 $$file $(lst_install_path); \
+            install -m 755 $$file $(lst_install_path) || exit 1; \
             ln -sf $(lst_link_source_path)/$$file $(link_path)/$$file; \
         done;
 	@for file in $(SCRIPT_IMPORTS); do \
             echo "  installing $$file"; \
-            install -m 644 $$file $(lst_install_path); \
+            install -m 644 $$file $(lst_install_path) || exit 1; \
             ln -sf $(lst_link_source_path)/$$file $(link_path)/$$file; \
         done;
 

@@ -31,7 +31,7 @@ install:
 	install -d $(static_install_path)
 	@for file in $(STATIC_DATA_FILES); do \
             echo "  installing $$file"; \
-            install -m 644 $$file $(static_install_path); \
+            install -m 644 $$file $(static_install_path) || exit 1; \
         done;
 
 clean:

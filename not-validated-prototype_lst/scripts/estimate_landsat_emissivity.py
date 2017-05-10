@@ -451,6 +451,7 @@ def extract_aster_data(url, filename, intermediate):
                      [3] - Map Y of upper left corner
                      [4] - X rotation
                      [5] - Pixel size in Y direction
+        <bool>: True if the ASTER tile is available, False otherwise
     """
 
     logger = logging.getLogger(__name__)
@@ -459,6 +460,19 @@ def extract_aster_data(url, filename, intermediate):
     h5_file_path = ''.join([filename, '.h5'])
 
     download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
+
+    # There are cases where the emissivity data will not be available
+    # (for example, in water regions).
+    aster_b13_data = []
+    aster_b14_data = []
+    aster_ndvi_data = []
+    samps = 0
+    lines = 0
+    geo_transform = []
+    if not os.path.exists(h5_file_path):
+        # The ASTER tile is not available, so don't try to process it
+        return (aster_b13_data, aster_b14_data, aster_ndvi_data,
+                samps, lines, geo_transform, False)
 
     # Define the sub-dataset names
     emis_ds_name = ''.join(['HDF5:"', h5_file_path,
@@ -504,7 +518,7 @@ def extract_aster_data(url, filename, intermediate):
     geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
 
     return (aster_b13_data, aster_b14_data, aster_ndvi_data,
-            samps, lines, geo_transform)
+            samps, lines, geo_transform, True)
 
 
 def generate_estimated_emis_tile(coefficients, tile_name,
@@ -642,7 +656,7 @@ def generate_tiles(src_info, coefficients, url, wkt,
     """
 
     '''
-    Process through the lattitude and longitude ASTER tiles which cover
+    Process through the latitude and longitude ASTER tiles which cover
     the Landsat scene we are processing
     - Download them
     - Extract the Emissivity bands 13 and 14 as well as the NDVI
@@ -667,15 +681,20 @@ def generate_tiles(src_info, coefficients, url, wkt,
         ls_emis_tile_name = ''.join([filename, '_emis.tif'])
         aster_ndvi_tile_name = ''.join([filename, '_ndvi.tif'])
 
-        # Add the tile names to the list for mosaic building and warping
-        ls_emis_mean_filenames.append(ls_emis_tile_name)
-        aster_ndvi_mean_filenames.append(aster_ndvi_tile_name)
-
+        # Read the ASTER data
         (aster_b13_data, aster_b14_data, aster_ndvi_data,
-         samps, lines, transform) = (
+         samps, lines, transform, aster_data_available) = (
              extract_aster_data(url=url,
                                 filename=filename,
                                 intermediate=intermediate))
+
+        # Skip the tile if it isn't available
+        if not aster_data_available:
+            continue
+
+        # Add the tile names to the list for mosaic building and warping
+        ls_emis_mean_filenames.append(ls_emis_tile_name)
+        aster_ndvi_mean_filenames.append(aster_ndvi_tile_name)
 
         generate_estimated_emis_tile(coefficients=coefficients,
                                      tile_name=ls_emis_tile_name,
@@ -991,13 +1010,6 @@ def add_emissivity_band_to_xml(espa_metadata, filename, sensor_code,
     espa_metadata.write()
 
 
-# ------------------------------------------------------------------------
-# TODO - NEED TO PROCESS A COASTAL SCENE BECAUSE MAY NOT HAVE ASTER TILE
-#        DATA FOR SOME OF THE SCENE AND WILL NEED TO DO SOMETHING ELSE
-#      - I have implemented a solution for this, but have not been able to
-#        test it.  I have not been able to find a scene that has this
-#        condition.
-# ------------------------------------------------------------------------
 def generate_emissivity_data(xml_filename, server_name, server_path,
                              no_data_value, intermediate):
     """Provides the main processing algorithm for generating the estimated
@@ -1029,6 +1041,8 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     lines = dataset.RasterYSize
     del dataset
 
+    # Initialize coefficients.
+    ASTER_GED_WATER = 0.988
     coefficients = sensor_coefficients(espa_metadata.xml_object
                                        .global_metadata.satellite)
 
@@ -1079,11 +1093,22 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                              no_data_value=no_data_value,
                              intermediate=intermediate))
 
+    # Find water locations using the value of water in ASTER GED
+    water_locations = np.where(ls_emis_data > ASTER_GED_WATER)
+
+    # Replace NDVI values greater than 1 with 1
+    ls_ndvi_data[ls_ndvi_data > 1.0] = 1
+    aster_ndvi_data[aster_ndvi_data > 1.0] = 1
+
     logger.info('Normalizing Landsat and ASTER NDVI')
     # Normalize Landsat NDVI by max value
     max_ls_ndvi = ls_ndvi_data.max()
+    min_ls_ndvi = ls_ndvi_data.min()
     logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
     ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
+
+    # Calculate fractional vegetation cover
+    fv_L = 1.0 - (max_ls_ndvi - ls_ndvi_data) / (max_ls_ndvi - min_ls_ndvi)
 
     if intermediate:
         logger.info('Writing Landsat NDVI NORM MAX raster')
@@ -1115,24 +1140,46 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                                       gdal.GDT_Float32)
 
     # Soil - From prototype code variable name
-    logger.info('Calculating EMIS Final')
-    with np.errstate(divide='ignore'):
-        ls_emis_final = ((ls_emis_data - 0.975 * aster_ndvi_data) /
-                         (1.0 - aster_ndvi_data))
+    logger.info('Calculating bare soil component')
 
-    # Memory cleanup
-    del aster_ndvi_data
-    del ls_emis_data
+    # Get pixels with significant bare soil component 
+    bare_locations = np.where(aster_ndvi_data < 0.5)
+
+    # Only calculate soil component for these pixels
+    ls_emis_bare = ((ls_emis_data[bare_locations]
+                     - 0.975 * aster_ndvi_data[bare_locations])
+                    / (1 - aster_ndvi_data[bare_locations]))
+
+    # Calculate veg adjustment with Landsat
+    logger.info('Calculating EMIS Final')
 
     # Adjust estimated Landsat EMIS for vegetation and snow, to generate
     # the final Landsat EMIS data
     logger.info('Adjusting estimated EMIS for vegetation')
     ls_emis_final = (coefficients.vegetation_coeff * ls_ndvi_data +
-                     ls_emis_final * (1.0 - ls_ndvi_data))
+                     ls_emis_data * (1.0 - ls_ndvi_data))
+
+    # Memory cleanup
+    del aster_ndvi_data
+    del ls_emis_data
+
+    # Add soil component pixels
+    ls_emis_final[bare_locations] = ls_emis_bare
+
+    # Set fill values on granule edge to nan
+    fill_locations = np.where(np.isnan(fv_L))
+    ls_emis_final[fill_locations] = np.nan
+
+    # Final check for emissivity values greater than 1.  Reset values greater
+    # than 1 to nominal veg/water value (should be very few, if any)
+    ls_emis_final[ls_emis_final > 1.0] = ASTER_GED_WATER
 
     # Medium snow
     logger.info('Adjusting estimated EMIS for snow')
     ls_emis_final[snow_locations] = coefficients.snow_emissivity
+
+    # Reset water values
+    ls_emis_final[water_locations] = ASTER_GED_WATER 
 
     # Memory cleanup
     del ls_ndvi_data
@@ -1184,7 +1231,7 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--version',
                         action='version',
-                        version='Land Surface Temparature - Version 0.1.1')
+                        version=util.Version.version_text())
 
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',

@@ -913,13 +913,15 @@ int calculate_point_atmospheric_parameters
                 grid_points->points[i].row, grid_points->points[i].col,
                 grid_points->points[i].narr_row,
                 grid_points->points[i].narr_col,
-                modtran_results->points[i].elevations[j].elevation);
+                modtran_results->points[i].elevations[j].elevation_directory);
 
             fd = fopen (current_file, "r");
             if (fd == NULL)
             {
-                RETURN_ERROR ("Can't open MODTRAN information file",
-                              FUNC_NAME, FAILURE);
+                snprintf (msg, sizeof (msg),
+                          "Can't open MODTRAN information file [%s]",
+                           current_file);
+                RETURN_ERROR (msg, FUNC_NAME, FAILURE);
             }
             /* Retrieve the temperature from this lowest atmospheric layer */
             if (fscanf (fd, "%*s %lf%*c", &zero_temp) != 1)
@@ -957,7 +959,8 @@ int calculate_point_atmospheric_parameters
                     grid_points->points[i].row, grid_points->points[i].col,
                     grid_points->points[i].narr_row,
                     grid_points->points[i].narr_col,
-                    modtran_results->points[i].elevations[j].elevation,
+                    modtran_results->points[i]
+                        .elevations[j].elevation_directory,
                     temperature[index - 1],
                     albedo[index - 1]);
 
@@ -1995,8 +1998,9 @@ int load_elevations
             continue; 
         }
 
-        status = fscanf(elevation_fd, "%lf\n", 
-            &(modtran_points->points[index].elevations[0].elevation));
+        status = fscanf(elevation_fd, "%lf %lf\n", 
+            &(modtran_points->points[index].elevations[0].elevation),
+            &(modtran_points->points[index].elevations[0].elevation_directory));
         if (status <= 0)
         {
             RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
@@ -2108,6 +2112,8 @@ int initialize_modtran_points
         {
             modtran_points->points[index].elevations[elevation_index]
                 .elevation = gndalt[elevation_index];
+            modtran_points->points[index].elevations[elevation_index]
+                .elevation_directory = gndalt[elevation_index];
         }
     }
 
