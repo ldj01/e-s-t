@@ -49,8 +49,7 @@
     #define FAILURE 1
 #endif
 
-
-#define NUM_ELEVATIONS 9
+#define MAX_NUM_ELEVATIONS 9
 #define NARR_ROWS 277
 #define NARR_COLS 349
 

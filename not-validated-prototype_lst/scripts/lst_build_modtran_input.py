@@ -18,6 +18,8 @@ import logging
 import math
 from argparse import ArgumentParser
 from collections import namedtuple
+from bisect import bisect
+import numpy as np
 
 from espa import Metadata
 import lst_utilities as util
@@ -25,6 +27,7 @@ import lst_utilities as util
 from lst_grid_points import read_grid_points
 
 GRID_ELEVATION_NAME = 'grid_elevations.txt'
+MODTRAN_ELEVATION_NAME = 'modtran_elevations.txt'
 
 
 class InvalidNarrDataPointError(Exception):
@@ -803,9 +806,73 @@ def determine_elevations(grid_elevation_file, elevations, height):
     return new_elevations
 
 
+def build_ground_altitudes(ground_altitudes, espa_metadata):
+
+    """Build list of ground altitudes based on the standard ground altitudes
+       and the scene.  Also, write these altitudes to a file for later use
+
+    Args:
+        ground_altitudes <file>: List of altitudes to process
+        espa_metadata <espa.metadata>: The metadata information for the input
+    """
+
+    # Determine the minimum and maximum scene elevations
+    data_type = np.int16
+    for band in espa_metadata.xml_object.bands.band:
+        if (band.get('product') == 'elevation' and
+                band.get('category') == 'image'):
+
+            filename = str(band.file_name)
+
+    input_data = np.fromfile(filename, dtype=data_type)
+    elevation_minimum = np.min(input_data)
+    elevation_maximum = np.max(input_data)
+
+    # If minimum or maximum is less than 0, make it 0
+    if elevation_minimum < 0.0:
+        elevation_minimum = 0.0
+    if elevation_maximum < 0.0:
+        elevation_maximum = 0.0
+
+    # Scale the elevation results to match the NARR data (scale m to km)
+    scaled_elevation_minimum = elevation_minimum * 0.001
+    scaled_elevation_maximum = elevation_maximum * 0.001
+
+    # Find the standard altitudes that bound the minimum and maximum elevations
+    min_index = bisect(GROUND_ALT, scaled_elevation_minimum) - 1
+    max_index = bisect(GROUND_ALT, scaled_elevation_maximum)
+
+    # Make sure elevation indexes are within range (the actual elevations could
+    # fall outside the standard range).  Also, we don't need to put the 0.0
+    # elevation in the list twice, so avoid that for low elevation scenes
+    num_elevations = len(GROUND_ALT)
+    if min_index <= 0:
+        min_index = 1
+    if min_index >= num_elevations:
+        min_index = num_elevations - 1
+    if max_index <= 0:
+        max_index = 1
+    if max_index >= num_elevations:
+        max_index = num_elevations - 1
+
+    # Build the elevations list like the standard elevations list, but only
+    # with elevations we need to process based on this scene's elevations.
+    # We always need the 0 elevation
+    ground_altitudes.append(0.0)
+    for index in range(min_index, max_index + 1):
+        ground_altitudes.append(GROUND_ALT[index])
+
+    # Make a file that shows what elevations are actually being used
+    with open(MODTRAN_ELEVATION_NAME, 'w') as modtran_elevation_file:
+        modtran_elevation_file.write('{0}\n'.format(len(ground_altitudes)))
+        for altitude in ground_altitudes:
+            modtran_elevation_file.write('{0}\n'.format(altitude))
+    modtran_elevation_file.close()
+
+
 def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
-                                   interp_factor, doy_str,
-                                   head_template, tail_template):
+                                   interp_factor, doy_str, head_template,
+                                   tail_template, ground_altitudes):
     """Generate tape5 file for the current point
 
     Args:
@@ -816,6 +883,7 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
         interp_factor <float>: The interpolation factor to use
         head_template <str>: The template for the head of the tape5 file
         tail_template <str>: The template for the tail of the tape5 file
+        ground_altitudes [<float>]: The standard altitudes we need to process
     """
 
     logger = logging.getLogger(__name__)
@@ -841,7 +909,7 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
                                             interp_factor=interp_factor)
 
     elevations = determine_elevations(grid_elevation_file,
-                                      elevations=GROUND_ALT,
+                                      elevations=ground_altitudes,
                                       height=values[PRESSURE_LAYERS[0]].hgt)
 
     for elevation in elevations:
@@ -880,6 +948,10 @@ def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
     interp_factor = (float((acq_date - t0_date).seconds) /
                      float((t1_date - t0_date).seconds))
 
+    # Build the list of altitudes to process based on scene elevations
+    ground_alts = []
+    build_ground_altitudes(ground_alts, espa_metadata)
+
     with open(GRID_ELEVATION_NAME, 'w') as grid_elevation_file:
         for point in grid_points:
             if point.run_modtran:
@@ -890,7 +962,8 @@ def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
                                                interp_factor=interp_factor,
                                                doy_str=doy_str,
                                                head_template=head_template,
-                                               tail_template=tail_template)
+                                               tail_template=tail_template,
+                                               ground_altitudes=ground_alts)
     grid_elevation_file.close()
 
 
