@@ -174,23 +174,23 @@ int read_input
     int count;
     int index;
     uint8_t *thermal_uint8 = NULL;
-    int16_t *thermal_int16 = NULL;
+    uint16_t *thermal_uint16 = NULL;
 
     if (input->meta.instrument == INST_OLI_TIRS
         && input->meta.satellite == SAT_LANDSAT_8)
     {
-        thermal_int16 = malloc(sizeof(int16_t) * pixel_count);
-        if (thermal_int16 == NULL)
+        thermal_uint16 = malloc(sizeof(uint16_t) * pixel_count);
+        if (thermal_uint16 == NULL)
         {
             RETURN_ERROR("error allocating thermal memory",
                          FUNC_NAME, FAILURE);
         }
 
-        count = fread(thermal_int16, sizeof(int16_t), pixel_count,
+        count = fread(thermal_uint16, sizeof(uint16_t), pixel_count,
                       input->band_fd[I_BAND_THERMAL]);
         if (count != pixel_count)
         {
-            free(thermal_int16);
+            free(thermal_uint16);
 
             RETURN_ERROR("Failed reading thermal band data",
             FUNC_NAME, FAILURE);
@@ -200,19 +200,19 @@ int read_input
            radiance and float */
         for (index = 0; index < pixel_count; index++)
         {
-            if (thermal_int16[index] == input->fill_value[I_BAND_THERMAL])
+            if (thermal_uint16[index] == input->fill_value[I_BAND_THERMAL])
             {
                 band_thermal[index] = LST_NO_DATA_VALUE;
             }
             else
             {
                 band_thermal[index] =
-                    (float)((input->thermal_rad_gain * thermal_int16[index])
+                    (float)((input->thermal_rad_gain * thermal_uint16[index])
                             + input->thermal_rad_bias);
             }
         }
 
-        free(thermal_int16);
+        free(thermal_uint16);
     }
     else
     {
