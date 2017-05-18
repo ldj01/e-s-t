@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.2.0 Release Notes
-Release Date: March 2017
+## Land Surface Temperature 0.3.0 Release Notes
+Release Date: June 2017
 
-See git tag [lst-rit-v0.2.0]
+See git tag [lst-rit-v0.3.0]
 
 This project contains application source code for producing Land Surface Temperature products.
 
@@ -12,17 +12,12 @@ See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/p
 
 ## Release Notes
 * Version change
-* The emissivity software was updated to eliminate a case where a few pixels
-  would have -inf values.
-* Cases where ASTER GED data are not available for a region will not cause the
-  entire order to fail.  The region will not be processed, but the rest of the
-  scene will be processed.
-* The Surface Temperature bands' short names are made consistent, using a
-  4-digit prefix.
-* Fix a rounding error that causes Surface Temperature to fail trying to read 
-  an incorrect directory.
-* Improve error handling in Makefiles
-  
+* Update to only compute parameters for elevations used for the scene.  This
+  results in shorter run times, particularly for scenes without large elevation
+  changes.
+* An error with the data type of the Landsat 8 input thermal data was 
+  corrected. 
+ 
 
 ## Installation
 
