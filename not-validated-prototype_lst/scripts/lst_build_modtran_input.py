@@ -816,17 +816,19 @@ def build_ground_altitudes(ground_altitudes, espa_metadata):
         espa_metadata <espa.metadata>: The metadata information for the input
     """
 
-    # Determine the minimum and maximum scene elevations
+    # Determine the minimum and maximum scene elevations, excluding fill
     data_type = np.int16
     for band in espa_metadata.xml_object.bands.band:
         if (band.get('product') == 'elevation' and
                 band.get('category') == 'image'):
-
             filename = str(band.file_name)
+            elevation_fill = int(band.get('fill_value'))
 
     input_data = np.fromfile(filename, dtype=data_type)
-    elevation_minimum = np.min(input_data)
-    elevation_maximum = np.max(input_data)
+    masked_input_data = np.ma.masked_array(input_data, input_data == \
+        elevation_fill)
+    elevation_minimum = np.min(masked_input_data)
+    elevation_maximum = np.max(masked_input_data)
 
     # If minimum or maximum is less than 0, make it 0
     if elevation_minimum < 0.0:
