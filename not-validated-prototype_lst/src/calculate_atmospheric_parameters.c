@@ -902,7 +902,7 @@ int calculate_point_atmospheric_parameters
         fprintf (used_points_fd, "\"%d\"|\"%f\"|\"%f\"\n",
                  i, grid_points->points[i].map_x, grid_points->points[i].map_y);
 
-        for (j = 0; j < NUM_ELEVATIONS; j++)
+        for (j = 0; j < modtran_results->points[i].count; j++)
         {
             /* Read the lst_modtran.info file for the 000 execution
                (when MODTRAN is run at 0K)
@@ -1065,7 +1065,7 @@ int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
             current_data = NULL;
-        } /* END - NUM_ELEVATIONS loop */
+        } /* END - modtran_results->points[i].count loop */
     } /* END - count loop */
     fclose (used_points_fd);
 
@@ -1098,7 +1098,7 @@ int calculate_point_atmospheric_parameters
             continue;
         }
 
-        for (j = 0; j < NUM_ELEVATIONS; j++)
+        for (j = 0; j < modtran_results->points[i].count; j++)
         {
             fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
                  modtran_results->points[i].lat,
@@ -1215,7 +1215,7 @@ void interpolate_to_height
     double inv_height_diff; /* To remove the multiple divisions */
 
     /* Find the height to use that is below the interpolate_to height */
-    for (elevation = 0; elevation < NUM_ELEVATIONS; elevation++)
+    for (elevation = 0; elevation < modtran_point.count; elevation++)
     {
         if (modtran_point.elevations[elevation].elevation < interpolate_to)
         {
@@ -1226,7 +1226,7 @@ void interpolate_to_height
     /* Find the height to use that is equal to or above the interpolate_to
        height.  It will always be the same or the next height */ 
     above = below; /* Start with the same */
-    if (above != (NUM_ELEVATIONS - 1))
+    if (above != (modtran_point.count - 1))
     {
         /* Not the last height */
 
@@ -2067,10 +2067,45 @@ int initialize_modtran_points
 {
     char FUNC_NAME[] = "initialize_modtran_points";
 
-    double gndalt[NUM_ELEVATIONS] = { 0.0, 0.6, 1.1, 1.6, 2.1,
-                                      2.6, 3.1, 3.6, 4.05 };
+    double gndalt[MAX_NUM_ELEVATIONS];
+
     int index;
+    int num_elevations;            /* Number of elevations actually used */
     int elevation_index;           /* Index into elevations */
+    int status;                    /* Function return status */
+
+    FILE *modtran_elevation_fd = NULL;
+
+    char modtran_elevation_filename[] = "modtran_elevations.txt";
+    char errmsg[PATH_MAX];
+
+    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", 
+        modtran_elevation_filename);
+
+    modtran_elevation_fd = fopen(modtran_elevation_filename, "r");
+    if (modtran_elevation_fd == NULL)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    status = fscanf(modtran_elevation_fd, "%d\n", &num_elevations);
+    if (status <= 0)
+    {
+        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+    }
+
+    /* Read the elevations into the gndalt structure. */ 
+    index = 0;
+    for (index = 0; index < num_elevations; index++)
+    {
+        status = fscanf(modtran_elevation_fd, "%lf\n", &gndalt[index]);
+        if (status <= 0)
+        {
+            RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+        }
+    }
+
+    fclose(modtran_elevation_fd);
 
     modtran_points->count = grid_points->count;
 
@@ -2084,7 +2119,7 @@ int initialize_modtran_points
 
     for (index = 0; index < modtran_points->count; index++)
     {
-        modtran_points->points[index].count = NUM_ELEVATIONS;
+        modtran_points->points[index].count = num_elevations;
         modtran_points->points[index].ran_modtran =
             grid_points->points[index].run_modtran;
         modtran_points->points[index].row = grid_points->points[index].row;
@@ -2099,7 +2134,7 @@ int initialize_modtran_points
         modtran_points->points[index].map_y = grid_points->points[index].map_y;
 
         modtran_points->points[index].elevations =
-            malloc(NUM_ELEVATIONS * sizeof(MODTRAN_ELEVATION));
+            malloc(num_elevations * sizeof(MODTRAN_ELEVATION));
         if (modtran_points->points[index].elevations == NULL)
         {
             RETURN_ERROR("Failed allocating memory for modtran point"
@@ -2107,7 +2142,7 @@ int initialize_modtran_points
         }
 
         /* Iterate over the elevations and assign the elevation values. */
-        for (elevation_index = 0; elevation_index < NUM_ELEVATIONS; 
+        for (elevation_index = 0; elevation_index < num_elevations; 
             elevation_index++)
         {
             modtran_points->points[index].elevations[elevation_index]

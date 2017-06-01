@@ -6,7 +6,7 @@
 #include <math.h>
 
 
-#define LST_VERSION "0.2.0"
+#define LST_VERSION "0.3.0"
 #define LST_NO_DATA_VALUE (-9999.0)
 
 
@@ -49,8 +49,7 @@
     #define FAILURE 1
 #endif
 
-
-#define NUM_ELEVATIONS 9
+#define MAX_NUM_ELEVATIONS 9
 #define NARR_ROWS 277
 #define NARR_COLS 349
 

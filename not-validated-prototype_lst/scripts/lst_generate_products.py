@@ -255,14 +255,15 @@ def cleanup_temporary_data():
     """
 
     GRID_POINT_ELEVATION_NAME = 'grid_elevations.txt'
+    MODTRAN_ELEVATION_NAME = 'modtran_elevations.txt'
     ATMOSPHERE_PARAMETERS_NAME = 'atmospheric_parameters.txt'
     USED_POINTS_NAME = 'used_points.txt'
     EMISSIVITY_HEADER_NAME = '*_emis.img.aux.xml'
 
     # File cleanup
     cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME, 
-                    GRID_POINT_ELEVATION_NAME, ATMOSPHERE_PARAMETERS_NAME,
-                    USED_POINTS_NAME]
+                    GRID_POINT_ELEVATION_NAME, MODTRAN_ELEVATION_NAME,
+                    ATMOSPHERE_PARAMETERS_NAME, USED_POINTS_NAME]
 
     for filename in cleanup_list:
         if os.path.exists(filename):
