@@ -8,7 +8,7 @@ See git tag [lst-rit-v0.3.0]
 This project contains application source code for producing Land Surface Temperature products.
 
 ## Product Descriptions
-See the [lst_readme_vX.X_for_evaluators.pdf](http://espa.cr.usgs.gov/downloads/provisional/land_surface_temperature) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
+See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads/provisional/land_surface_temperature/provisional_st_README_v10.pdf) product guide (which is an unofficial and provisional version) for information about the Land Surface Temperature products.
 
 ## Release Notes
 * Version change
