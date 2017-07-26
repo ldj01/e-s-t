@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Land Surface Temperature 0.3.0 Release Notes
-Release Date: June 2017
+## Land Surface Temperature 0.3.1 Release Notes
+Release Date: August 2017
 
-See git tag [lst-rit-v0.3.0]
+See git tag [lst-rit-v0.3.1]
 
 This project contains application source code for producing Land Surface Temperature products.
 
@@ -12,12 +12,8 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ## Release Notes
 * Version change
-* Update to only compute parameters for elevations used for the scene.  This
-  results in shorter run times, particularly for scenes without large elevation
-  changes.
-* An error with the data type of the Landsat 8 input thermal data was 
-  corrected. 
- 
+* Fix a problem where if 2 or more grid points have the same distance to a 
+  pixel, the wrong grid point (farther from the pixel) could be selected.
 
 ## Installation
 
