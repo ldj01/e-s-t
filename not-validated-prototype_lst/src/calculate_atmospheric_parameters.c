@@ -1680,15 +1680,12 @@ int calculate_pixel_atmospheric_parameters
                 { /* LL Cell */
                     cell_vertices[LL_POINT] = center_point - 1 - num_cols;
                 }
-                else if (avg_distance_ul < avg_distance_ll
-                    && avg_distance_ul < avg_distance_ur
+                else if (avg_distance_ul < avg_distance_ur
                     && avg_distance_ul < avg_distance_lr)
                 { /* UL Cell */
                     cell_vertices[LL_POINT] = center_point - 1;
                 }
-                else if (avg_distance_ur < avg_distance_ll
-                    && avg_distance_ur < avg_distance_ul
-                    && avg_distance_ur < avg_distance_lr)
+                else if (avg_distance_ur < avg_distance_lr)
                 { /* UR Cell */
                     cell_vertices[LL_POINT] = center_point;
                 }
