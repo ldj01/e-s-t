@@ -37,8 +37,7 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    parser = ArgumentParser(description='Runs MODTRAN on a pre-determined'
-                                        ' set of points')
+    parser = ArgumentParser(description='Creates surface temperature product')
 
     parser.add_argument('--version',
                         action='version',
@@ -307,7 +306,7 @@ PROC_CFG_FILENAME = 'processing.conf'
 
 
 def main():
-    """Main processing for building the points list
+    """Main processing for creating the surface temperature product 
     """
 
     # Command Line Arguments
