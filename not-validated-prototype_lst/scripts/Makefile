@@ -15,6 +15,7 @@ SCRIPTS = \
     lst_extract_auxiliary_narr_data.py \
     lst_generate_distance_to_cloud.py \
     lst_generate_products.py \
+    lst_generate_qa.py \
     lst_run_modtran.py \
     estimate_landsat_emissivity.py
 

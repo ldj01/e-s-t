@@ -14,13 +14,13 @@
 import os
 import sys
 import logging
+import datetime
 from argparse import ArgumentParser
 from collections import namedtuple
-
-
 import numpy as np
 from scipy import ndimage
 from osgeo import gdal, osr
+from lxml import objectify as objectify
 
 import lst_utilities as util
 from espa import Metadata
@@ -207,6 +207,84 @@ def write_distance_to_cloud_product(samps, lines, transform, wkt, no_data_value,
         os.unlink(aux_filename)
 
 
+def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code, 
+                                   no_data_value):
+    """Adds the cloud distance band to the Metadata XML file
+
+    Args:
+        espa_metadata <espa.Metadata>: XML metadata information
+        filename <str>: Full path for the output file to create
+        sensor_code <str>: Name prefix for the sensor
+        no_data_value <float>: Value to use for fill
+    """
+
+    logger = logging.getLogger(__name__)
+
+    logger.info('Adding {0} to Metadata XML'.format(filename))
+
+    # Create an element maker
+    maker = objectify.ElementMaker(annotate=False, namespace=None, nsmap=None)
+
+    source_product = 'toa_refl'
+
+    # Find the TOA Band 1 to use for the specific band details
+    base_band = None
+    for band in espa_metadata.xml_object.bands.band:
+        if (band.get('product') == source_product and
+                band.get('name') == 'toa_band1'):
+            base_band = band
+
+    if base_band is None:
+        raise MissingBandError('Failed to find the TOA BLUE band'
+                               ' in the input data')
+
+    distance_band = maker.band()
+    distance_band.set('product', 'lst_intermediate')
+    distance_band.set('source', source_product)
+    distance_band.set('name', 'st_cloud_distance')
+    distance_band.set('category', 'image')
+    distance_band.set('data_type', 'FLOAT32')
+    distance_band.set('nlines', base_band.attrib['nlines'])
+    distance_band.set('nsamps', base_band.attrib['nsamps'])
+    distance_band.set('fill_value', str(no_data_value))
+
+    distance_band.short_name \
+        = maker.element('{0}ST_CLOUD_DIST'.format(sensor_code))
+
+    distance_band.long_name = maker.element('Landsat surface temperature'
+                                        ' distance to cloud band')
+    distance_band.file_name = maker.element(filename)
+
+    distance_band.pixel_size = base_band.pixel_size
+
+    distance_band.resample_method = maker.element('none')
+    distance_band.data_units = maker.element('distance (km)')
+
+    distance_band.valid_range = maker.element()
+    distance_band.valid_range.set('min', '0')
+    # The largest distance will be from 1 corner of the image to the opposite
+    # corner.  We don't have a specific limit, so use the Earth diameter in
+    # case we support long intervals of scenes. 
+    distance_band.valid_range.set('max', '12742')
+
+    distance_band.app_version = maker.element(util.Version.app_version())
+
+    # Get the production date and time in string format
+    # Strip the microseconds and add a Z
+    date_now = ('{0}Z'.format(datetime.datetime.now()
+                              .strftime('%Y-%m-%dT%H:%M:%S')))
+    distance_band.production_date = maker.element(date_now)
+
+    # Append the band to the XML
+    espa_metadata.xml_object.bands.append(distance_band)
+
+    # Validate the XML
+    espa_metadata.validate()
+
+    # Write it to the XML file
+    espa_metadata.write()
+
+
 def generate_distance(xml_filename, no_data_value):
     """Provides the main processing algorithm for generating the distance 
        to cloud product.
@@ -225,6 +303,7 @@ def generate_distance(xml_filename, no_data_value):
     src_info = retrieve_metadata_information(espa_metadata)
 
     # Determine output information
+    sensor_code = get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.qa_filename)
     output_srs = osr.SpatialReference()
     output_srs.ImportFromWkt(dataset.GetProjection())
@@ -238,7 +317,7 @@ def generate_distance(xml_filename, no_data_value):
 
     # Build distance to cloud filename
     distance_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_cloud_distance', '.img'])
+                                    '_lst_cloud_distance', '.img'])
 
     # Write distance to cloud product 
     write_distance_to_cloud_product(samps=samps,
@@ -249,9 +328,36 @@ def generate_distance(xml_filename, no_data_value):
                                     filename=distance_img_filename,
                                     file_data=distance_to_cloud)
 
+    add_cloud_distance_band_to_xml(espa_metadata=espa_metadata,
+                                   filename=distance_img_filename,
+                                   sensor_code=sensor_code,
+                                   no_data_value=no_data_value)
+
+
+def get_satellite_sensor_code(xml_filename):
+    """Derives the satellite-sensor code from the XML filename
+
+    Args:
+        xml_filename <str>: Filename for the ESPA Metadata XML
+
+    Returns:
+        <str>: Satellite sensor code
+    """
+
+    collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
+
+    base_name = os.path.basename(xml_filename)
+
+    satellite_sensor_code = base_name[0:4]
+    if satellite_sensor_code in collection_prefixes:
+        return satellite_sensor_code
+
+    raise Exception('Satellite-Sensor code ({0}) not understood'
+                    .format(satellite_sensor_code))
+
 
 # Specify the no data value we will be using.
-NO_DATA_VALUE = -1.0 
+NO_DATA_VALUE = -1
 
 
 def main():

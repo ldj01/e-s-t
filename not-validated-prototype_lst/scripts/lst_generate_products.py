@@ -249,6 +249,52 @@ def run_modtran(modtran_data_path, process_count, debug):
             logger.info(output)
 
 
+def generate_distance_to_cloud(xml_filename, debug):
+    """Run the tool to create the distance to cloud band
+
+    Args:
+        xml_filename <str>: XML metadata filename
+        debug <bool>: Debug logging and processing
+    """
+
+    output = ''
+    try:
+        cmd = ['lst_generate_distance_to_cloud.py',
+               '--xml', xml_filename]
+
+        if debug:
+            cmd.append('--debug')
+
+        output = util.System.execute_cmd(' '.join(cmd))
+    finally:
+        if len(output) > 0:
+            logger = logging.getLogger(__name__)
+            logger.info(output)
+
+
+def generate_qa(xml_filename, debug):
+    """Run the tool to create the surface temperature quality band 
+
+    Args:
+        xml_filename <str>: XML metadata filename
+        debug <bool>: Debug logging and processing
+    """
+
+    output = ''
+    try:
+        cmd = ['lst_generate_qa.py',
+               '--xml', xml_filename]
+
+        if debug:
+            cmd.append('--debug')
+
+        output = util.System.execute_cmd(' '.join(cmd))
+    finally:
+        if len(output) > 0:
+            logger = logging.getLogger(__name__)
+            logger.info(output)
+
+
 def cleanup_temporary_data():
     """Cleanup/remove all the LST temporary files and directories 
     """
@@ -258,6 +304,7 @@ def cleanup_temporary_data():
     ATMOSPHERE_PARAMETERS_NAME = 'atmospheric_parameters.txt'
     USED_POINTS_NAME = 'used_points.txt'
     EMISSIVITY_HEADER_NAME = '*_emis.img.aux.xml'
+    EMISSIVITY_STDEV_HEADER_NAME = '*_emis_stdev.img.aux.xml'
 
     # File cleanup
     cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME, 
@@ -268,9 +315,12 @@ def cleanup_temporary_data():
         if os.path.exists(filename):
             os.unlink(filename)
 
-    # Cleanup file pattern.
-    for filename in glob.glob(EMISSIVITY_HEADER_NAME):
-        os.unlink(filename)
+    # Cleanup file patterns.
+    cleanup_pattern_list = [EMISSIVITY_HEADER_NAME, 
+                            EMISSIVITY_STDEV_HEADER_NAME]
+    for pattern in cleanup_pattern_list:
+        for filename in glob.glob(pattern):
+            os.unlink(filename)
 
     # Directory cleanup
     for directory in glob.glob('[0-9][0-9][0-9]_[0-9][0-9][0-9]_'
@@ -287,19 +337,27 @@ def cleanup_intermediate_bands():
     """
 
     # File cleanup
-    EMISSIVITY_PATTERN = '*_landsat_emis.*'
-    ATMOSPHERIC_TRANSMITTANCE_PATTERN = '*_lst_atmospheric_transmittance.*'
-    DOWNWELLED_RADIANCE_PATTERN = '*_lst_downwelled_radiance.*'
-    UPWELLED_RADIANCE_PATTERN = '*_lst_upwelled_radiance.*'
-    THERMAL_RADIANCE_PATTERN = '*_lst_thermal_radiance.*'
+    EMISSIVITY_PATTERN = '*_emis.'
+    EMISSIVITY_STDEV_PATTERN = '*_emis_stdev.'
+    ATMOSPHERIC_TRANSMITTANCE_PATTERN = '*_lst_atmospheric_transmittance.'
+    DOWNWELLED_RADIANCE_PATTERN = '*_lst_downwelled_radiance.'
+    UPWELLED_RADIANCE_PATTERN = '*_lst_upwelled_radiance.'
+    THERMAL_RADIANCE_PATTERN = '*_lst_thermal_radiance.'
+    CLOUD_DISTANCE_PATTERN = '*_lst_cloud_distance.'
 
     # Cleanup file patterns.
-    cleanup_list = [EMISSIVITY_PATTERN, ATMOSPHERIC_TRANSMITTANCE_PATTERN,
+    cleanup_list = [EMISSIVITY_PATTERN, EMISSIVITY_STDEV_PATTERN,
+                    ATMOSPHERIC_TRANSMITTANCE_PATTERN,
                     DOWNWELLED_RADIANCE_PATTERN, UPWELLED_RADIANCE_PATTERN,
-                    THERMAL_RADIANCE_PATTERN]
-    for pattern in cleanup_list:
-        for filename in glob.glob(pattern):
-            os.unlink(filename)
+                    THERMAL_RADIANCE_PATTERN, CLOUD_DISTANCE_PATTERN]
+
+    # Only cleanup these extensions
+    extensions = ('hdr', 'img')
+    for extension in extensions:
+        for pattern in cleanup_list:
+            pattern += extension
+            for filename in glob.glob(pattern):
+                os.unlink(filename)
 
 
 PROC_CFG_FILENAME = 'processing.conf'
@@ -397,6 +455,14 @@ def main():
     except Exception:
         logger.error('Failed processing Land Surface Temperature')
         raise
+
+    # Build the distance to cloud band 
+    generate_distance_to_cloud(xml_filename=args.xml_filename,
+                               debug=args.debug)
+
+    # Build the surface temperature quality band
+    generate_qa(xml_filename=args.xml_filename,
+                debug=args.debug)
 
     # Clean up files and directories according to user selections.
     if not args.temporary:

@@ -124,7 +124,7 @@ class BuildLSTData(object):
                 self.downwelled_name = band.get_file_name()
 
             if (band.product == 'lst_intermediate' and
-                    band.name == 'landsat_emis'):
+                    band.name == 'emis'):
                 self.emissivity_name = band.get_file_name()
 
         # Error if we didn't find the required TOA bands in the data
@@ -141,7 +141,7 @@ class BuildLSTData(object):
             raise Exception('Failed to find the lst_downwelled_radiance'
                             ' in the input data')
         if len(self.emissivity_name) <= 0:
-            raise Exception('Failed to find the landsat_emis'
+            raise Exception('Failed to find the emis'
                             ' in the input data')
 
         # Save for later
