@@ -1,4 +1,3 @@
-TODO TODO TODO - This whole thing needs lots and lots of work.
 
 This is the algorithm description derived from the prototype implementation
 provided by the authors and subsequent conversations and emails.
@@ -21,6 +20,11 @@ Algorithm Authors:
         Research Scientist
         NASA Jet Propulsion Laboratory
         email: glynn.hulley@nasa.gov
+
+    Kelly Laraby
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        kga1099@rit.edu
 
     John R. Schott
         Chester F. Carlson Center for Imaging Science
@@ -46,6 +50,9 @@ Algorithm Description - Overview:
 
         6) Use all of the previously-generated bands to make a land surface
            temperature band.
+
+        7) Use the previously-generated bands and a cloud distance band to
+           make a quality band for the land surface temperature band.
 
 ==============================================================================
 Algorithm Description - Inputs:
@@ -150,4 +157,16 @@ Algorithm Description - Detailed:
 
        19) Scale the land surface temperature value to include 1/10 degree 
            precision in the integer product. 
+
+       20) Use the level 2 quality band (pixel_qa) to identify cloud locations,
+           and build a distance to cloud band base on those locations.
+
+       21) Calculate atmospheric uncertainty, instrument uncertainty,
+           emissivity uncertainty, cross correlation terms, and unknown
+           uncertainty using thermal radiance, atmospheric transmission,
+           upwelled radiance, downwelled radiance, emissivity, emissivity
+           standard deviation, and cloud distance bands.
+
+       22) Combine uncertainties and use the result to create a surface
+           temperature quality band.
 
