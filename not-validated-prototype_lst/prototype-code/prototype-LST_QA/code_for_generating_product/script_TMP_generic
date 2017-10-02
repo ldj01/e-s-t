@@ -1,0 +1,11 @@
+#!/bin/sh
+# download NARR data
+
+yymm=yearmo
+date=yearmody
+hr=rh        	#specify in 3 hour increments
+
+a="https://nomads.ncdc.noaa.gov/data/narr/$yymm/$date/narr-a_221_${date}_${hr}00_000"
+echo $a.inv
+./get_inv.pl $a.inv | egrep "TMP:.00|TMP:.25|TMP:.50|TMP:.75" | ./get_grib.pl $a.grb TMP.grb
+echo "done"
