@@ -17,8 +17,8 @@ all:
 install:
 	install -d $(link_path)
 	install -d $(script_install_path)
-	install -m 755 land_surface_temperature.py $(script_install_path) || exit 1
-	ln -sf ../$(project_name)/bin/land_surface_temperature.py $(link_path)/land_surface_temperature.py
+	install -m 755 surface_temperature.py $(script_install_path) || exit 1
+	ln -sf ../$(project_name)/bin/surface_temperature.py $(link_path)/surface_temperature.py
 
 clean:
 

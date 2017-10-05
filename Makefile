@@ -8,8 +8,8 @@
 
 include make.config
 
-DIR_RIT = not-validated-prototype_lst
-DIR_AUX = lst_auxiliary_data
+DIR_RIT = not-validated-prototype_st
+DIR_AUX = st_auxiliary_data
 
 all: all-script all-rit
 
@@ -32,28 +32,28 @@ clean-script:
 
 #-----------------------------------------------------------------------------
 all-rit:
-	echo "make all in not-validated-prototype_lst"; \
+	echo "make all in not-validated-prototype_st"; \
         (cd $(DIR_RIT); $(MAKE) all);
 
 install-rit: check-environment
-	echo "make install in not-validated-prototype_lst"; \
+	echo "make install in not-validated-prototype_st"; \
         (cd $(DIR_RIT); $(MAKE) install);
 
 clean-rit:
-	echo "make clean in not-validated-prototype_lst"; \
+	echo "make clean in not-validated-prototype_st"; \
         (cd $(DIR_RIT); $(MAKE) clean);
 
 #-----------------------------------------------------------------------------
 all-rit-aux:
-	echo "make install in lst_auxiliary_data"; \
+	echo "make install in st_auxiliary_data"; \
         (cd $(DIR_AUX); $(MAKE));
 
 install-rit-aux:
-	echo "make install in lst_auxiliary_data"; \
+	echo "make install in st_auxiliary_data"; \
         (cd $(DIR_AUX); $(MAKE) install);
 
 clean-rit-aux:
-	echo "make install in lst_auxiliary_data"; \
+	echo "make install in st_auxiliary_data"; \
         (cd $(DIR_AUX); $(MAKE) clean);
 
 #-----------------------------------------------------------------------------
