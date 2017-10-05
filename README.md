@@ -39,8 +39,8 @@ export ESPALIB="path_to_ESPA_PRODUCT_FORMATTER_libraries"
 * Clone the repository and replace the defaulted version(master) with this
   version of the software
 ```
-git clone https://github.com/USGS-EROS/espa-land-surface-temperature.git
-cd espa-land-surface-temperature
+git clone https://github.com/USGS-EROS/espa-surface-temperature.git
+cd espa-surface-temperature
 git checkout version_<version>
 ```
 * Build and install the application specific software
@@ -55,10 +55,10 @@ See `surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
-* ST_AUX_DIR - Points to the local NARR data archive.  See [LST Auxiliary Data](st_auxiliary_data/README.md).
+* ST_AUX_DIR - Points to the local NARR data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
   - `export ST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
 * ST_DATA_DIR - Points to the installed static file
-  - `export ST_DATA_DIR="/usr/local/espa-land-surface-temperature/lst/static_data"`
+  - `export ST_DATA_DIR="/usr/local/espa-surface-temperature/st/static_data"`
 * MODTRAN_PATH - Points to the installed MODTRAN location
   - `export MODTRAN_PATH="/usr/local/bin"`
 * MODTRAN_DATA_DIR - Points to the directory containing the MODTRAN "DATA" directory
