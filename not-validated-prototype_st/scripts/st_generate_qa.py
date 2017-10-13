@@ -3,7 +3,7 @@
 '''
     File: st_generate_qa.py
 
-    Purpose: Builds a quality band for the surface temperature product. 
+    Purpose: Builds a quality band for the surface temperature product.
 
     Project: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -40,7 +40,7 @@ def get_transmission_uncertainty(tau_values):
         tau_values <numpy.2darray>: Transmission values 
 
     Returns:
-        tau_uncertainty <numpy.2darray>: Transmission uncertainty values 
+        tau_uncertainty <numpy.2darray>: Transmission uncertainty values
     """
 
     # Just give it the right shape
@@ -84,7 +84,7 @@ def get_upwelled_uncertainty(lu_values):
         lu_values <numpy.2darray>: Upwelled radiance values 
 
     Returns:
-        lu_uncertainty <numpy.2darray>: Upwelled radiance uncertainty values 
+        lu_uncertainty <numpy.2darray>: Upwelled radiance uncertainty values
     """
 
     # Just give it the right shape
@@ -92,7 +92,7 @@ def get_upwelled_uncertainty(lu_values):
 
     # Set a lower bound, above which a quadratic fit will be made,
     # and below which last value of the fit line is extended as a constant.
-    # The lower bound was set as simply the smallest upwelled radiance value 
+    # The lower bound was set as simply the smallest upwelled radiance value
     # from the validation set that was used.
     lu_value_where_real_data_ends = 5.6788 
 
@@ -125,10 +125,10 @@ def get_downwelled_uncertainty(ld_values):
        surface temperature uncertainty estimation.
 
     Args:
-        ld_values <numpy.2darray>: Downwelled radiance values 
+        ld_values <numpy.2darray>: Downwelled radiance values
 
     Returns:
-        ld_uncertainty <numpy.2darray>: Downwelled radiance uncertainty values 
+        ld_uncertainty <numpy.2darray>: Downwelled radiance uncertainty values
     """
 
     # Just give it the right shape
@@ -136,7 +136,7 @@ def get_downwelled_uncertainty(ld_values):
 
     # Set a lower bound, above which a quadratic fit will be made,
     # and below which last value of the fit line is extended as a constant.
-    # The lower bound was set as simply the smallest downwelled radiance value 
+    # The lower bound was set as simply the smallest downwelled radiance value
     # from the validation set that was used.
     ld_value_where_real_data_ends = 7.2307 
 
@@ -169,15 +169,15 @@ def get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD):
        temperature uncertainty estimation.
 
     Args:
-        dLT_dTAU <numpy.2darray>: transmission partial 
-        dLT_dLU <numpy.2darray>: upwelled partial 
-        dLT_dLD <numpy.2darray>: downwelled partial 
-        S_TAU <numpy.2darray>: transmission uncertainty 
-        S_LU <numpy.2darray>: upwelled uncertainty 
-        S_LD <numpy.2darray>: downwelled uncertainty 
+        dLT_dTAU <numpy.2darray>: transmission partial
+        dLT_dLU <numpy.2darray>: upwelled partial
+        dLT_dLD <numpy.2darray>: downwelled partial
+        S_TAU <numpy.2darray>: transmission uncertainty
+        S_LU <numpy.2darray>: upwelled uncertainty
+        S_LD <numpy.2darray>: downwelled uncertainty
 
     Returns:
-        cross_correlation <numpy.2darray>: cross correlation term 
+        cross_correlation <numpy.2darray>: cross correlation term
     """
 
     # Correlation coefficients from MODTRAN simulations using MERRA.
@@ -206,11 +206,11 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
        temperature uncertainty estimation.
 
     Args:
-        cloud_distances <numpy.2darray>: distances to nearest cloud 
-        tau <numpy.2darray>: transmission 
+        cloud_distances <numpy.2darray>: distances to nearest cloud
+        transmission_values <numpy.2darray>: transmission
 
     Returns:
-        unknown_uncertainty <numpy.2darray>: interpolated unknown uncertainty 
+        unknown_uncertainty <numpy.2darray>: interpolated unknown uncertainty
     """
 
     # Flatten the inputs.
@@ -235,23 +235,23 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     cld_interp = np.array([0, 0.5, 3.0, 7.5, 25.0, 82.5, 200.0])
 
     # Define the highest values in the vectors. These are the last values.
-    tau_highest = tau_interp[-1] 
-    cld_highest = cld_interp[-1] 
+    tau_highest = tau_interp[-1]
+    cld_highest = cld_interp[-1]
 
     # From input transmission values, find closest indices from tau_interp
     # vector, calculate step in vector, then calculate fractional tau index.
-    tau_close_index = np.searchsorted(tau_interp, flat_transmission_values, 
+    tau_close_index = np.searchsorted(tau_interp, flat_transmission_values,
         side='right')
     tau_close_index = tau_close_index - 1
     tau_step = tau_interp[tau_close_index + 1] - tau_interp[tau_close_index]
-    tau_frac_index = tau_close_index + ((flat_transmission_values 
+    tau_frac_index = tau_close_index + ((flat_transmission_values
         - tau_interp[tau_close_index]) / tau_step)
     one_locations = np.where(tau_frac_index == tau_highest)
     tau_frac_index[one_locations] = len(tau_interp) - 1
 
     # From input cloud distance values, find closest indices from cld_interp
     # vector, calculate step in vector, then calculate fractional cloud index.
-    cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances, 
+    cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances,
         side='right')
     cld_close_index = cld_close_index - 1
     cld_step = cld_interp[cld_close_index + 1] - cld_interp[cld_close_index]
@@ -265,7 +265,7 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     coordinates = np.row_stack((cld_frac_index, tau_frac_index))
 
     # Interpolate the results at the specified coordinates. 
-    unknown_uncertainty = map_coordinates(unknown_error_matrix, coordinates, 
+    unknown_uncertainty = map_coordinates(unknown_error_matrix, coordinates,
         order=1, mode='nearest')
 
     # Memory cleanup
@@ -346,6 +346,7 @@ def retrieve_metadata_information(espa_metadata, band_name):
 
     Args:
         espa_metadata <espa.Metadata>: XML metadata
+        band_name <str>: Name of band to extract metadata information from
 
     Returns:
         <SourceInfo>: Populated with source information
@@ -373,15 +374,22 @@ def retrieve_metadata_information(espa_metadata, band_name):
 
 def calculate_qa(radiance_filename, transmission_filename, upwelled_filename, 
                  downwelled_filename, emis_filename, emis_stdev_filename,
-                 distance_filename, fill_value):
+                 distance_filename, satellite, fill_value):
     """Calculate QA 
 
     Args:
-        src_info <SourceInfo>: Information about the source data
+        radiance_filename <str>: Name of radiance file
+        transmission_filename <str>: Name of atmospheric transmission file
+        upwelled_filename <str>: Name of upwelled radiance file
+        downwelled_filename <str>: Name of downwelled radiance file
+        emis_filename <str>: Name of emissivity file
+        emis_stdev_filename <str>: Name of emissivity standard deviation file
+        distance_filename <str>: Name of cloud distance file
+        satellite <str>: Name of satellite (e.g.: "LANDSAT_8")
         fill_value <float>: No data (fill) value to use
 
     Returns:
-        <numpy.2darray>: Generated QA band data
+        <numpy.2darray>: Generated surface temperature QA band data
     """
 
     logger = logging.getLogger(__name__)
@@ -389,10 +397,10 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     logger.info('Building QA band')
 
     # Read the intermediate input
-    # Lobs = thermal radiance 
-    # tau = transmission 
+    # Lobs = thermal radiance
+    # tau = transmission
     # Lu = upwelled radiance
-    # Ld = downwelled radiance 
+    # Ld = downwelled radiance
     Lobs_array = extract_raster_data(radiance_filename, 1)
     tau_array = extract_raster_data(transmission_filename, 1)
     Lu_array = extract_raster_data(upwelled_filename, 1)
@@ -401,8 +409,16 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     emis_stdev_array = extract_raster_data(emis_stdev_filename, 1)
     distance_array = extract_raster_data(distance_filename, 1)
 
-    # Find non-zero locations
-    nonfill_locations = np.where(Lobs_array != -9999)
+    # Find fill locations
+    nonfill_locations = np.where(Lobs_array != fill_value)
+    tau_fill_locations = np.where(tau_array == fill_value)
+    Lu_fill_locations = np.where(Lu_array == fill_value)
+    Ld_fill_locations = np.where(Ld_array == fill_value)
+    emis_fill_locations = np.where(emis_array == fill_value)
+    emis_stdev_fill_locations = np.where(emis_stdev_array == fill_value)
+    distance_fill_locations = np.where(distance_array == fill_value)
+
+    # Only operate where thermal radiance is non-fill
     Lobs = Lobs_array[nonfill_locations]
     tau = tau_array[nonfill_locations]
     Lu = Lu_array[nonfill_locations]
@@ -426,12 +442,44 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # Calculate atmosphere uncertainty
     S_A = (dLT_dTAU * S_TAU)**2 + (dLT_dLU * S_LU)**2 + (dLT_dLD * S_LD)**2
 
+    # Look up satellite thermal band uncertainty based on satellite
+    if satellite == 'LANDSAT_4':
+        landsat_uncertainty = 0.8
+    elif satellite == 'LANDSAT_5':
+        landsat_uncertainty = 0.8
+    elif satellite == 'LANDSAT_7':
+        landsat_uncertainty = 0.4
+    elif satellite == 'LANDSAT_8':
+        landsat_uncertainty = 0.3
+    else:
+        raise Exception('Unsupported satellite sensor')
+
     # Calculate instrument uncertainty
-    landsat_uncertainty = 0.032 # [K], for Landsat 7
     S_I = (dLT_dLOBS * landsat_uncertainty)**2
 
+    # Get the RMSE of the linear regression fit of the spectral emissivity
+    # adjustment procedure (which is the emis_data calculation in
+    # estimate_landsat_emissivity)
+    if satellite == 'LANDSAT_4':
+        emis_regfit = 0.00085135
+    elif satellite == 'LANDSAT_5':
+        emis_regfit = 0.0013
+    elif satellite == 'LANDSAT_7':
+        emis_regfit = 0.0011
+    elif satellite == 'LANDSAT_8':
+        emis_regfit = 0.00093909
+    else:
+        raise Exception('Unsupported satellite sensor')
+
+    # Calculate the total algorithmic uncertainty of the Temperature Emissivity
+    # Separation algorithm used to produce the ASTER GED emissivities described
+    # in Hulley et al. 2012
+    eret13 = 0.0164
+    eret14 = 0.0174
+    eret = np.sqrt((eret13**2 + eret14**2) / 2)
+
     # Calculate emissivity uncertainty
-    S_E = ((Lu - Lobs + Ld * tau) / (tau * emis**2) * emis_stdev)**2
+    S_E = np.sqrt((emis_stdev**2 + emis_regfit**2 + eret**2) / 3)
 
     # Calculate cross correlation terms 
     S_P = get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD)
@@ -464,12 +512,25 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del S_P
     del unknown_uncertainty
 
-    # Give st_uncertainty the same dimensions as the original Lobs.  Add back
-    # the fill locations.
-    st_uncertainty_array = np.zeros_like(Lobs_array)
+    # Give st_uncertainty the same dimensions as the original Lobs
+    st_uncertainty_array = np.full_like(Lobs_array, fill_value)
     st_uncertainty_array[nonfill_locations] = st_uncertainty
 
+    # Apply fill to results where other inputs were fill
+    st_uncertainty_array[tau_fill_locations] = fill_value
+    st_uncertainty_array[Lu_fill_locations] = fill_value
+    st_uncertainty_array[Ld_fill_locations] = fill_value
+    st_uncertainty_array[emis_fill_locations] = fill_value
+    st_uncertainty_array[emis_stdev_fill_locations] = fill_value
+    st_uncertainty_array[distance_fill_locations] = fill_value
+
     del nonfill_locations
+    del tau_fill_locations
+    del Lu_fill_locations
+    del Ld_fill_locations
+    del emis_fill_locations
+    del emis_stdev_fill_locations
+    del distance_fill_locations
     del st_uncertainty
 
     return st_uncertainty_array
@@ -528,7 +589,7 @@ def add_qa_band_to_xml(espa_metadata, filename, sensor_code, no_data_value):
 
     qa_band.valid_range = maker.element()
     qa_band.valid_range.set('min', '0')
-    qa_band.valid_range.set('max', '2230')
+    qa_band.valid_range.set('max', '32767')
 
     qa_band.app_version = maker.element(util.Version.app_version())
 
@@ -569,7 +630,7 @@ def write_qa_product(samps, lines, transform, wkt, no_data_value, filename,
     """
 
     # Scale the data
-    file_data = file_data * MULT_FACTOR
+    file_data[file_data != no_data_value] *= MULT_FACTOR
 
     logger = logging.getLogger(__name__)
 
@@ -619,6 +680,7 @@ def generate_qa(xml_filename, no_data_value):
     emis_src_info = retrieve_metadata_information(espa_metadata, 'emis')
     emis_stdev_src_info \
         = retrieve_metadata_information(espa_metadata, 'emis_stdev')
+    satellite = espa_metadata.xml_object.global_metadata.satellite
 
     # Determine output information.  Make it like the emissivity band
     sensor_code = get_satellite_sensor_code(xml_filename)
@@ -642,6 +704,7 @@ def generate_qa(xml_filename, no_data_value):
                       emis_src_info.filename, 
                       emis_stdev_src_info.filename, 
                       distance_img_filename,
+                      satellite,
                       no_data_value)
 
     # Build QA filename

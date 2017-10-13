@@ -262,10 +262,8 @@ def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code,
 
     distance_band.valid_range = maker.element()
     distance_band.valid_range.set('min', '0')
-    # The largest distance will be from 1 corner of the image to the opposite
-    # corner.  We don't have a specific limit, so use the Earth diameter in
-    # case we support long intervals of scenes. 
-    distance_band.valid_range.set('max', '12742')
+    # The largest distance should be about 8000 pixels * 30 meters, or 240 km
+    distance_band.valid_range.set('max', '240')
 
     distance_band.app_version = maker.element(util.Version.app_version())
 
@@ -357,7 +355,7 @@ def get_satellite_sensor_code(xml_filename):
 
 
 # Specify the no data value we will be using.
-NO_DATA_VALUE = -1
+NO_DATA_VALUE = -9999
 
 
 def main():

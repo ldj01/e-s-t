@@ -352,7 +352,7 @@ def generate_landsat_ndvi(src_info, no_data_value):
 
 
 def snow_and_ndsi_locations(src_info, no_data_value):
-    """Generate Landsat NDVI
+    """Generate Landsat snow locations and NDSI nodata locations
 
     Args:
         src_info <SourceInfo>: Information about the source data
@@ -441,6 +441,7 @@ def extract_aster_data(url, filename, intermediate):
     Returns:
         <numpy.2darray>: Mean Band 13 data
         <numpy.2darray>: Mean Band 14 data
+        <numpy.2darray>: SDev Band 13 data
         <numpy.2darray>: SDev Band 14 data
         <numpy.2darray>: NDVI band data
         <int>: Samples in the data
@@ -466,15 +467,17 @@ def extract_aster_data(url, filename, intermediate):
     # (for example, in water regions).
     aster_b13_data = []
     aster_b14_data = []
-    aster_sdev_data = []
+    aster_b13_sdev_data = []
+    aster_b14_sdev_data = []
     aster_ndvi_data = []
     samps = 0
     lines = 0
     geo_transform = []
     if not os.path.exists(h5_file_path):
         # The ASTER tile is not available, so don't try to process it
-        return (aster_b13_data, aster_b14_data, aster_sdev_data, 
-                aster_ndvi_data, samps, lines, geo_transform, False)
+        return (aster_b13_data, aster_b14_data, aster_b13_sdev_data,
+                aster_b14_sdev_data, aster_ndvi_data, samps, lines,
+                geo_transform, False)
 
     # Define the sub-dataset names
     emis_ds_name = ''.join(['HDF5:"', h5_file_path,
@@ -495,7 +498,8 @@ def extract_aster_data(url, filename, intermediate):
 
     aster_b13_data = extract_raster_data(emis_ds_name, 4)
     aster_b14_data = extract_raster_data(emis_ds_name, 5)
-    aster_sdev_data = extract_raster_data(emis_sdev_ds_name, 5)
+    aster_b13_sdev_data = extract_raster_data(emis_sdev_ds_name, 4)
+    aster_b14_sdev_data = extract_raster_data(emis_sdev_ds_name, 5)
     aster_ndvi_data = extract_raster_data(ndvi_ds_name, 1)
     aster_lat_data = extract_raster_data(lat_ds_name, 1)
     aster_lon_data = extract_raster_data(lon_ds_name, 1)
@@ -522,8 +526,9 @@ def extract_aster_data(url, filename, intermediate):
     # Build the geo transform
     geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
 
-    return (aster_b13_data, aster_b14_data, aster_sdev_data, aster_ndvi_data,
-            samps, lines, geo_transform, True)
+    return (aster_b13_data, aster_b14_data, aster_b13_sdev_data,
+            aster_b14_sdev_data, aster_ndvi_data, samps, lines, geo_transform,
+            True)
 
 
 def generate_estimated_emis_tile(coefficients, tile_name,
@@ -597,14 +602,15 @@ def generate_estimated_emis_tile(coefficients, tile_name,
     del emis_data
 
 
-def generate_emis_stdev_tile(tile_name, stdev_data,
-                             samps, lines, transform,
+def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
+                             aster_b14_stdev_data, samps, lines, transform,
                              wkt, no_data_value):
     """Generate ASTER emissivity standard deviation values for the tile
 
     Args:
         tile_name <str>: Filename to create for the tile
-        stdev_data <numpy.2darray>: Unscaled sdev Band 14 ASTER tile data
+        aster_b13_data <numpy.2darray>: Unscaled band 13 ASTER stdev tile data
+        aster_b14_data <numpy.2darray>: Unscaled band 14 ASTER stdev tile data
         samps <int>: Samples in the data
         lines <int>: Lines in the data
         transform <2x3:float>: GDAL Affine transformation matrix
@@ -620,27 +626,49 @@ def generate_emis_stdev_tile(tile_name, stdev_data,
 
     logger = logging.getLogger(__name__)
 
-    # Save the no data locations.
-    stdev_no_data_locations = np.where(stdev_data == no_data_value)
+    # Save the no data and gap locations.
+    aster_b13_stdev_gap_locations = np.where(aster_b13_stdev_data == 0)
+    aster_b13_stdev_no_data_locations = np.where(aster_b13_stdev_data ==
+        no_data_value)
 
     # Scale the data
-    data = stdev_data * 0.0001
+    aster_b13_stdev_data = aster_b13_stdev_data * 0.0001
 
-    # Re-apply the no data locations.
-    data[stdev_no_data_locations] = no_data_value
+    # Save the no data and gap locations.
+    aster_b14_stdev_gap_locations = np.where(aster_b14_stdev_data == 0)
+    aster_b14_stdev_no_data_locations = np.where(aster_b14_stdev_data ==
+        no_data_value)
 
-    # Create the ASTER NDVI raster output tile
+    # Scale the data
+    aster_b14_stdev_data = aster_b14_stdev_data * 0.0001
+
+    # Create the estimated Landsat EMIS stdev data.
+    emis_stdev_data = np.sqrt((aster_b13_stdev_data**2
+        + aster_b14_stdev_data**2)/2)
+
+    # Re-apply the no data and gap locations.
+    emis_stdev_data[aster_b13_stdev_gap_locations] = 0
+    emis_stdev_data[aster_b13_stdev_no_data_locations] = no_data_value
+    emis_stdev_data[aster_b14_stdev_gap_locations] = 0
+    emis_stdev_data[aster_b14_stdev_no_data_locations] = no_data_value
+
+    del aster_b13_stdev_gap_locations
+    del aster_b14_stdev_gap_locations
+    del aster_b13_stdev_no_data_locations
+    del aster_b14_stdev_no_data_locations
+
+    # Create the ASTER EMIS standard deviation raster output tile
     logger.info('Creating an ASTER EMIS STDEV tile {}'.format(tile_name))
     util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                   tile_name,
-                                  data,
+                                  emis_stdev_data,
                                   samps, lines,
                                   transform,
                                   wkt,
                                   no_data_value,
                                   gdal.GDT_Float32)
 
-    del data
+    del emis_stdev_data
 
 
 def generate_aster_ndvi_tile(tile_name, ndvi_data,
@@ -713,10 +741,11 @@ def generate_tiles(src_info, coefficients, url, wkt,
     the Landsat scene we are processing
     - Download them
     - Extract the Emissivity mean bands 13 and 14
-    - Extract the Emissivity standard deviation band 14
+    - Extract the Emissivity standard deviation bands 13 and 14
     - Extract the NDVI
     - Generate the Landsat EMIS from the 13 and 14 band data
-    - Generate the Landsat EMIS standard deviation from the stdev band data 
+    - Generate the Landsat EMIS standard deviation from the 13 and 14 stdev
+    - band data
     '''
     ls_emis_mean_filenames = list()
     ls_emis_stdev_filenames = list()
@@ -740,8 +769,9 @@ def generate_tiles(src_info, coefficients, url, wkt,
         aster_ndvi_tile_name = ''.join([filename, '_ndvi.tif'])
 
         # Read the ASTER data
-        (aster_b13_data, aster_b14_data, aster_stdev_data, aster_ndvi_data,
-         samps, lines, transform, aster_data_available) = (
+        (aster_b13_data, aster_b14_data, aster_b13_stdev_data,
+         aster_b14_stdev_data, aster_ndvi_data, samps, lines, transform,
+         aster_data_available) = (
              extract_aster_data(url=url,
                                 filename=filename,
                                 intermediate=intermediate))
@@ -769,14 +799,16 @@ def generate_tiles(src_info, coefficients, url, wkt,
         del aster_b14_data
 
         generate_emis_stdev_tile(tile_name=ls_emis_stdev_tile_name,
-                                 stdev_data=aster_stdev_data,
+                                 aster_b13_stdev_data=aster_b13_stdev_data,
+                                 aster_b14_stdev_data=aster_b14_stdev_data,
                                  samps=samps,
                                  lines=lines,
                                  transform=transform,
                                  wkt=wkt,
                                  no_data_value=no_data_value)
 
-        del aster_stdev_data
+        del aster_b13_stdev_data
+        del aster_b14_stdev_data
 
         generate_aster_ndvi_tile(tile_name=aster_ndvi_tile_name,
                                  ndvi_data=aster_ndvi_data,
