@@ -3,7 +3,7 @@
 ## Surface Temperature 0.4 Release Notes
 Release Date: November 2017
 
-See git tag [st-rit-v0.4]
+See git tag [st-rit-v0.4.0]
 
 This project contains application source code for producing Surface Temperature products.
 

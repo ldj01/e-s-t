@@ -1,7 +1,7 @@
-## Surface Temperature Auxiliary Archive Generation 0.3.0 Release Notes
-Release Date: June 2017
+## Surface Temperature Auxiliary Archive Generation 0.4.0 Release Notes
+Release Date: November 2017
 
-See git tag [st-rit-v0.3.0]
+See git tag [st-rit-v0.4.0]
 
 The scripts in this directory facilitate building an archive of NARR data utilized by the Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the NARR data, even for the reduced files this software produces and archives.
 

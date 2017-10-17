@@ -249,6 +249,12 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     one_locations = np.where(tau_frac_index == tau_highest)
     tau_frac_index[one_locations] = len(tau_interp) - 1
 
+    # Memory cleanup
+    del tau_interp
+    del tau_close_index
+    del tau_step
+    del one_locations
+
     # From input cloud distance values, find closest indices from cld_interp
     # vector, calculate step in vector, then calculate fractional cloud index.
     cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances,
@@ -260,9 +266,19 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     two_hundred_locations = np.where(cld_frac_index == cld_highest)
     cld_frac_index[two_hundred_locations] = len(cld_interp) - 1
 
+    # Memory cleanup
+    del cld_interp
+    del cld_close_index
+    del cld_step
+    del two_hundred_locations
+
     # Merge the arrays so they represent coordinates in the unknown_error_matrix
     # grid to map_coordinates.
     coordinates = np.row_stack((cld_frac_index, tau_frac_index))
+
+    # Memory cleanup
+    del tau_frac_index
+    del cld_frac_index
 
     # Interpolate the results at the specified coordinates. 
     unknown_uncertainty = map_coordinates(unknown_error_matrix, coordinates,
@@ -270,16 +286,6 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
 
     # Memory cleanup
     del unknown_error_matrix
-    del tau_interp
-    del tau_close_index
-    del tau_step
-    del one_locations
-    del cld_interp
-    del tau_frac_index
-    del cld_close_index
-    del cld_step
-    del two_hundred_locations
-    del cld_frac_index
     del coordinates
 
     return unknown_uncertainty 
@@ -427,17 +433,33 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     emis_stdev = emis_stdev_array[nonfill_locations]
     distance = distance_array[nonfill_locations]
 
+    # Memory cleanup
+    del tau_array
+    del Lu_array
+    del Ld_array
+    del emis_array
+    del emis_stdev_array
+    del distance_array
+
     # Calculate partials
     dLT_dTAU  = (Lu - Lobs) / (emis * tau**2)
     dLT_dLU   = -1 / (tau * emis)
     dLT_dLD   = (emis - 1) / emis
     dLT_dLOBS = 1 / (tau * emis)
 
+    # Memory cleanup
+    del Lobs 
+    del emis 
+
     # Calculate transmission, upwelled radiance, and downwelled radiance 
     # uncertainty
     S_TAU = get_transmission_uncertainty(tau)
     S_LU = get_upwelled_uncertainty(Lu)
     S_LD = get_downwelled_uncertainty(Ld)
+
+    # Memory cleanup
+    del Lu
+    del Ld
 
     # Calculate atmosphere uncertainty
     S_A = (dLT_dTAU * S_TAU)**2 + (dLT_dLU * S_LU)**2 + (dLT_dLD * S_LD)**2
@@ -456,6 +478,9 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
 
     # Calculate instrument uncertainty
     S_I = (dLT_dLOBS * landsat_uncertainty)**2
+
+    # Memory cleanup
+    del dLT_dLOBS 
 
     # Get the RMSE of the linear regression fit of the spectral emissivity
     # adjustment procedure (which is the emis_data calculation in
@@ -481,40 +506,47 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # Calculate emissivity uncertainty
     S_E = np.sqrt((emis_stdev**2 + emis_regfit**2 + eret**2) / 3)
 
+    # Memory cleanup
+    del emis_stdev
+
     # Calculate cross correlation terms 
     S_P = get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD)
+
+    # Memory cleanup
+    del S_TAU
+    del S_LU
+    del S_LD
+    del dLT_dTAU
+    del dLT_dLU
+    del dLT_dLD
 
     # Calculate unknown uncertainty
     unknown_uncertainty = get_unknown_uncertainty(distance, tau)
     S_U = unknown_uncertainty**2
 
+    # Memory cleanup
+    del tau 
+    del distance 
+    del unknown_uncertainty
+
     # Calculate uncertainty
     st_uncertainty = np.sqrt(S_A + S_I + S_E + S_P + S_U)
 
     # Memory cleanup
-    del Lobs 
-    del tau 
-    del Lu
-    del Ld
-    del emis 
-    del emis_stdev
-    del distance 
-    del dLT_dTAU
-    del dLT_dLU
-    del dLT_dLD
-    del dLT_dLOBS 
-    del S_TAU
-    del S_LU
-    del S_LD
     del S_A
     del S_I
     del S_E
     del S_P
-    del unknown_uncertainty
+    del S_U
 
     # Give st_uncertainty the same dimensions as the original Lobs
     st_uncertainty_array = np.full_like(Lobs_array, fill_value)
     st_uncertainty_array[nonfill_locations] = st_uncertainty
+
+    # Memory cleanup
+    del nonfill_locations
+    del Lobs_array
+    del st_uncertainty
 
     # Apply fill to results where other inputs were fill
     st_uncertainty_array[tau_fill_locations] = fill_value
@@ -524,14 +556,13 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     st_uncertainty_array[emis_stdev_fill_locations] = fill_value
     st_uncertainty_array[distance_fill_locations] = fill_value
 
-    del nonfill_locations
+    # Memory cleanup
     del tau_fill_locations
     del Lu_fill_locations
     del Ld_fill_locations
     del emis_fill_locations
     del emis_stdev_fill_locations
     del distance_fill_locations
-    del st_uncertainty
 
     return st_uncertainty_array
 

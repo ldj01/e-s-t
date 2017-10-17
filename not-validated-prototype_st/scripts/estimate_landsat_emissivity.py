@@ -1245,6 +1245,27 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                             no_data_value=no_data_value,
                             intermediate=intermediate))
 
+    # Write emissivity standard deviation data and metadata
+    ls_emis_stdev_img_filename = ''.join([xml_filename.split('.xml')[0],
+                                    '_emis_stdev', '.img'])
+
+    write_emissivity_product(samps=samps,
+                             lines=lines,
+                             transform=output_transform,
+                             wkt=output_srs.ExportToWkt(),
+                             no_data_value=no_data_value,
+                             filename=ls_emis_stdev_img_filename,
+                             file_data=ls_emis_stdev_data)
+
+    add_emissivity_band_to_xml(espa_metadata=espa_metadata,
+                               filename=ls_emis_stdev_img_filename,
+                               sensor_code=sensor_code,
+                               no_data_value=no_data_value,
+                               band_type='stdev')
+
+    # Memory cleanup
+    del ls_emis_stdev_data
+
     # Find water locations using the value of water in ASTER GED
     water_locations = np.where(ls_emis_data > ASTER_GED_WATER)
 
@@ -1258,9 +1279,6 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     min_ls_ndvi = ls_ndvi_data.min()
     logger.info('Max LS NDVI {0}'.format(max_ls_ndvi))
     ls_ndvi_data = ls_ndvi_data / float(max_ls_ndvi)
-
-    # Calculate fractional vegetation cover
-    fv_L = 1.0 - (max_ls_ndvi - ls_ndvi_data) / (max_ls_ndvi - min_ls_ndvi)
 
     if intermediate:
         logger.info('Writing Landsat NDVI NORM MAX raster')
@@ -1302,6 +1320,9 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                      - 0.975 * aster_ndvi_data[bare_locations])
                     / (1 - aster_ndvi_data[bare_locations]))
 
+    # Memory cleanup
+    del aster_ndvi_data
+
     # Calculate veg adjustment with Landsat
     logger.info('Calculating EMIS Final')
 
@@ -1311,16 +1332,27 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     ls_emis_final = (coefficients.vegetation_coeff * ls_ndvi_data +
                      ls_emis_data * (1.0 - ls_ndvi_data))
 
+    # Calculate fractional vegetation cover
+    fv_L = 1.0 - (max_ls_ndvi - ls_ndvi_data) / (max_ls_ndvi - min_ls_ndvi)
+
     # Memory cleanup
-    del aster_ndvi_data
     del ls_emis_data
+    del ls_ndvi_data
 
     # Add soil component pixels
     ls_emis_final[bare_locations] = ls_emis_bare
 
+    # Memory cleanup
+    del ls_emis_bare
+    del bare_locations
+
     # Set fill values on granule edge to nan
     fill_locations = np.where(np.isnan(fv_L))
     ls_emis_final[fill_locations] = np.nan
+
+    # Memory cleanup
+    del fv_L
+    del fill_locations
 
     # Final check for emissivity values greater than 1.  Reset values greater
     # than 1 to nominal veg/water value (should be very few, if any)
@@ -1330,12 +1362,14 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     logger.info('Adjusting estimated EMIS for snow')
     ls_emis_final[snow_locations] = coefficients.snow_emissivity
 
+    # Memory cleanup
+    del snow_locations
+
     # Reset water values
     ls_emis_final[water_locations] = ASTER_GED_WATER 
 
     # Memory cleanup
-    del ls_ndvi_data
-    del snow_locations
+    del water_locations
 
     # Add the fill and scan gaps and ASTER gaps back into the results,
     # since they may have been lost
@@ -1353,7 +1387,10 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del ls_emis_gap_locations
     del aster_ndvi_no_data_locations
     del aster_ndvi_gap_locations
+    del ndvi_no_data_locations
+    del ndsi_no_data_locations 
 
+    # Write emissivity data and metadata
     ls_emis_img_filename = ''.join([xml_filename.split('.xml')[0],
                                     '_emis', '.img'])
 
@@ -1371,22 +1408,8 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                                no_data_value=no_data_value,
                                band_type='mean')
 
-    ls_emis_stdev_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_emis_stdev', '.img'])
-
-    write_emissivity_product(samps=samps,
-                             lines=lines,
-                             transform=output_transform,
-                             wkt=output_srs.ExportToWkt(),
-                             no_data_value=no_data_value,
-                             filename=ls_emis_stdev_img_filename,
-                             file_data=ls_emis_stdev_data)
-
-    add_emissivity_band_to_xml(espa_metadata=espa_metadata,
-                               filename=ls_emis_stdev_img_filename,
-                               sensor_code=sensor_code,
-                               no_data_value=no_data_value,
-                               band_type='stdev')
+    # Memory cleanup
+    del ls_emis_final
 
 
 def retrieve_command_line_arguments():
