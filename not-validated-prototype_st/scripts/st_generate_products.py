@@ -223,6 +223,22 @@ def generate_emissivity_products(xml_filename, server_name, server_path,
             logger = logging.getLogger(__name__)
             logger.info(output)
 
+    output = ''
+    try:
+        cmd = ['estimate_landsat_emissivity_stdev.py',
+               '--xml', xml_filename,
+               '--aster-ged-server-name', server_name,
+               '--aster-ged-server-path', server_path]
+
+        if debug:
+            cmd.append('--debug')
+
+        output = util.System.execute_cmd(' '.join(cmd))
+    finally:
+        if len(output) > 0:
+            logger = logging.getLogger(__name__)
+            logger.info(output)
+
 
 def run_modtran(modtran_data_path, process_count, debug):
     """Determines the grid points to utilize
