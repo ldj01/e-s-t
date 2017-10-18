@@ -415,11 +415,10 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     emis_stdev_array = extract_raster_data(emis_stdev_filename, 1)
     distance_array = extract_raster_data(distance_filename, 1)
 
-    # Find fill locations
+    # Find fill locations.  We don't need to do this for transmission, 
+    # upwelled radiance, or downwelled radiance since these are created
+    # with fill based on the the thermal radiance fill locations
     nonfill_locations = np.where(Lobs_array != fill_value)
-    tau_fill_locations = np.where(tau_array == fill_value)
-    Lu_fill_locations = np.where(Lu_array == fill_value)
-    Ld_fill_locations = np.where(Ld_array == fill_value)
     emis_fill_locations = np.where(emis_array == fill_value)
     emis_stdev_fill_locations = np.where(emis_stdev_array == fill_value)
     distance_fill_locations = np.where(distance_array == fill_value)
@@ -549,17 +548,11 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del st_uncertainty
 
     # Apply fill to results where other inputs were fill
-    st_uncertainty_array[tau_fill_locations] = fill_value
-    st_uncertainty_array[Lu_fill_locations] = fill_value
-    st_uncertainty_array[Ld_fill_locations] = fill_value
     st_uncertainty_array[emis_fill_locations] = fill_value
     st_uncertainty_array[emis_stdev_fill_locations] = fill_value
     st_uncertainty_array[distance_fill_locations] = fill_value
 
     # Memory cleanup
-    del tau_fill_locations
-    del Lu_fill_locations
-    del Ld_fill_locations
     del emis_fill_locations
     del emis_stdev_fill_locations
     del distance_fill_locations

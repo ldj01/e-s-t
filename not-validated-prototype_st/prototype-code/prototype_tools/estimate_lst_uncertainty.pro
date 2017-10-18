@@ -33,9 +33,10 @@
 ; Several changes were made to the production ST procedure that require
 ; corresponding changes to this procedure for comparison purposes.
 ;
-; - Fill locations for emissivity, emissivity standard deviation, tau, Lu, Ld,
-;   and cloud distance are set to fill in the output product.  This is typically
-;   most significant for emissivity.
+; - Fill locations for emissivity, emissivity standard deviation, and cloud 
+;   distance are set to fill in the output product.  This is typically most
+;   significant for emissivity.  Tau, Ld, and Lu need no be processed since
+;   their fill values are based on thermal radiance.
 ; - The output ST QA product is scaled by 100.  The production version is int16.
 ;   WRITE_TIFF only offers unsigned int (/SHORT) so this is kept as FLOAT
 ;   (because the nodata value is -9999) but rounded.
@@ -80,9 +81,6 @@ dist2cloud_image = READ_TIFF(imagebase + '_st_cloud_distance.tif')
 distance = dist2cloud_image(nonfill)
 
 ; read fill locations
-tau_fill_locations = WHERE(tau_array[*,*] EQ -9999)
-Lu_fill_locations = WHERE(Lu_array[*,*] EQ -9999)
-Ld_fill_locations = WHERE(Ld_array[*,*] EQ -9999)
 emis_fill_locations = WHERE(emis_array[*,*] EQ -9999)
 emis_stdev_fill_locations = WHERE(emis_stdev_array[*,*] EQ -9999)
 distance_fill_locations = WHERE(distance[*,*] EQ -9999)
@@ -200,9 +198,6 @@ lst_uncertainty_array = DBLARR(array_size[1], array_size[2])
 
 MULT_FACTOR = 100.0
 lst_uncertainty_array[nonfill] = round(lst_uncertainty * MULT_FACTOR)
-lst_uncertainty_array[tau_fill_locations] = -9999 
-lst_uncertainty_array[Lu_fill_locations] = -9999 
-lst_uncertainty_array[Ld_fill_locations] = -9999 
 lst_uncertainty_array[emis_fill_locations] = -9999 
 lst_uncertainty_array[emis_stdev_fill_locations] = -9999 
 lst_uncertainty_array[distance_fill_locations] = -9999 
