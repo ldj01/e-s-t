@@ -28,20 +28,40 @@
 ;   comparison with the production code results at the various steps where 
 ;   debug outputs are created.
 ;
+;   10/18/2017 update:
+;
+; Several changes were made to the production ST procedure that require
+; corresponding changes to this procedure for comparison purposes.
+;
+; - Fill locations for emissivity, emissivity standard deviation, tau, Lu, Ld,
+;   and cloud distance are set to fill in the output product.  This is typically
+;   most significant for emissivity.
+; - The output ST QA product is scaled by 100.  The production version is int16.
+;   WRITE_TIFF only offers unsigned int (/SHORT) so this is kept as FLOAT
+;   (because the nodata value is -9999) but rounded.
+; - The emissivity uncertainty algorithm from Glynn Hulley used used to 
+;   compute S_E.
+; - Landsat uncertainty values for L4, L5, and L8 are used.  Also the L7 value
+;   is updated.  The new values are from Pat Scaramuzza.
+; - Filenames are updated (for example, "st" is used instead of "lst").
+;
 
 ; input arguments should probably be pointers
 PRO estimate_lst_uncertainty
 
 ; Update this with whatever scene you are testing.
-imagebase = 'LE07_L1TP_014035_20150615_20160902_01_T1' ; L7 scene
+;imagebase = 'LE07_L1TP_014035_20150615_20160902_01_T1' ; L7 scene
+imagebase = 'LC08_L1TP_015043_20160515_20170223_01_T1' ; L8 scene
+whichLandsat = strmid(imagebase, 3, 1)
+satNum = fix(whichLandsat) 
 
 ; read in atmosphere layers
-Lobs_array = READ_TIFF(imagebase + '_lst_thermal_radiance.tif',GEOTIFF=lst_geotiff)
-emiss_array = READ_TIFF(imagebase + '_landsat_emis.tif')
-emiss_stdev_array = READ_TIFF(imagebase + '_landsat_emis_stdev.tif')
-tau_array = READ_TIFF(imagebase + '_lst_atmospheric_transmittance.tif')
-Lu_array = READ_TIFF(imagebase + '_lst_upwelled_radiance.tif')
-Ld_array = READ_TIFF(imagebase + '_lst_downwelled_radiance.tif')
+Lobs_array = READ_TIFF(imagebase + '_st_thermal_radiance.tif',GEOTIFF=lst_geotiff)
+emis_array = READ_TIFF(imagebase + '_emis.tif')
+emis_stdev_array = READ_TIFF(imagebase + '_emis_stdev.tif')
+tau_array = READ_TIFF(imagebase + '_st_atmospheric_transmittance.tif')
+Lu_array = READ_TIFF(imagebase + '_st_upwelled_radiance.tif')
+Ld_array = READ_TIFF(imagebase + '_st_downwelled_radiance.tif')
 
 nonfill = WHERE(Lobs_array[*,*] NE -9999)
 
@@ -49,23 +69,31 @@ Lobs = Lobs_array(nonfill)
 tau = tau_array(nonfill)
 Lu = Lu_array(nonfill)
 Ld = Ld_array(nonfill)
-emiss = emiss_array(nonfill)
-emiss_stdev = emiss_stdev_array(nonfill)
+emis = emis_array(nonfill)
+emis_stdev = emis_stdev_array(nonfill)
 
 array_size = SIZE(Lobs_array)
 slice_size = SIZE(Lobs)
 
 ; read in distance image
-dist2cloud_image = READ_TIFF(imagebase + '_cloud_distance.tif')
+dist2cloud_image = READ_TIFF(imagebase + '_st_cloud_distance.tif')
 distance = dist2cloud_image(nonfill)
+
+; read fill locations
+tau_fill_locations = WHERE(tau_array[*,*] EQ -9999)
+Lu_fill_locations = WHERE(Lu_array[*,*] EQ -9999)
+Ld_fill_locations = WHERE(Ld_array[*,*] EQ -9999)
+emis_fill_locations = WHERE(emis_array[*,*] EQ -9999)
+emis_stdev_fill_locations = WHERE(emis_stdev_array[*,*] EQ -9999)
+distance_fill_locations = WHERE(distance[*,*] EQ -9999)
 
 ;
 ; Calculate partials
 ;
-dLT_dTAU = (Lu - Lobs) / ( emiss * tau^2)
-dLT_dLU  = -1 / ( tau * emiss )
-dLT_dLD  = ( emiss - 1) / emiss
-dLT_dLOBS = 1 / ( tau * emiss )
+dLT_dTAU = (Lu - Lobs) / ( emis * tau^2)
+dLT_dLU  = -1 / ( tau * emis )
+dLT_dLD  = ( emis - 1) / emis
+dLT_dLOBS = 1 / ( tau * emis )
 
 S_TAU = get_transmission_uncertainty(tau)
 S_LU  = get_upwelled_uncertainty(Lu)
@@ -101,15 +129,35 @@ WRITE_TIFF, imagebase + '_dist.tif', dist_out, GEOTIFF=lst_geotiff, /FLOAT
 S_A = ( dLT_dTAU * S_TAU )^2 + ( dLT_dLU * S_LU )^2 + ( dLT_dLD * S_LD )^2 
 
 ;
-; Instrument Uncertainty
+; Instrument Uncertainty in K
 ;
-landsat_uncertainty = 0.032 ; [K], for Landsat 7 
+CASE satNum OF
+   4: landsat_uncertainty = 0.8 
+   5: landsat_uncertainty = 0.8
+   7: landsat_uncertainty = 0.4
+   8: landsat_uncertainty = 0.3 
+ENDCASE
+
 S_I = ( dLT_dLOBS * landsat_uncertainty )^2 
 
 ;
 ; Emissivity Uncertainty
+; This S_E algorithm is from Glynn Hulley.
 ;
-S_E = ( (Lu - Lobs + Ld * tau) / ( tau * emiss^2 ) * emiss_stdev )^2 
+; S_E = ( (Lu - Lobs + Ld * tau) / ( tau * emis^2 ) * emis_stdev )^2  
+; 
+CASE satNum OF
+   4: emis_regfit = 0.00085135
+   5: emis_regfit = 0.0013
+   7: emis_regfit = 0.0011
+   8: emis_regfit = 0.00093909
+ENDCASE
+
+eret13 = 0.0164
+eret14 = 0.0174
+eret = sqrt((eret13^2 + eret14^2) / 2)
+
+S_E = sqrt((emis_stdev^2 + emis_regfit^2 + eret^2) / 3)
 
 ;
 ; Cross correlation terms
@@ -150,7 +198,14 @@ lst_uncertainty = sqrt( S_A + S_I + S_E + S_P + S_U)
 
 lst_uncertainty_array = DBLARR(array_size[1], array_size[2])
 
-lst_uncertainty_array[nonfill] = lst_uncertainty
+MULT_FACTOR = 100.0
+lst_uncertainty_array[nonfill] = round(lst_uncertainty * MULT_FACTOR)
+lst_uncertainty_array[tau_fill_locations] = -9999 
+lst_uncertainty_array[Lu_fill_locations] = -9999 
+lst_uncertainty_array[Ld_fill_locations] = -9999 
+lst_uncertainty_array[emis_fill_locations] = -9999 
+lst_uncertainty_array[emis_stdev_fill_locations] = -9999 
+lst_uncertainty_array[distance_fill_locations] = -9999 
 
 WRITE_TIFF, imagebase + '_uncertainty.tif', lst_uncertainty_array, GEOTIFF=lst_geotiff, /FLOAT
 END
