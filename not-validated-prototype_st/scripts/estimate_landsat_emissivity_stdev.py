@@ -3,7 +3,7 @@
 '''
     FILE: estimate_landsat_emissivity_stdev.py
 
-    PURPOSE: Estimates a Landsat Emissivity standard deviation product from 
+    PURPOSE: Estimates a Landsat Emissivity standard deviation product from
              ASTER Emissivity. The results are meant to be used for generation
              of a Surface Temperature product.
 
@@ -90,7 +90,7 @@ def extract_aster_data(url, filename, intermediate):
 
     # Define the sub-dataset names
     emis_sdev_ds_name = ''.join(['HDF5:"', h5_file_path,
-                            '"://Emissivity/SDev'])
+                                 '"://Emissivity/SDev'])
     lat_ds_name = ''.join(['HDF5:"', h5_file_path,
                            '"://Geolocation/Latitude'])
     lon_ds_name = ''.join(['HDF5:"', h5_file_path,
@@ -116,7 +116,7 @@ def extract_aster_data(url, filename, intermediate):
     # Determine the resolution and dimensions of the ASTER data
     (x_res, y_res, samps, lines) = (
         emis_util.data_resolution_and_size(lat_ds_name,
-                                 x_min, x_max, y_min, y_max))
+                                           x_min, x_max, y_min, y_max))
 
     # Remove the HDF5 tile since we no longer need it
     if not intermediate:
@@ -126,7 +126,7 @@ def extract_aster_data(url, filename, intermediate):
     # Build the geo transform
     geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
 
-    return (aster_b13_sdev_data, aster_b14_sdev_data, samps, lines, 
+    return (aster_b13_sdev_data, aster_b14_sdev_data, samps, lines,
             geo_transform, True)
 
 
@@ -154,34 +154,28 @@ def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
 
     logger = logging.getLogger(__name__)
 
-    # Save the no data and gap locations.
-    aster_b13_stdev_gap_locations = np.where(aster_b13_stdev_data == 0)
+    # Save the no data locations.
     aster_b13_stdev_no_data_locations = np.where(aster_b13_stdev_data ==
-        no_data_value)
+                                                 no_data_value)
 
     # Scale the data
     aster_b13_stdev_data = aster_b13_stdev_data * 0.0001
 
-    # Save the no data and gap locations.
-    aster_b14_stdev_gap_locations = np.where(aster_b14_stdev_data == 0)
+    # Save the no data locations.
     aster_b14_stdev_no_data_locations = np.where(aster_b14_stdev_data ==
-        no_data_value)
+                                                 no_data_value)
 
     # Scale the data
     aster_b14_stdev_data = aster_b14_stdev_data * 0.0001
 
     # Create the estimated Landsat EMIS stdev data.
     emis_stdev_data = np.sqrt((aster_b13_stdev_data**2
-        + aster_b14_stdev_data**2)/2)
+                               + aster_b14_stdev_data**2)/2)
 
-    # Re-apply the no data and gap locations.
-    emis_stdev_data[aster_b13_stdev_gap_locations] = 0
+    # Re-apply the no data locations.
     emis_stdev_data[aster_b13_stdev_no_data_locations] = no_data_value
-    emis_stdev_data[aster_b14_stdev_gap_locations] = 0
     emis_stdev_data[aster_b14_stdev_no_data_locations] = no_data_value
 
-    del aster_b13_stdev_gap_locations
-    del aster_b14_stdev_gap_locations
     del aster_b13_stdev_no_data_locations
     del aster_b14_stdev_no_data_locations
 
@@ -264,10 +258,10 @@ def generate_tiles(src_info, url, wkt, no_data_value, intermediate):
         del aster_b13_stdev_data
         del aster_b14_stdev_data
 
-    return (ls_emis_stdev_filenames)
+    return ls_emis_stdev_filenames
 
 
-def build_ls_emis_data(server_name, server_path, src_info, 
+def build_ls_emis_data(server_name, server_path, src_info,
                        ls_emis_stdev_warped_name, no_data_value, intermediate):
     """Build estimated Landsat Emissivity Data
 
@@ -322,7 +316,7 @@ def build_ls_emis_data(server_name, server_path, src_info,
     # Warp estimated Landsat EMIS stdev to match the Landsat data
     logger.info('Warping estimated Landsat EMIS stdev to match Landsat data')
     emis_util.warp_raster(src_info, src_proj4, no_data_value,
-                ls_emis_stdev_mosaic_name, ls_emis_stdev_warped_name)
+                          ls_emis_stdev_mosaic_name, ls_emis_stdev_warped_name)
 
     if not intermediate:
         # Cleanup the temp files
@@ -340,14 +334,12 @@ def extract_warped_data(ls_emis_stdev_warped_name, no_data_value, intermediate):
 
     Returns:
         <numpy.2darray>: Emissivity standard deviation data
-        list(<int>): Emissivity stdev deviation locations where gap data exists
         list(<int>): Emissivity stdev locations containing no data (fill) values
     """
 
     # Load the warped estimated Landsat EMIS stdev into memory
     ls_emis_stdev_data = emis_util.extract_raster_data(
         ls_emis_stdev_warped_name, 1)
-    ls_emis_stdev_gap_locations = np.where(ls_emis_stdev_data == 0)
     ls_emis_stdev_no_data_locations \
         = np.where(ls_emis_stdev_data == no_data_value)
 
@@ -356,8 +348,7 @@ def extract_warped_data(ls_emis_stdev_warped_name, no_data_value, intermediate):
         if os.path.exists(ls_emis_stdev_warped_name):
             os.unlink(ls_emis_stdev_warped_name)
 
-    return (ls_emis_stdev_data, ls_emis_stdev_gap_locations, 
-            ls_emis_stdev_no_data_locations)
+    return (ls_emis_stdev_data, ls_emis_stdev_no_data_locations)
 
 
 def generate_emissivity_data(xml_filename, server_name, server_path,
@@ -405,30 +396,37 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
                        no_data_value=no_data_value,
                        intermediate=intermediate)
 
-    (ls_emis_stdev_data, ls_emis_stdev_gap_locations,
-     ls_emis_stdev_no_data_locations) = ( 
-         extract_warped_data(
-                            ls_emis_stdev_warped_name=ls_emis_stdev_warped_name,
-                            no_data_value=no_data_value,
-                            intermediate=intermediate))
+    (ls_emis_stdev_data, ls_emis_stdev_no_data_locations) = (
+        extract_warped_data(
+            ls_emis_stdev_warped_name=ls_emis_stdev_warped_name,
+            no_data_value=no_data_value,
+            intermediate=intermediate))
+
+    # Add the fill back into the results, since the may have been lost
+    logger.info('Adding fill back into the estimated Landsat emissivity'
+                ' stdev results')
+    ls_emis_stdev_data[ls_emis_stdev_no_data_locations] = no_data_value
+
+    # Memory cleanup
+    del ls_emis_stdev_no_data_locations
 
     # Write emissivity standard deviation data and metadata
     ls_emis_stdev_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_emis_stdev', '.img'])
+                                          '_emis_stdev', '.img'])
 
     emis_util.write_emissivity_product(samps=samps,
-                             lines=lines,
-                             transform=output_transform,
-                             wkt=output_srs.ExportToWkt(),
-                             no_data_value=no_data_value,
-                             filename=ls_emis_stdev_img_filename,
-                             file_data=ls_emis_stdev_data)
+                                       lines=lines,
+                                       transform=output_transform,
+                                       wkt=output_srs.ExportToWkt(),
+                                       no_data_value=no_data_value,
+                                       filename=ls_emis_stdev_img_filename,
+                                       file_data=ls_emis_stdev_data)
 
     emis_util.add_emissivity_band_to_xml(espa_metadata=espa_metadata,
-                               filename=ls_emis_stdev_img_filename,
-                               sensor_code=sensor_code,
-                               no_data_value=no_data_value,
-                               band_type='stdev')
+                                         filename=ls_emis_stdev_img_filename,
+                                         sensor_code=sensor_code,
+                                         no_data_value=no_data_value,
+                                         band_type='stdev')
 
     # Memory cleanup
     del ls_emis_stdev_data

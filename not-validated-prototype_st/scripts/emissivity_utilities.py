@@ -3,7 +3,7 @@
 '''
     FILE: emissivity_utilities.py
 
-    PURPOSE: Provide a library of routines to be used by ST emissivity 
+    PURPOSE: Provide a library of routines to be used by ST emissivity
              applications.
 
     PROJECT: Land Satellites Data Systems (LSDS) Science Research and
@@ -25,20 +25,16 @@
 '''
 
 import os
-import sys
 import logging
 import math
 import datetime
 from argparse import ArgumentParser
 from collections import namedtuple
 
-
 import requests
 from lxml import objectify as objectify
-from osgeo import gdal, osr
+from osgeo import gdal
 
-
-from espa import Metadata
 from st_exceptions import MissingBandError
 
 
@@ -370,7 +366,7 @@ def add_emissivity_band_to_xml(espa_metadata, filename, sensor_code,
     Args:
         espa_metadata <espa.Metadata>: XML metadata information
         filename <str>: Full path for the output file to create
-        sensor_code <str>: Name prefix for the sensor 
+        sensor_code <str>: Name prefix for the sensor
         no_data_value <float>: Value to use for fill
         band_type <str>: Emissivity mean or standard deviation
     """
@@ -536,4 +532,3 @@ def get_satellite_sensor_code(xml_filename):
 
     raise Exception('Satellite-Sensor code ({0}) not understood'
                     .format(satellite_sensor_code))
-

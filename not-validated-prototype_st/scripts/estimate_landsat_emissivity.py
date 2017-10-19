@@ -270,7 +270,7 @@ def extract_aster_data(url, filename, intermediate):
     # Determine the resolution and dimensions of the ASTER data
     (x_res, y_res, samps, lines) = (
         emis_util.data_resolution_and_size(lat_ds_name,
-                                 x_min, x_max, y_min, y_max))
+                                           x_min, x_max, y_min, y_max))
 
     # Remove the HDF5 tile since we no longer need it
     if not intermediate:
@@ -280,7 +280,7 @@ def extract_aster_data(url, filename, intermediate):
     # Build the geo transform
     geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
 
-    return (aster_b13_data, aster_b14_data, aster_ndvi_data, samps, lines, 
+    return (aster_b13_data, aster_b14_data, aster_ndvi_data, samps, lines,
             geo_transform, True)
 
 
@@ -446,7 +446,7 @@ def generate_tiles(src_info, coefficients, url, wkt,
         aster_ndvi_tile_name = ''.join([filename, '_ndvi.tif'])
 
         # Read the ASTER data
-        (aster_b13_data, aster_b14_data, aster_ndvi_data, samps, lines, 
+        (aster_b13_data, aster_b14_data, aster_ndvi_data, samps, lines,
          transform, aster_data_available) = (
              extract_aster_data(url=url,
                                 filename=filename,
@@ -487,7 +487,7 @@ def generate_tiles(src_info, coefficients, url, wkt,
 
 
 def build_ls_emis_data(server_name, server_path, src_info, coefficients,
-                       ls_emis_warped_name, aster_ndvi_warped_name, 
+                       ls_emis_warped_name, aster_ndvi_warped_name,
                        no_data_value, intermediate):
     """Build estimated Landsat Emissivity Data
 
@@ -556,12 +556,12 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
     # Warp estimated Landsat EMIS to match the Landsat data
     logger.info('Warping estimated Landsat EMIS to match Landsat data')
     emis_util.warp_raster(src_info, src_proj4, no_data_value,
-                ls_emis_mosaic_name, ls_emis_warped_name)
+                          ls_emis_mosaic_name, ls_emis_warped_name)
 
     # Warp ASTER NDVI to match the Landsat data
     logger.info('Warping ASTER NDVI to match Landsat data')
     emis_util.warp_raster(src_info, src_proj4, no_data_value,
-                aster_ndvi_mosaic_name, aster_ndvi_warped_name)
+                          aster_ndvi_mosaic_name, aster_ndvi_warped_name)
 
     if not intermediate:
         # Cleanup the temp files
@@ -571,7 +571,7 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
             os.unlink(aster_ndvi_mosaic_name)
 
 
-def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name, 
+def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
                         no_data_value, intermediate):
     """Retrieves the warped image data with some massaging of ASTER NDVI
 
@@ -613,7 +613,7 @@ def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
             os.unlink(aster_ndvi_warped_name)
 
     return (ls_emis_data, ls_emis_gap_locations, ls_emis_no_data_locations,
-            aster_ndvi_data, aster_ndvi_gap_locations, 
+            aster_ndvi_data, aster_ndvi_gap_locations,
             aster_ndvi_no_data_locations)
 
 
@@ -695,12 +695,9 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     (ls_emis_data, ls_emis_gap_locations, ls_emis_no_data_locations,
      aster_ndvi_data, aster_ndvi_gap_locations, aster_ndvi_no_data_locations) \
          = (extract_warped_data(ls_emis_warped_name=ls_emis_warped_name,
-                            aster_ndvi_warped_name=aster_ndvi_warped_name,
-                            no_data_value=no_data_value,
-                            intermediate=intermediate))
-
-    # Find water locations using the value of water in ASTER GED
-    water_locations = np.where(ls_emis_data > ASTER_GED_WATER)
+                                aster_ndvi_warped_name=aster_ndvi_warped_name,
+                                no_data_value=no_data_value,
+                                intermediate=intermediate))
 
     # Replace NDVI values greater than 1 with 1
     ls_ndvi_data[ls_ndvi_data > 1.0] = 1
@@ -745,7 +742,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     # Soil - From prototype code variable name
     logger.info('Calculating bare soil component')
 
-    # Get pixels with significant bare soil component 
+    # Get pixels with significant bare soil component
     bare_locations = np.where(aster_ndvi_data < 0.5)
 
     # Only calculate soil component for these pixels
@@ -769,7 +766,6 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     fv_L = 1.0 - (max_ls_ndvi - ls_ndvi_data) / (max_ls_ndvi - min_ls_ndvi)
 
     # Memory cleanup
-    del ls_emis_data
     del ls_ndvi_data
 
     # Add soil component pixels
@@ -799,10 +795,10 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del snow_locations
 
     # Reset water values
-    ls_emis_final[water_locations] = ASTER_GED_WATER 
+    ls_emis_final[np.where(ls_emis_data > ASTER_GED_WATER)] = ASTER_GED_WATER
 
     # Memory cleanup
-    del water_locations
+    del ls_emis_data
 
     # Add the fill and scan gaps and ASTER gaps back into the results,
     # since they may have been lost
@@ -821,25 +817,25 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del aster_ndvi_no_data_locations
     del aster_ndvi_gap_locations
     del ndvi_no_data_locations
-    del ndsi_no_data_locations 
+    del ndsi_no_data_locations
 
     # Write emissivity data and metadata
     ls_emis_img_filename = ''.join([xml_filename.split('.xml')[0],
                                     '_emis', '.img'])
 
     emis_util.write_emissivity_product(samps=samps,
-                             lines=lines,
-                             transform=output_transform,
-                             wkt=output_srs.ExportToWkt(),
-                             no_data_value=no_data_value,
-                             filename=ls_emis_img_filename,
-                             file_data=ls_emis_final)
+                                       lines=lines,
+                                       transform=output_transform,
+                                       wkt=output_srs.ExportToWkt(),
+                                       no_data_value=no_data_value,
+                                       filename=ls_emis_img_filename,
+                                       file_data=ls_emis_final)
 
     emis_util.add_emissivity_band_to_xml(espa_metadata=espa_metadata,
-                               filename=ls_emis_img_filename,
-                               sensor_code=sensor_code,
-                               no_data_value=no_data_value,
-                               band_type='mean')
+                                         filename=ls_emis_img_filename,
+                                         sensor_code=sensor_code,
+                                         no_data_value=no_data_value,
+                                         band_type='mean')
 
     # Memory cleanup
     del ls_emis_final

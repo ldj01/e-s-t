@@ -3,7 +3,7 @@
 '''
     File: st_generate_distance_to_cloud.py
 
-    Purpose: Builds a band for distance to cloud based on pixel_qa input. 
+    Purpose: Builds a band for distance to cloud based on pixel_qa input.
 
     Project: Land Satellites Data Systems Science Research and Development
              (LSRD) at the USGS EROS
@@ -23,9 +23,10 @@ from osgeo import gdal, osr
 from lxml import objectify as objectify
 
 import st_utilities as util
+from st_exceptions import MissingBandError
 from espa import Metadata
 
-PQA_FILL = 0 
+PQA_FILL = 0
 PQA_CLOUD = 5
 PQA_SINGLE_BIT = 0x01             # 00000001
 
@@ -113,7 +114,7 @@ def retrieve_metadata_information(espa_metadata):
         raise MissingBandError('Failed to find the PIXEL QA band'
                                ' in the input data')
 
-    return SourceInfo(proj4 = proj4, qa_filename = pixel_qa_filename)
+    return SourceInfo(proj4=proj4, qa_filename=pixel_qa_filename)
 
 
 def calculate_distance(src_info, fill_value):
@@ -131,10 +132,10 @@ def calculate_distance(src_info, fill_value):
 
     logger.info('Building distance to cloud band')
 
-    # Read the pixel QA input 
+    # Read the pixel QA input
     qa_data = extract_raster_data(src_info.qa_filename, 1)
 
-    # Make a layer that is only set for cloud locations 
+    # Make a layer that is only set for cloud locations
     qa_cloud_shifted_mask = np.right_shift(qa_data, PQA_CLOUD)
     qa_cloud_mask = np.bitwise_and(qa_cloud_shifted_mask, PQA_SINGLE_BIT)
 
@@ -165,7 +166,7 @@ def calculate_distance(src_info, fill_value):
 
 
 def write_distance_to_cloud_product(samps, lines, transform, wkt, no_data_value,
-                             filename, file_data):
+                                    filename, file_data):
     """Creates the distance to cloud band file
 
     Args:
@@ -207,7 +208,7 @@ def write_distance_to_cloud_product(samps, lines, transform, wkt, no_data_value,
         os.unlink(aux_filename)
 
 
-def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code, 
+def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code,
                                    no_data_value):
     """Adds the cloud distance band to the Metadata XML file
 
@@ -252,7 +253,7 @@ def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code,
         = maker.element('{0}ST_CLOUD_DIST'.format(sensor_code))
 
     distance_band.long_name = maker.element('Surface temperature distance to'
-                                        ' cloud band')
+                                            ' cloud band')
     distance_band.file_name = maker.element(filename)
 
     distance_band.pixel_size = base_band.pixel_size
@@ -284,7 +285,7 @@ def add_cloud_distance_band_to_xml(espa_metadata, filename, sensor_code,
 
 
 def generate_distance(xml_filename, no_data_value):
-    """Provides the main processing algorithm for generating the distance 
+    """Provides the main processing algorithm for generating the distance
        to cloud product.
 
     Args:
@@ -315,9 +316,9 @@ def generate_distance(xml_filename, no_data_value):
 
     # Build distance to cloud filename
     distance_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_st_cloud_distance', '.img'])
+                                     '_st_cloud_distance', '.img'])
 
-    # Write distance to cloud product 
+    # Write distance to cloud product
     write_distance_to_cloud_product(samps=samps,
                                     lines=lines,
                                     transform=output_transform,
@@ -359,7 +360,7 @@ NO_DATA_VALUE = -9999
 
 
 def main():
-    """Main processing for building the distance to cloud band 
+    """Main processing for building the distance to cloud band
     """
 
     # Command Line Arguments

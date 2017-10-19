@@ -29,6 +29,7 @@ from osgeo import gdal, osr
 from scipy.ndimage.interpolation import map_coordinates
 
 import st_utilities as util
+from st_exceptions import MissingBandError
 from espa import Metadata
 
 
@@ -37,7 +38,7 @@ def get_transmission_uncertainty(tau_values):
        surface temperature uncertainty estimation.
 
     Args:
-        tau_values <numpy.2darray>: Transmission values 
+        tau_values <numpy.2darray>: Transmission values
 
     Returns:
         tau_uncertainty <numpy.2darray>: Transmission uncertainty values
@@ -73,7 +74,7 @@ def get_transmission_uncertainty(tau_values):
     del quadratic_region
     del constant_region
 
-    return tau_uncertainty 
+    return tau_uncertainty
 
 
 def get_upwelled_uncertainty(lu_values):
@@ -81,7 +82,7 @@ def get_upwelled_uncertainty(lu_values):
        surface temperature uncertainty estimation.
 
     Args:
-        lu_values <numpy.2darray>: Upwelled radiance values 
+        lu_values <numpy.2darray>: Upwelled radiance values
 
     Returns:
         lu_uncertainty <numpy.2darray>: Upwelled radiance uncertainty values
@@ -94,7 +95,7 @@ def get_upwelled_uncertainty(lu_values):
     # and below which last value of the fit line is extended as a constant.
     # The lower bound was set as simply the smallest upwelled radiance value
     # from the validation set that was used.
-    lu_value_where_real_data_ends = 5.6788 
+    lu_value_where_real_data_ends = 5.6788
 
     # Transmission coefficients calculated from MODTRAN simulations using MERRA
     lu_poly_coeff1 = -0.007147307279714
@@ -117,7 +118,7 @@ def get_upwelled_uncertainty(lu_values):
     del quadratic_region
     del constant_region
 
-    return upwelled_uncertainty 
+    return upwelled_uncertainty
 
 
 def get_downwelled_uncertainty(ld_values):
@@ -138,7 +139,7 @@ def get_downwelled_uncertainty(ld_values):
     # and below which last value of the fit line is extended as a constant.
     # The lower bound was set as simply the smallest downwelled radiance value
     # from the validation set that was used.
-    ld_value_where_real_data_ends = 7.2307 
+    ld_value_where_real_data_ends = 7.2307
 
     # Transmission coefficients calculated from MODTRAN simulations using MERRA
     ld_poly_coeff1 = -0.005291631300309
@@ -161,7 +162,7 @@ def get_downwelled_uncertainty(ld_values):
     del quadratic_region
     del constant_region
 
-    return downwelled_uncertainty 
+    return downwelled_uncertainty
 
 
 def get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD):
@@ -181,24 +182,24 @@ def get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD):
     """
 
     # Correlation coefficients from MODTRAN simulations using MERRA.
-    corr_tau_lu = -0.9899;
-    corr_tau_ld = -0.9857;
-    corr_lu_ld  =  0.9965;
+    corr_tau_lu = -0.9899
+    corr_tau_ld = -0.9857
+    corr_lu_ld = 0.9965
 
     # Calculate cross correlation terms
-    part_tau_lu = 2 * corr_tau_lu * dLT_dTAU * dLT_dLU * S_TAU * S_LU;
-    part_tau_ld = 2 * corr_tau_ld * dLT_dTAU * dLT_dLD * S_TAU * S_LD;
-    part_lu_ld =  2 * corr_lu_ld  * dLT_dLU  * dLT_dLD * S_LU  * S_LD;
+    part_tau_lu = 2 * corr_tau_lu * dLT_dTAU * dLT_dLU * S_TAU * S_LU
+    part_tau_ld = 2 * corr_tau_ld * dLT_dTAU * dLT_dLD * S_TAU * S_LD
+    part_lu_ld = 2 * corr_lu_ld * dLT_dLU * dLT_dLD * S_LU * S_LD
 
     # Calculate cross correlation
-    cross_correlation = part_tau_lu + part_tau_ld + part_lu_ld;
+    cross_correlation = part_tau_lu + part_tau_ld + part_lu_ld
 
     # Memory cleanup
     del part_tau_lu
     del part_tau_ld
     del part_lu_ld
 
-    return cross_correlation 
+    return cross_correlation
 
 
 def get_unknown_uncertainty(cloud_distances, transmission_values):
@@ -219,11 +220,11 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
 
     # Matrix of "unknown errors," which was calculated from observed and
     # predicted ST errors from the L7 global validation study.
-    unknown_error_matrix =  np.array([ [2.3905, 2.7150, 2.5762, 2.1302],
-                              [2.0158, 1.7028, 1.4872, 1.3053],
-                              [1.8156, 1.0619, 0.9760, 0.7264],
-                              [1.9715, 1.3853, 0.8110, 0.7295],
-                              [1.4160, 0.8752, 0.7948, 0.4269] ])
+    unknown_error_matrix = np.array([[2.3905, 2.7150, 2.5762, 2.1302],
+                                     [2.0158, 1.7028, 1.4872, 1.3053],
+                                     [1.8156, 1.0619, 0.9760, 0.7264],
+                                     [1.9715, 1.3853, 0.8110, 0.7295],
+                                     [1.4160, 0.8752, 0.7948, 0.4269]])
 
     # tau bins are 0.3 - 0.55, 0.55 - 0.7, 0.7 - 0.85, 0.85 - 1.0
     # cloud bins are 0 - 1 km, 1 - 5 km, 5 - 10 km, 10 - 40 km, 40 - inf
@@ -241,11 +242,12 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     # From input transmission values, find closest indices from tau_interp
     # vector, calculate step in vector, then calculate fractional tau index.
     tau_close_index = np.searchsorted(tau_interp, flat_transmission_values,
-        side='right')
+                                      side='right')
     tau_close_index = tau_close_index - 1
     tau_step = tau_interp[tau_close_index + 1] - tau_interp[tau_close_index]
     tau_frac_index = tau_close_index + ((flat_transmission_values
-        - tau_interp[tau_close_index]) / tau_step)
+                                         - tau_interp[tau_close_index])
+                                        / tau_step)
     one_locations = np.where(tau_frac_index == tau_highest)
     tau_frac_index[one_locations] = len(tau_interp) - 1
 
@@ -258,11 +260,12 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     # From input cloud distance values, find closest indices from cld_interp
     # vector, calculate step in vector, then calculate fractional cloud index.
     cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances,
-        side='right')
+                                      side='right')
     cld_close_index = cld_close_index - 1
     cld_step = cld_interp[cld_close_index + 1] - cld_interp[cld_close_index]
-    cld_frac_index = cld_close_index + ((flat_cloud_distances 
-        - cld_interp[cld_close_index]) / cld_step)
+    cld_frac_index = cld_close_index + ((flat_cloud_distances
+                                         - cld_interp[cld_close_index])
+                                        / cld_step)
     two_hundred_locations = np.where(cld_frac_index == cld_highest)
     cld_frac_index[two_hundred_locations] = len(cld_interp) - 1
 
@@ -280,15 +283,15 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     del tau_frac_index
     del cld_frac_index
 
-    # Interpolate the results at the specified coordinates. 
+    # Interpolate the results at the specified coordinates.
     unknown_uncertainty = map_coordinates(unknown_error_matrix, coordinates,
-        order=1, mode='nearest')
+                                          order=1, mode='nearest')
 
     # Memory cleanup
     del unknown_error_matrix
     del coordinates
 
-    return unknown_uncertainty 
+    return unknown_uncertainty
 
 
 def extract_raster_data(name, band_number):
@@ -375,13 +378,13 @@ def retrieve_metadata_information(espa_metadata, band_name):
         raise MissingBandError('Failed to find the intermediate band'
                                ' in the input data')
 
-    return SourceInfo(proj4 = proj4, filename = intermediate_filename)
+    return SourceInfo(proj4=proj4, filename=intermediate_filename)
 
 
-def calculate_qa(radiance_filename, transmission_filename, upwelled_filename, 
+def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
                  downwelled_filename, emis_filename, emis_stdev_filename,
                  distance_filename, satellite, fill_value):
-    """Calculate QA 
+    """Calculate QA
 
     Args:
         radiance_filename <str>: Name of radiance file
@@ -415,7 +418,7 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     emis_stdev_array = extract_raster_data(emis_stdev_filename, 1)
     distance_array = extract_raster_data(distance_filename, 1)
 
-    # Find fill locations.  We don't need to do this for transmission, 
+    # Find fill locations.  We don't need to do this for transmission,
     # upwelled radiance, or downwelled radiance since these are created
     # with fill based on the the thermal radiance fill locations
     nonfill_locations = np.where(Lobs_array != fill_value)
@@ -441,16 +444,16 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del distance_array
 
     # Calculate partials
-    dLT_dTAU  = (Lu - Lobs) / (emis * tau**2)
-    dLT_dLU   = -1 / (tau * emis)
-    dLT_dLD   = (emis - 1) / emis
+    dLT_dTAU = (Lu - Lobs) / (emis * tau**2)
+    dLT_dLU = -1 / (tau * emis)
+    dLT_dLD = (emis - 1) / emis
     dLT_dLOBS = 1 / (tau * emis)
 
     # Memory cleanup
-    del Lobs 
-    del emis 
+    del Lobs
+    del emis
 
-    # Calculate transmission, upwelled radiance, and downwelled radiance 
+    # Calculate transmission, upwelled radiance, and downwelled radiance
     # uncertainty
     S_TAU = get_transmission_uncertainty(tau)
     S_LU = get_upwelled_uncertainty(Lu)
@@ -479,7 +482,7 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     S_I = (dLT_dLOBS * landsat_uncertainty)**2
 
     # Memory cleanup
-    del dLT_dLOBS 
+    del dLT_dLOBS
 
     # Get the RMSE of the linear regression fit of the spectral emissivity
     # adjustment procedure (which is the emis_data calculation in
@@ -508,7 +511,7 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # Memory cleanup
     del emis_stdev
 
-    # Calculate cross correlation terms 
+    # Calculate cross correlation terms
     S_P = get_cross_correlation(dLT_dTAU, dLT_dLU, dLT_dLD, S_TAU, S_LU, S_LD)
 
     # Memory cleanup
@@ -524,8 +527,8 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     S_U = unknown_uncertainty**2
 
     # Memory cleanup
-    del tau 
-    del distance 
+    del tau
+    del distance
     del unknown_uncertainty
 
     # Calculate uncertainty
@@ -693,14 +696,18 @@ def generate_qa(xml_filename, no_data_value):
     espa_metadata = Metadata(xml_filename)
     espa_metadata.parse()
 
-    radiance_src_info = retrieve_metadata_information(espa_metadata,
-        'st_thermal_radiance')
-    transmission_src_info = retrieve_metadata_information(espa_metadata,
-        'st_atmospheric_transmittance')
-    upwelled_src_info = retrieve_metadata_information(espa_metadata,
-        'st_upwelled_radiance')
-    downwelled_src_info = retrieve_metadata_information(espa_metadata,
-        'st_downwelled_radiance')
+    radiance_src_info \
+        = retrieve_metadata_information(espa_metadata,
+                                        'st_thermal_radiance')
+    transmission_src_info \
+        = retrieve_metadata_information(espa_metadata,
+                                        'st_atmospheric_transmittance')
+    upwelled_src_info \
+        = retrieve_metadata_information(espa_metadata,
+                                        'st_upwelled_radiance')
+    downwelled_src_info \
+        = retrieve_metadata_information(espa_metadata,
+                                        'st_downwelled_radiance')
     emis_src_info = retrieve_metadata_information(espa_metadata, 'emis')
     emis_stdev_src_info \
         = retrieve_metadata_information(espa_metadata, 'emis_stdev')
@@ -718,22 +725,22 @@ def generate_qa(xml_filename, no_data_value):
 
     # Build cloud distance filename
     distance_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_st_cloud_distance', '.img'])
+                                     '_st_cloud_distance', '.img'])
 
     # Build QA information in memory
     qa = calculate_qa(radiance_src_info.filename,
                       transmission_src_info.filename,
-                      upwelled_src_info.filename, 
-                      downwelled_src_info.filename, 
-                      emis_src_info.filename, 
-                      emis_stdev_src_info.filename, 
+                      upwelled_src_info.filename,
+                      downwelled_src_info.filename,
+                      emis_src_info.filename,
+                      emis_stdev_src_info.filename,
                       distance_img_filename,
                       satellite,
                       no_data_value)
 
     # Build QA filename
     qa_img_filename = ''.join([xml_filename.split('.xml')[0],
-                      '_st_uncertainty', '.img'])
+                               '_st_uncertainty', '.img'])
 
     # Write QA product
     write_qa_product(samps=samps,
@@ -780,7 +787,7 @@ MULT_FACTOR = 100.0
 
 
 def main():
-    """Main processing for building the surface temperature QA band 
+    """Main processing for building the surface temperature QA band
     """
 
     # Command Line Arguments
