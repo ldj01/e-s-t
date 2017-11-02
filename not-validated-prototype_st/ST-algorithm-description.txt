@@ -159,7 +159,7 @@ Algorithm Description - Detailed:
            in the integer product. 
 
        20) Use the level 2 quality band (pixel_qa) to identify cloud locations,
-           and build a distance to cloud band base on those locations.
+           and build a distance to cloud band based on those locations.
 
        21) Calculate atmospheric uncertainty, instrument uncertainty,
            emissivity uncertainty, cross correlation terms, and unknown
