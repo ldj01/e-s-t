@@ -388,7 +388,7 @@ def add_emissivity_band_to_xml(espa_metadata, filename, sensor_code,
             base_band = band
 
     if base_band is None:
-        raise MissingBandError('Failed to find the TOA BLUE band'
+        raise MissingBandError('Failed to find the TOA band 1'
                                ' in the input data')
 
     emis_band = maker.band()

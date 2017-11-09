@@ -338,7 +338,7 @@ class BuildSTData(object):
                 base_band = band
 
         if base_band is None:
-            raise Exception('Failed to find the TOA BLUE band'
+            raise Exception('Failed to find the TOA band 1'
                             ' in the input data')
 
         st_band = metadata_api.band(product='st',

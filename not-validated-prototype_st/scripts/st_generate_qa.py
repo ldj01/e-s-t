@@ -330,7 +330,7 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',
-                        required=False, default=None,
+                        required=True, default=None,
                         help='The XML metadata file to use')
 
     parser.add_argument('--debug',
@@ -590,7 +590,7 @@ def add_qa_band_to_xml(espa_metadata, filename, sensor_code, no_data_value):
             base_band = band
 
     if base_band is None:
-        raise MissingBandError('Failed to find the TOA BLUE band'
+        raise MissingBandError('Failed to find the TOA band 1'
                                ' in the input data')
 
     qa_band = maker.band()
