@@ -1,6 +1,6 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Surface Temperature 0.4 Release Notes
+## Surface Temperature 0.4.0 Release Notes
 Release Date: November 2017
 
 See git tag [st-rit-v0.4.0]

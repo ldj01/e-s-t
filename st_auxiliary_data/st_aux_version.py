@@ -2,6 +2,6 @@
 """
 
 
-VERSION = '0.4'
+VERSION = '0.4.0'
 VERSION_TEXT = ('Surface Temperature - Auxiliary Scripts - Version {}'
                 .format(VERSION))

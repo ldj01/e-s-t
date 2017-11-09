@@ -17,6 +17,7 @@ import logging
 import datetime
 from argparse import ArgumentParser
 from collections import namedtuple
+
 import numpy as np
 from scipy import ndimage
 from osgeo import gdal, osr

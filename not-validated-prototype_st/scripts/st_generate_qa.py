@@ -23,6 +23,7 @@ import logging
 import datetime
 from argparse import ArgumentParser
 from collections import namedtuple
+
 import numpy as np
 from lxml import objectify as objectify
 from osgeo import gdal, osr
@@ -422,9 +423,9 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # upwelled radiance, or downwelled radiance since these are created
     # with fill based on the the thermal radiance fill locations
     nonfill_locations = np.where(Lobs_array != fill_value)
-    emis_fill_locations = np.where(emis_array == fill_value)
-    emis_stdev_fill_locations = np.where(emis_stdev_array == fill_value)
-    distance_fill_locations = np.where(distance_array == fill_value)
+    fill_locations = np.where((emis_array == fill_value) |
+                              (emis_stdev_array == fill_value) |
+                              (distance_array == fill_value))
 
     # Only operate where thermal radiance is non-fill
     Lobs = Lobs_array[nonfill_locations]
@@ -551,14 +552,10 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del st_uncertainty
 
     # Apply fill to results where other inputs were fill
-    st_uncertainty_array[emis_fill_locations] = fill_value
-    st_uncertainty_array[emis_stdev_fill_locations] = fill_value
-    st_uncertainty_array[distance_fill_locations] = fill_value
+    st_uncertainty_array[fill_locations] = fill_value
 
     # Memory cleanup
-    del emis_fill_locations
-    del emis_stdev_fill_locations
-    del distance_fill_locations
+    del fill_locations
 
     return st_uncertainty_array
 

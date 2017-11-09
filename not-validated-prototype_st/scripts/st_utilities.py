@@ -27,7 +27,7 @@ class Version(object):
         Provides methods for retrieving version information.
     '''
 
-    version = '0.4'
+    version = '0.4.0'
 
     @staticmethod
     def version_number():
