@@ -543,7 +543,8 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del S_U
 
     # Give st_uncertainty the same dimensions as the original Lobs
-    st_uncertainty_array = np.full_like(Lobs_array, fill_value)
+    st_uncertainty_array = Lobs_array.copy()
+    st_uncertainty_array.fill(fill_value)
     st_uncertainty_array[nonfill_locations] = st_uncertainty
 
     # Memory cleanup
