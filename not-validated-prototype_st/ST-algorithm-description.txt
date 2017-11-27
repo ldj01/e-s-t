@@ -1,0 +1,172 @@
+
+This is the algorithm description derived from the prototype implementation
+provided by the authors and subsequent conversations and emails.
+
+
+==============================================================================
+Algorithm Authors:
+
+    Monica Cook
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        mxc7441@rit.edu
+
+    Simon J. Hook
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: Simon.J.Hook@jpl.nasa.gov
+
+    Glynn C. Hulley
+        Research Scientist
+        NASA Jet Propulsion Laboratory
+        email: glynn.hulley@nasa.gov
+
+    Kelly Laraby
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        kga1099@rit.edu
+
+    John R. Schott
+        Chester F. Carlson Center for Imaging Science
+        Rochester Institute of Technology
+        schott@cis.rit.edu
+
+==============================================================================
+Algorithm Description - Overview:
+
+        1) Create a Landsat emissivity band based on Landsat top of 
+           atmosphere reflectance, ASTER emissivity and ASTER NDVI data.
+ 
+        2) Read NARR atmospheric data at grid points over the Landsat scene.
+
+        3) Use the atmospheric data to generate MODTRAN runs for multiple
+           elevations and temperature/albedo pairs at each grid point.
+
+        4) Use the MODTRAN results to generate transmission, upwelled 
+           radiance, and downwelled radiance at each grid point and elevation.
+
+        5) Interpolate the nearby grid point values to create similar values
+           for each pixel at the height of the pixel.
+
+        6) Use all of the previously-generated bands to make a surface
+           temperature band.
+
+        7) Use the previously-generated bands and a cloud distance band to
+           make a quality band for the surface temperature band.
+
+==============================================================================
+Algorithm Description - Inputs:
+
+    The primary sources of input to the algorithm are:
+
+        Landsat L1T thermal band retrieved from LPGS L1T products
+        NARR (North American Regional Reanalysis) grib formatted data
+        ASTER Emissivity and NDVI data
+        Landsat TOA (top of atmosphere) reflectance bands
+        GLS2000 derived DEM (same as what Landsat uses)
+
+    The L1T thermal band is used to create a thermal radiance band. 
+
+    The NARR data provides a 32 km grid of atmospheric data at 29 pressure
+        levels.  The data that is used includes geopotential height, 
+        temperature, and specific humidity at multiple pressure levels.
+        The NARR data is used to generate inputs to MODTRAN which is used
+        to calculate atmospheric transmission, upwelled radiance, and 
+        downwelled radiance at the grid points at multiple elevations.
+
+    The ASTER emissivity and NDVI data, as well as the Landsat TOA data
+        from multiple bands, are used to simulate a Landsat emissivity band 
+        matching the Landsat scene. 
+
+    The DEM is used to adjust for the correct height during the interpolation
+        step.
+
+==============================================================================
+Algorithm Description - Detailed:
+
+        1) Read Landsat top of atmosphere reflectance green, red, NIR, SWIR1,
+           and brightness temperature bands for the scene.  Generate a 
+           Landsat NDVI layer from the red and NIR bands.  Generate NDSI and
+           snow layers from the green and SWIR bands.  Get projection 
+           information from the brightness temperature band.  
+
+        2) Retrieve ASTER emissivity and NDVI data, and warp them to match
+           the Landsat scene. 
+
+        3) Calculate a simulated Landsat emissivity layer using the ASTER 
+           emissivity values, ASTER NDVI values, Landsat NDVI band, NDSI band, 
+           and snow locations.  Write the simulated Landsat emissivity layer 
+           to a file. 
+
+        4) Determine grid of points based on NARR data coverage and Landsat 
+           scene coverage plus a buffer to allow points outside the scene to 
+           be used since they are needed during later interpolation steps for
+           pixels near the scene edges.
+
+        5) Extract NARR data at grid points for multiple pressure levels:
+
+            - temperature
+            - geopotential height
+            - specific humidity
+
+        6) Convert geopotential height to geometric height.
+
+        7) Convert specific humidity to relative humidity.
+
+        8) Interpolate geometric height and relative humidity before and after 
+           the Landsat scene time to match the scene time.
+
+        9) Create MODTRAN "tape5" format input files at each grid point for 
+           9 elevations, and 3 temperature/albedo pairs per elevation.  The
+           input for each MODTRAN run includes the geometric height, relative 
+           humidity, temperature, and pressure.
+
+       10) Run MODTRAN to generate temperature, wavelength, and radiance values.
+
+       11) Read the MODTRAN results.  Also read satellite-specific spectral 
+           response files.  Use them to calculate transmission, upwelled
+           radiance, and downwelled radiance at each height for each grid
+           point.
+
+       12) For each pixel in the Landsat scene, find the closest set of 
+	   4 surrounding grid points.  Interpolate the 3 parameters 
+           (transmission, upwelled and downwelled radiance) at these
+           surrounding grid points to the spatial location and height
+           of the Landsat pixel. 
+
+       13) Create band files for atmospheric transmission, upwelled radiance,
+           and downwelled radiance based on the computed per-pixel layers. 
+
+       14) Use the Landsat L1T thermal band to derive a thermal radiance
+           layer, and write a band file for that layer.
+
+       15) Read the emissivity, thermal radiance, atmospheric transmission, 
+           upwelled radiance, and downwelled radiance bands.
+
+       16) Calculate surface_radiance:
+
+           (thermal_radiance - upwelled_radiance) / atmospheric_transmission
+
+       17) Calculate Earth-emitted radiance:
+
+           surface_radiance - (1.0 - emissivity) * downwelled_radiance
+
+       18) Use a satellite-specific brightness temperature lookup table with 
+           radiance and temperature to linearly interpolate Earth-emitted
+           radiance values to derive surface temperature.
+
+       19) Scale the surface temperature value to include 1/10 degree precision
+           in the integer product. 
+
+       20) Use the level 2 quality band (pixel_qa) to identify cloud locations,
+           and build a distance to cloud band based on those locations.
+
+       21) Calculate atmospheric uncertainty, instrument uncertainty,
+           emissivity uncertainty, cross correlation terms, and unknown
+           uncertainty using thermal radiance, atmospheric transmission,
+           upwelled radiance, downwelled radiance, emissivity, emissivity
+           standard deviation, and cloud distance bands.
+
+       22) Combine uncertainties and use the result to create a surface
+           temperature quality band.
+

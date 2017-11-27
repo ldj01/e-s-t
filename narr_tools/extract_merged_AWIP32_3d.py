@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 
 logger = None
 # Name of the static NARR coordinates file
-NARR_COORDINATES_PATH = ('../not-validated-prototype_lst'
+NARR_COORDINATES_PATH = ('../not-validated-prototype_st'
                          '/static_data/narr_coordinates.txt')
 
 
