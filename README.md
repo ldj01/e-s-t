@@ -1,9 +1,9 @@
 ## NOTE - The products produced by this software have not been validated and are considered prototype.
 
-## Surface Temperature 0.4.0 Release Notes
-Release Date: November 2017
+## Surface Temperature 1.0.0 Release Notes
+Release Date: January 2018
 
-See git tag [st-rit-v0.4.0]
+See git tag [st-rit-v1.0.0]
 
 This project contains application source code for producing Surface Temperature products.
 
@@ -12,8 +12,8 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ## Release Notes
 * Version change
-* Produce a surface temperature quality band  
-* Switch to "surface temperature" terminology 
+* Update surface temperature quality band procedure to match Kelvin and 
+  radiance units
 
 ## Installation
 

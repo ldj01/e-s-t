@@ -33,6 +33,44 @@ import st_utilities as util
 from st_exceptions import MissingBandError
 from espa import Metadata
 
+SourceInfo = namedtuple('SourceInfo', ('proj4', 'filename'))
+ThermalConstantInfo = namedtuple('ThermalInfo', ('k1', 'k2'))
+
+
+def convert_radiance_to_temperature(radiance, k1, k2):
+    """Calculates radiance image given temperature image using the inverse 
+       Planck Function, modified to use K1 and K2 constants for a specific 
+       instrument.
+
+    Args:
+        radiance <numpy.2darray>: Radiance values
+        k1 <float>: K1 thermal conversion constant for the satellite
+        k2 <float>: K2 thermal conversion constant for the satellite
+
+    Returns:
+        temperature <numpy.2darray>: temperature values
+    """
+
+    # Convert radiance to temperature
+    return k2 / np.log(k1 / radiance + 1)
+
+
+def convert_temperature_to_radiance(temperature, k1, k2):
+    """Calculates temperature image given radiance image using the Planck  
+       Function, modified to use K1 and K2 constants for a specific instrument.
+
+    Args:
+        temperature <numpy.2darray>: Temperature values
+        k1 <float>: K1 thermal conversion constant for the satellite
+        k2 <float>: K2 thermal conversion constant for the satellite
+
+    Returns:
+        radiance <numpy.2darray>: Radiance values
+    """
+
+    # Convert temperature to radiance 
+    return k1 / (np.exp(k2 / temperature) - 1) 
+
 
 def get_transmission_uncertainty(tau_values):
     """Calculates the transmission uncertainty term, which is part of the
@@ -221,11 +259,11 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
 
     # Matrix of "unknown errors," which was calculated from observed and
     # predicted ST errors from the L7 global validation study.
-    unknown_error_matrix = np.array([[2.3905, 2.7150, 2.5762, 2.1302],
-                                     [2.0158, 1.7028, 1.4872, 1.3053],
-                                     [1.8156, 1.0619, 0.9760, 0.7264],
-                                     [1.9715, 1.3853, 0.8110, 0.7295],
-                                     [1.4160, 0.8752, 0.7948, 0.4269]])
+    unknown_error_matrix = np.array([[2.3749, 2.6962, 2.5620, 2.1131],
+                                     [1.9912, 1.6789, 1.4471, 1.2739],
+                                     [1.7925, 1.0067, 0.9143, 0.6366],
+                                     [1.9416, 1.3558, 0.7604, 0.6682],
+                                     [1.3861, 0.8269, 0.7404, 0.3125]])
 
     # tau bins are 0.3 - 0.55, 0.55 - 0.7, 0.7 - 0.85, 0.85 - 1.0
     # cloud bins are 0 - 1 km, 1 - 5 km, 5 - 10 km, 10 - 40 km, 40 - inf
@@ -348,9 +386,6 @@ def retrieve_command_line_arguments():
     return args
 
 
-SourceInfo = namedtuple('SourceInfo', ('proj4', 'filename'))
-
-
 def retrieve_metadata_information(espa_metadata, band_name):
     """Reads required information from the metadata XML file
 
@@ -373,7 +408,6 @@ def retrieve_metadata_information(espa_metadata, band_name):
             # Get the output proj4 string
             proj4 = util.Geo.get_proj4_projection_string(intermediate_filename)
 
-
     # Error if we didn't find the required intermediate band in the data
     if intermediate_filename is None:
         raise MissingBandError('Failed to find the intermediate band'
@@ -382,9 +416,46 @@ def retrieve_metadata_information(espa_metadata, band_name):
     return SourceInfo(proj4=proj4, filename=intermediate_filename)
 
 
+def retrieve_thermal_constants(espa_metadata, satellite):
+    """Reads thermal constants from the metadata XML file
+
+    Args:
+        espa_metadata <espa.Metadata>: XML metadata
+        satellite <str>: Name of satellite
+
+    Returns:
+        <ThermalConstantInfo>: Populated with thermal constants 
+    """
+
+    thermal_constants = None
+    band_name = None
+
+    # Determine the band to retrieve constants from using the satellite
+    if satellite == 'LANDSAT_4' or satellite == 'LANDSAT_5':
+        band_name = "b6"
+    elif satellite == 'LANDSAT_7':
+        band_name = "b61"
+    elif satellite == 'LANDSAT_8':
+        band_name = "b10"
+
+    # Find the band to extract information from
+    for band in espa_metadata.xml_object.bands.band:
+        if (band.get('name') == band_name):
+            thermal_constants = str(band.thermal_const)
+            k1 = band.thermal_const.get('k1')
+            k2 = band.thermal_const.get('k2')
+
+    # Error if we didn't find the required intermediate band in the data
+    if thermal_constants is None:
+        raise MissingBandError('Failed to find the thermal band in the '
+                               ' input data')
+
+    return ThermalConstantInfo(k1=k1, k2=k2)
+
+
 def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
                  downwelled_filename, emis_filename, emis_stdev_filename,
-                 distance_filename, satellite, fill_value):
+                 distance_filename, satellite, k1, k2, fill_value):
     """Calculate QA
 
     Args:
@@ -396,6 +467,8 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
         emis_stdev_filename <str>: Name of emissivity standard deviation file
         distance_filename <str>: Name of cloud distance file
         satellite <str>: Name of satellite (e.g.: "LANDSAT_8")
+        k1 <float>: K1 thermal conversion constant for the satellite
+        k2 <float>: K2 thermal conversion constant for the satellite
         fill_value <float>: No data (fill) value to use
 
     Returns:
@@ -450,6 +523,11 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     dLT_dLD = (emis - 1) / emis
     dLT_dLOBS = 1 / (tau * emis)
 
+    # Create radiance image that will be used as nominal values around which
+    # the uncertainty values will operate
+    Le_Image = (Lobs - Lu - (1 - emis) * Ld * tau) / (emis * tau)
+    Le_Image[Le_Image > 30.0] = 0
+
     # Memory cleanup
     del Lobs
     del emis
@@ -467,15 +545,20 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # Calculate atmosphere uncertainty
     S_A = (dLT_dTAU * S_TAU)**2 + (dLT_dLU * S_LU)**2 + (dLT_dLD * S_LD)**2
 
-    # Look up satellite thermal band uncertainty based on satellite
+    # Look up satellite thermal band uncertainty in radiance based on satellite.
+    # These are based on the following uncertainty values in K:
+    # Landsat 4: 0.8
+    # Landsat 5: 0.8
+    # Landsat 7: 0.4
+    # Landsat 8: 0.3
     if satellite == 'LANDSAT_4':
-        landsat_uncertainty = 0.8
+        landsat_uncertainty = 0.08959421
     elif satellite == 'LANDSAT_5':
-        landsat_uncertainty = 0.8
+        landsat_uncertainty = 0.08959421
     elif satellite == 'LANDSAT_7':
-        landsat_uncertainty = 0.4
+        landsat_uncertainty = 0.04471454
     elif satellite == 'LANDSAT_8':
-        landsat_uncertainty = 0.3
+        landsat_uncertainty = 0.03577072
     else:
         raise Exception('Unsupported satellite sensor')
 
@@ -523,7 +606,7 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del dLT_dLU
     del dLT_dLD
 
-    # Calculate unknown uncertainty
+    # Calculate unknown uncertainty in K
     unknown_uncertainty = get_unknown_uncertainty(distance, tau)
     S_U = unknown_uncertainty**2
 
@@ -532,25 +615,91 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del distance
     del unknown_uncertainty
 
-    # Calculate uncertainty
-    st_uncertainty = np.sqrt(S_A + S_I + S_E + S_P + S_U)
+    # The conversion to residual radiance must be about a nominal temperature,
+    # the LST image
+    Delta_Temps = S_U / 2.0
+
+    # Memory Cleanup
+    del S_U
+
+    # Create temperature image that will be used as nominal values around which
+    # the uncertainty values will operate
+    LST_Image = convert_radiance_to_temperature(Le_Image, k1, k2) 
+
+    # Find the deltas around the nominal values
+    LST_Minus_Delta = LST_Image - Delta_Temps
+    LST_Plus_Delta = LST_Image + Delta_Temps
+
+    # Memory Cleanup
+    del LST_Image
+    del Delta_Temps
+
+    # Convert from temperature (K) to radiance
+    S_U_Radiance_High = convert_temperature_to_radiance(LST_Plus_Delta, k1, k2)
+    S_U_Radiance_Low = convert_temperature_to_radiance(LST_Minus_Delta, k1, k2)
+
+    # Memory Cleanup
+    del LST_Minus_Delta
+    del LST_Plus_Delta
+
+    # The total uncertainty is the difference between the high and low values
+    S_U_Radiance = S_U_Radiance_High - S_U_Radiance_Low
+    S_U_Radiance[S_U_Radiance < 0.0] = 0
+
+    # Memory Cleanup
+    del S_U_Radiance_High 
+    del S_U_Radiance_Low 
+
+    # Calculate uncertainty in radiance units
+    st_uncertainty_radiance = np.sqrt(S_A + S_I + S_E + S_P + S_U_Radiance)
 
     # Memory cleanup
     del S_A
     del S_I
     del S_E
     del S_P
-    del S_U
+    del S_U_Radiance
+
+    # Again the st_uncertainty values are residuals about some nominal radiance
+    # values, so we must convert to residual temperature about some nominal 
+    # reference radiance, which we get from the original radiance image
+    Delta_Radiance = st_uncertainty_radiance / 2.0
+
+    # Find the deltas around the nominal values
+    Radiance_Minus_Delta = Le_Image - Delta_Radiance
+    Radiance_Plus_Delta = Le_Image + Delta_Radiance
+
+    # Memory Cleanup
+    del Le_Image 
+    del Delta_Radiance 
+
+    # Convert from radiance to temperature (K)
+    Temp_uncertainty_High = convert_radiance_to_temperature(Radiance_Plus_Delta,
+                                                            k1, k2)
+    Temp_uncertainty_Low = convert_radiance_to_temperature(Radiance_Minus_Delta,
+                                                           k1, k2)
+
+    # Memory Cleanup
+    del Radiance_Plus_Delta 
+    del Radiance_Minus_Delta 
+
+    # The total uncertainty is the difference between the high and low values
+    Temp_Uncertainty = Temp_uncertainty_High - Temp_uncertainty_Low
+    Temp_Uncertainty[Temp_Uncertainty > 100.0] = 0
+
+    # Memory Cleanup
+    del Temp_uncertainty_High 
+    del Temp_uncertainty_Low 
 
     # Give st_uncertainty the same dimensions as the original Lobs
     st_uncertainty_array = Lobs_array.copy()
     st_uncertainty_array.fill(fill_value)
-    st_uncertainty_array[nonfill_locations] = st_uncertainty
+    st_uncertainty_array[nonfill_locations] = Temp_Uncertainty
 
     # Memory cleanup
     del nonfill_locations
     del Lobs_array
-    del st_uncertainty
+    del Temp_Uncertainty
 
     # Apply fill to results where other inputs were fill
     st_uncertainty_array[fill_locations] = fill_value
@@ -710,6 +859,7 @@ def generate_qa(xml_filename, no_data_value):
     emis_stdev_src_info \
         = retrieve_metadata_information(espa_metadata, 'emis_stdev')
     satellite = espa_metadata.xml_object.global_metadata.satellite
+    thermal_info = retrieve_thermal_constants(espa_metadata, satellite)
 
     # Determine output information.  Make it like the emissivity band
     sensor_code = get_satellite_sensor_code(xml_filename)
@@ -734,6 +884,8 @@ def generate_qa(xml_filename, no_data_value):
                       emis_stdev_src_info.filename,
                       distance_img_filename,
                       satellite,
+                      float(thermal_info.k1),
+                      float(thermal_info.k2),
                       no_data_value)
 
     # Build QA filename
