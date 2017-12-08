@@ -82,7 +82,8 @@ MULT_FACTOR = 100.0
 
 ; Update this with whatever scene you are testing.
 ;imagebase = 'LE07_L1TP_014035_20150615_20160902_01_T1' ; L7 scene
-imagebase = 'LE07_L1TP_013033_20130330_20160908_01_T2' ; L7 scene
+; imagebase = 'LE07_L1TP_013033_20130330_20160908_01_T2' ; L7 scene
+imagebase = 'LC08_L1TP_013032_20130330_20170310_01_T1' ; L8 scene
 whichLandsat = strmid(imagebase, 3, 1)
 satNum = fix(whichLandsat) 
 
@@ -166,6 +167,19 @@ CASE satNum OF
    8: landsat_uncertainty = 0.03577072
 ENDCASE
 
+CASE satNum OF
+   4: K1 = 671.62
+   5: K1 = 607.76
+   7: K1 = 666.09
+   8: K1 = 774.8853
+ENDCASE
+CASE satNum OF
+   4: K2 = 1284.3
+   5: K2 = 1260.56
+   7: K2 = 1282.71
+   8: K2 = 1321.0789
+ENDCASE
+
 
 S_I = ( dLT_dLOBS * landsat_uncertainty )^2 
 
@@ -205,7 +219,7 @@ S_U = (unknown_uncertainty)^2
 Le_Image=(Lobs_array-Lu_array-(1-emis_array)*Ld_array*tau_array)/(emis_array*tau_array)
 Le_Image(where(Le_Image gt 30))=0
 a=Le_Image
-LST_Image=planckInv(a, 11.0)
+LST_Image=K2/(alog((K1/Le_Image)+1))
 
 LST4Calculations = LST_Image(nonfill)
 Le4Calculations = Le_Image(nonfill)
@@ -216,8 +230,8 @@ LST_Minus_Delta=LST4Calculations-Delta_Temps
 LST_Plus_Delta=LST4Calculations+Delta_Temps
 
 ; CONVERT TO RADIANCE
-S_U_Radiance_High=0.0005*LST_Plus_Delta^2-0.1798*LST_Plus_Delta+15.969
-S_U_Radiance_Low=0.0005*LST_Minus_Delta^2-0.1798*LST_Minus_Delta+15.969
+S_U_Radiance_High=K1/((exp(K2/LST_Plus_Delta)) - 1)
+S_U_Radiance_Low=K1/((exp(K2/LST_Minus_Delta)) - 1)
 S_U_Radiance=S_U_Radiance_High-S_U_Radiance_Low
 ;I'M GETTING ODD VALUES IN THE SURROUND SO I ZERO THEM OUT
 S_U_Radiance(where(S_U_Radiance lt 0))=0
@@ -231,8 +245,8 @@ Radiance_Minus_Delta=Le4Calculations-Delta_Radiance
 Radiance_Plus_Delta=Le4Calculations+Delta_Radiance
 
 ; CONVERT BACK TO TEMPERATURE
-Temp_uncertainty_High=-0.0035*Radiance_Plus_Delta^4 + 0.1653*Radiance_Plus_Delta^3 - 2.9369*Radiance_Plus_Delta^2 + 29.627*Radiance_Plus_Delta + 170.1
-Temp_uncertainty_Low=-0.0035*Radiance_Minus_Delta^4 + 0.1653*Radiance_Minus_Delta^3 - 2.9369*Radiance_Minus_Delta^2 + 29.627*Radiance_Minus_Delta + 170.1
+Temp_uncertainty_High=K2/(alog((K1/Radiance_Plus_Delta)+1))
+Temp_uncertainty_Low=K2/(alog((K1/Radiance_Minus_Delta)+1))
 Temp_Uncertainty=Temp_uncertainty_High-Temp_uncertainty_Low
 ;I'M GETTING ODD VALUES IN THE SURROUND SO I ZERO THEM OUT
 Temp_Uncertainty(where(Temp_Uncertainty gt 100))=0
