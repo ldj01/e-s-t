@@ -16,11 +16,11 @@ FUNCTION get_unknown_uncertainty, cloud_distances, transmission_values, lst_geot
   ; matrix of "unknown errors," which was calculated from observed and 
   ; predicted LST errors from the L7 global validation study.  
   ;
-  unknown_error_matrix =  [ [2.3905, 2.7150, 2.5762, 2.1302], $
-                            [2.0158, 1.7028, 1.4872, 1.3053], $
-                            [1.8156, 1.0619, 0.9760, 0.7264], $
-                            [1.9715, 1.3853, 0.8110, 0.7295], $
-                            [1.4160, 0.8752, 0.7948, 0.4269] ]
+  unknown_error_matrix =  [ [2.3749, 2.6962, 2.5620, 2.1131], $
+                            [1.9912, 1.6789, 1.4471, 1.2739], $
+                            [1.7925, 1.0067, 0.9143, 0.6366], $
+                            [1.9416, 1.3558, 0.7604, 0.6682], $
+                            [1.3861, 0.8269, 0.7404, 0.3125] ]
 
   ;
   ; tau bins are 0.3 - 0.55, 0.55 - 0.7, 0.7 - 0.85, 0.85 - 1.0

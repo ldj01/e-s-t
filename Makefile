@@ -8,7 +8,7 @@
 
 include make.config
 
-DIR_RIT = not-validated-prototype_st
+DIR_RIT = provisional-st
 DIR_AUX = st_auxiliary_data
 
 all: all-script all-rit
@@ -32,15 +32,15 @@ clean-script:
 
 #-----------------------------------------------------------------------------
 all-rit:
-	echo "make all in not-validated-prototype_st"; \
+	echo "make all in provisional-st"; \
         (cd $(DIR_RIT); $(MAKE) all);
 
 install-rit: check-environment
-	echo "make install in not-validated-prototype_st"; \
+	echo "make install in provisional-st"; \
         (cd $(DIR_RIT); $(MAKE) install);
 
 clean-rit:
-	echo "make clean in not-validated-prototype_st"; \
+	echo "make clean in provisional-st"; \
         (cd $(DIR_RIT); $(MAKE) clean);
 
 #-----------------------------------------------------------------------------
