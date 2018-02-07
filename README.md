@@ -12,6 +12,7 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 ## Release Notes
 * Version change
 * Convert intermediate band files to integer and scale them 
+* Remove pre-collection software 
 
 ## Installation
 
