@@ -18,7 +18,8 @@ SCRIPTS = \
     st_generate_qa.py \
     st_run_modtran.py \
     estimate_landsat_emissivity.py \
-    estimate_landsat_emissivity_stdev.py
+    estimate_landsat_emissivity_stdev.py \
+    st_convert_bands.py
 
 SCRIPT_IMPORTS = \
     build_st_data.py \

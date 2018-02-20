@@ -1,8 +1,8 @@
-## Surface Temperature 1.0.0 Release Notes
+## Surface Temperature 1.1.0 Release Notes
 ## Note: The productions produced by this software are considered provisional.
-Release Date: January 2018
+Release Date: March 2018
 
-See git tag [st-rit-v1.0.0]
+See git tag [st-rit-v1.1.0]
 
 This project contains application source code for producing Surface Temperature products.
 
@@ -11,9 +11,8 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ## Release Notes
 * Version change
-* Update surface temperature quality band procedure to match Kelvin and 
-  radiance units
-* Update main product directory name to "provisional-st"
+* Convert intermediate band files to integer and scale them 
+* Remove pre-collection software 
 
 ## Installation
 

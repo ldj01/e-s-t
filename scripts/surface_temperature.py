@@ -103,14 +103,9 @@ def get_satellite_sensor_code(xml_filename):
     """Returns the satellite-sensor code if known
     """
 
-    old_prefixes = ['LT4', 'LT5', 'LE7', 'LT8', 'LC8', 'LO8']
     collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
 
     base_name = os.path.basename(xml_filename)
-
-    satellite_sensor_code = base_name[0:3]
-    if satellite_sensor_code in old_prefixes:
-        return satellite_sensor_code
 
     satellite_sensor_code = base_name[0:4]
     if satellite_sensor_code in collection_prefixes:
@@ -124,8 +119,7 @@ def get_science_application_name(satellite_sensor_code):
     """Returns name of executable that needs to be called
     """
 
-    available = ['LT4', 'LT5', 'LE7', 'LC8',
-                 'LT04', 'LT05', 'LE07', 'LC08']
+    available = ['LT04', 'LT05', 'LE07', 'LC08']
 
     if satellite_sensor_code in available:
         return 'st_generate_products.py'
