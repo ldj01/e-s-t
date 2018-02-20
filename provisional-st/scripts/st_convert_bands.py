@@ -112,7 +112,7 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    parser = ArgumentParser(description='Builds surface temperature QA band')
+    parser = ArgumentParser(description='Convert intermediate bands to int16')
 
     parser.add_argument('--xml',
                         action='store', dest='xml_filename',

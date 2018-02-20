@@ -1,6 +1,6 @@
 ## Surface Temperature 1.1.0 Release Notes
 ## Note: The productions produced by this software are considered provisional.
-Release Date: February 2018
+Release Date: March 2018
 
 See git tag [st-rit-v1.1.0]
 
