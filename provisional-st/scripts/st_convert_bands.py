@@ -119,6 +119,11 @@ def retrieve_command_line_arguments():
                         required=True, default=None,
                         help='The XML metadata file to use')
 
+    parser.add_argument('--debug',
+                        action='store_true', dest='debug',
+                        required=False, default=False,
+                        help='Output debug messages and/or keep debug data')
+
     args = parser.parse_args()
 
     # Verify that the --xml parameter was specified
@@ -402,6 +407,8 @@ def main():
 
     # Check logging level
     logging_level = logging.INFO
+    if args.debug:
+        logging_level = logging.DEBUG
 
     # Setup the default logger format and level.  Log to STDOUT.
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'

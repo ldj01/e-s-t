@@ -387,11 +387,11 @@ def interpolate_to_pressure_layers(data, point, layers, interp_factor):
         hgt_m1 = determine_geometric_hgt(data, point, layer, 1)
         # print(hgt_m1)
 
-        # Relative humitidy at t0
+        # Relative humididy at t0
         (rh_v0, temp_v0) = determine_rh_temp(data, point, layer, 0)
         # print(rh_v0, temp_v0)
 
-        # Relative humitidy at t1
+        # Relative humididy at t1
         (rh_v1, temp_v1) = determine_rh_temp(data, point, layer, 1)
         # print(rh_v1, temp_v1)
 

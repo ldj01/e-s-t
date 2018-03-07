@@ -1,6 +1,6 @@
 
 '''
-    File: st_build_points.py
+    File: st_grid_points.py
 
     Purpose: Builds a directory structure of points and required information
              to be used for generation and interpolation of atmospheric
