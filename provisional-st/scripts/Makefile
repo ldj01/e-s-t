@@ -12,6 +12,7 @@ include $(TOP)/make.config
 SCRIPTS = \
     st_determine_grid_points.py \
     st_build_modtran_input.py \
+    st_extract_auxiliary_merra_data.py \
     st_extract_auxiliary_narr_data.py \
     st_generate_distance_to_cloud.py \
     st_generate_products.py \

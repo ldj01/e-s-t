@@ -143,8 +143,8 @@ class System(object):
                 raise
 
 
-class NARR(object):
-    """Provides common NARR data related methods
+class REANALYSIS(object):
+    """Provides common REANALYSIS data related methods
     """
 
     @staticmethod
@@ -156,8 +156,8 @@ class NARR(object):
 
         Returns:
             acquisition <datetime>: Scene center date and time
-            time_0 <datetime>: NARR data datetime before scene center
-            time_1 <datetime>: NARR data datetime after scene center
+            time_0 <datetime>: REANALYSIS data datetime before scene center
+            time_1 <datetime>: REANALYSIS data datetime after scene center
         """
 
         center_time = str(espa_metadata.xml_object

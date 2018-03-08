@@ -25,7 +25,7 @@ import st_utilities as util
 from st_grid_points import (GRID_POINT_HEADER_NAME,
                              GRID_POINT_BINARY_NAME)
 
-from st_build_modtran_input import PARAMETERS
+from st_build_modtran_input import NARR_PARAMETERS, MERRA_PARAMETERS
 
 import build_st_data
 
@@ -57,6 +57,11 @@ def retrieve_command_line_arguments():
                         action='store_true', dest='temporary',
                         required=False, default=False,
                         help='Keep any temporary files generated')
+
+    parser.add_argument('--reanalysis',
+                        action='store', dest='reanalysis',
+                        required=False, default='MERRA',
+                        help='Reanalysis source - NARR or MERRA')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -121,12 +126,13 @@ def retrieve_cfg(cfg_filename):
     return cfg
 
 
-def determine_grid_points(xml_filename, data_path, debug):
+def determine_grid_points(xml_filename, data_path, reanalysis, debug):
     """Determines the grid points to utilize
 
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
+        reanalysis <str>: Reanalysis source: NARR or MERRA 
         debug <bool>: Debug logging and processing
     """
 
@@ -134,7 +140,8 @@ def determine_grid_points(xml_filename, data_path, debug):
     try:
         cmd = ['st_determine_grid_points.py',
                '--xml', xml_filename,
-               '--data_path', data_path]
+               '--data_path', data_path,
+               '--reanalysis', reanalysis]
 
         if debug:
             cmd.append('--debug')
@@ -146,20 +153,26 @@ def determine_grid_points(xml_filename, data_path, debug):
             logger.info(output)
 
 
-def extract_auxiliary_narr_data(xml_filename, aux_path, debug):
-    """Determines the grid points to utilize
+def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
+    """Extracts reanalysis data for the grid points
 
     Args:
         xml_filename <str>: XML metadata filename
         aux_path <str>: Directory for the auxiliary data files
+        reanalysis <str>: Reanalysis source: NARR or MERRA 
         debug <bool>: Debug logging and processing
     """
 
     output = ''
     try:
-        cmd = ['st_extract_auxiliary_narr_data.py',
-               '--xml', xml_filename,
-               '--aux_path', aux_path]
+        if reanalysis == "NARR":
+            cmd = ['st_extract_auxiliary_narr_data.py',
+                   '--xml', xml_filename,
+                   '--aux_path', aux_path]
+        else: # MERRA
+            cmd = ['st_extract_auxiliary_merra_data.py',
+                   '--xml', xml_filename,
+                   '--aux_path', aux_path]
 
         if debug:
             cmd.append('--debug')
@@ -171,12 +184,13 @@ def extract_auxiliary_narr_data(xml_filename, aux_path, debug):
             logger.info(output)
 
 
-def build_modtran_input(xml_filename, data_path, debug):
+def build_modtran_input(xml_filename, data_path, reanalysis, debug):
     """Determines the grid points to utilize
 
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
+        reanalysis <str>: Reanalysis source: NARR or MERRA 
         debug <bool>: Debug logging and processing
     """
 
@@ -184,7 +198,8 @@ def build_modtran_input(xml_filename, data_path, debug):
     try:
         cmd = ['st_build_modtran_input.py',
                '--xml', xml_filename,
-               '--data_path', data_path]
+               '--data_path', data_path,
+               '--reanalysis', reanalysis]
 
         if debug:
             cmd.append('--debug')
@@ -334,8 +349,11 @@ def convert_intermediate_bands(xml_filename, debug):
             logger.info(output)
 
 
-def cleanup_temporary_data():
+def cleanup_temporary_data(reanalysis):
     """Cleanup/remove all the ST temporary files and directories 
+
+    Args:
+        reanalysis <str>: Reanalysis source: NARR or MERRA 
     """
 
     GRID_POINT_ELEVATION_NAME = 'grid_elevations.txt'
@@ -366,7 +384,12 @@ def cleanup_temporary_data():
                                '[0-9][0-9][0-9]_[0-9][0-9][0-9]'):
         shutil.rmtree(directory)
 
-    for directory in PARAMETERS:
+    if reanalysis == "NARR":
+        parameters = NARR_PARAMETERS
+    else: # MERRA
+        parameters = MERRA_PARAMETERS
+
+    for directory in parameters:
         if os.path.exists(directory):
             shutil.rmtree(directory)
 
@@ -448,14 +471,21 @@ def main():
     # -------------- Generate the products --------------
     determine_grid_points(xml_filename=args.xml_filename,
                           data_path=data_path,
+                          reanalysis=args.reanalysis,
                           debug=args.debug)
 
-    extract_auxiliary_narr_data(xml_filename=args.xml_filename,
-                                aux_path=aux_path,
-                                debug=args.debug)
+    extract_auxiliary_data(xml_filename=args.xml_filename,
+                           aux_path=".",
+                           # MERRA auxiliary archive is not set up yet
+                           # TODO aux_path or something like it will be
+                           # TODO needed eventually, and it is now for NARR
+                           #aux_path=aux_path,
+                           reanalysis=args.reanalysis,
+                           debug=args.debug)
 
     build_modtran_input(xml_filename=args.xml_filename,
                         data_path=data_path,
+                        reanalysis=args.reanalysis,
                         debug=args.debug)
 
     generate_emissivity_products(xml_filename=args.xml_filename,
@@ -506,7 +536,7 @@ def main():
     # Clean up files and directories according to user selections, or
     # for intermediate bands convert them if they are to be kept.
     if not args.temporary:
-        cleanup_temporary_data()
+        cleanup_temporary_data(reanalysis=args.reanalysis)
 
     if args.intermediate:
         convert_intermediate_bands(xml_filename=args.xml_filename,

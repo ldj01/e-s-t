@@ -26,7 +26,7 @@ GridPointInfo = namedtuple('GridPointInfo',
                            ('index',
                             'run_modtran',
                             'col', 'row',
-                            'narr_col', 'narr_row',
+                            'reanalysis_col', 'reanalysis_row',
                             'lat', 'lon',
                             'map_y', 'map_x'))
 
@@ -63,8 +63,8 @@ def write_grid_points(grid_points, grid_rows, grid_cols):
                                    int(point['run_modtran']),
                                    point['row'],
                                    point['col'],
-                                   point['narr_row'],
-                                   point['narr_col'],
+                                   point['reanalysis_row'],
+                                   point['reanalysis_col'],
                                    point['point'].lon,
                                    point['point'].lat,
                                    point['point'].map_x,
@@ -100,14 +100,14 @@ def read_grid_points():
         for position in xrange(count):
             logger.debug('Reading point {}'.format(position))
             point_buffer = bytearray(binary_fd.read(point_struct.size))
-            (index, run_modtran, row, col, narr_row, narr_col,
+            (index, run_modtran, row, col, reanalysis_row, reanalysis_col,
              lon, lat, map_x, map_y) = point_struct.unpack(point_buffer)
 
             grid_points.append(GridPointInfo(index=index,
                                              run_modtran=run_modtran,
                                              row=row, col=col,
-                                             narr_row=narr_row,
-                                             narr_col=narr_col,
+                                             reanalysis_row=reanalysis_row,
+                                             reanalysis_col=reanalysis_col,
                                              lon=lon, lat=lat,
                                              map_x=map_x, map_y=map_y))
 

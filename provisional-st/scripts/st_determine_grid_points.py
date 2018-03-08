@@ -29,8 +29,9 @@ import st_utilities as util
 from st_grid_points import PointInfo, write_grid_points
 
 
-# Name of the static NARR coordinates file
+# Name of the static coordinates file
 NARR_COORDINATES_FILENAME = 'narr_coordinates.txt'
+MERRA_COORDINATES_FILENAME = 'merra_coordinates.txt'
 
 # Geometric values for the Earth
 RADIUS_EARTH_IN_METERS = 6378137.0
@@ -44,7 +45,7 @@ GdalInfo = namedtuple('GdalInfo',
                        'll_to_data', 'data_to_ll',
                        'nlines', 'nsamps', 'fill_value'))
 
-# Data boundry information
+# Data boundary information
 DataBoundInfo = namedtuple('DataBoundInfo',
                            ('north_lat', 'south_lat', 'east_lon', 'west_lon'))
 
@@ -77,6 +78,11 @@ def retrieve_command_line_arguments():
                         action='store', dest='data_path',
                         required=False, default=None,
                         help='Specify the ST Data directory')
+
+    parser.add_argument('--reanalysis',
+                        action='store', dest='reanalysis',
+                        required=False, default='MERRA',
+                        help='Reanalysis source - NARR or MERRA')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -163,19 +169,23 @@ def initialize_gdal_objects(espa_metadata):
                     nlines=nlines, nsamps=nsamps, fill_value=fill_value)
 
 
-def determine_adjusted_data_bounds(espa_metadata, gdal_objs):
-    """Determines the data boundaries specific to the NARR data resolution
+def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
+    """Determines the data boundaries specific to the reanalysis source's 
+       data resolution
 
     Args:
         espa_metadata <espa.Metadata>: The metadata for the data
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
+        reanalysis <str>: Reanalysis source: NARR or MERRA
 
     Returns:
-        <DataBoundInfo>: Contains adjusted data boundry information
+        <DataBoundInfo>: Contains adjusted data boundary information
     """
 
-    # Adjustment is specific to NARR data resolution in meters
-    adjustment = 32000 * 1.5
+    if reanalysis == "NARR":
+        adjustment = 32000 * 1.5
+    else: # MERRA
+        adjustment = 139000 * 1.5
 
     north_lat = float(espa_metadata.xml_object.
                       global_metadata.bounding_coordinates.north)
@@ -221,7 +231,7 @@ def check_within_bounds(data_bounds, lon, lat):
     """Checks that location values are within specified boundaries
 
     Args:
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+        data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         lon <float>: The longitude to check
         lat <float>: The latitude to check
@@ -239,7 +249,7 @@ def check_within_bounds(data_bounds, lon, lat):
     return False
 
 
-def convert_narr_line_to_point_info(gdal_objs, min_max, line):
+def convert_line_to_point_info(gdal_objs, min_max, line, reanalysis):
     """Converts a line of information into a PointInfo
 
     Args:
@@ -248,7 +258,7 @@ def convert_narr_line_to_point_info(gdal_objs, min_max, line):
         line <str>: The line of information read from the coordinate file
 
     Returns:
-        <PointInfo>: Contains point information from the NARR coordinates file
+        <PointInfo>: Contains point information from the coordinates file
     """
 
     (col, row, lat, lon) = line.split()
@@ -257,7 +267,9 @@ def convert_narr_line_to_point_info(gdal_objs, min_max, line):
     col = int(col)
     row = int(row)
     lat = float(lat)
-    lon = fix_narr_longitude(float(lon))
+    if reanalysis == "NARR":
+        lon = fix_narr_longitude(float(lon))
+    lon = float(lon)
 
     if (min_max.min_row <= row and
             min_max.max_row >= row and
@@ -277,8 +289,8 @@ def is_in_data(gdal_objs, point):
 
     Args:
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        point <PointInfo>: Contains point information from the NARR
-                           coordinates file
+        point <PointInfo>: Contains point information from the coordinates 
+                           file
 
     Returns:
         <bool>: True - If within the data bounds
@@ -336,8 +348,8 @@ def grid_point_distance(gdal_objs, point, samp, line):
 
     Args:
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        point <PointInfo>: Contains point information from the NARR
-                           coordinates file
+        point <PointInfo>: Contains point information from the coordinates 
+                           file
         samp <int>: The sample in the data
         line <int>: The line in the data
 
@@ -440,12 +452,14 @@ def fix_narr_longitude(lon):
         return -lon
 
 
-def extract_narr_row_col(data_bounds, line):
-    """Extracts the row and column from a line of NARR coordinate information
+def extract_row_col(data_bounds, line, reanalysis):
+    """Extracts the row and column from a line of reanalysis coordinate 
+       information
 
     Args:
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry information
+        data_bounds <DataBoundInfo>: Contains adjusted data boundary information
         line <str>: The line of information read from the coordinate file
+        reanalysis <str>: Reanalysis source: NARR or MERRA
 
     Returns:
         row <int>: The row for the point
@@ -458,7 +472,9 @@ def extract_narr_row_col(data_bounds, line):
     col = int(col)
     row = int(row)
     lat = float(lat)
-    lon = fix_narr_longitude(float(lon))
+    if reanalysis == "NARR":
+        lon = fix_narr_longitude(float(lon))
+    lon = float(lon)
 
     if not check_within_bounds(data_bounds, lon, lat):
         return None
@@ -466,13 +482,14 @@ def extract_narr_row_col(data_bounds, line):
         return (row, col)
 
 
-def determine_narr_min_max_row_col(data_bounds, data_path):
-    """Determine the NARR points that are within the data bounds
+def determine_min_max_row_col(data_bounds, data_path, reanalysis):
+    """Determine the reanalysis points that are within the data bounds
 
     Args:
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+        data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
-        data_path <str>: The full path to the NARR coordinates file
+        data_path <str>: The full path to the reanalysis coordinates file
+        reanalysis <str>: Reanalysis source: NARR or MERRA
 
     Returns:
         <MinMaxRowColInfo>: Contains the min and max rows and columns
@@ -480,8 +497,9 @@ def determine_narr_min_max_row_col(data_bounds, data_path):
 
     # Generate a list of the points [(row, col),] within the defined boundary
     with open(data_path, 'r') as coords_fd:
-        rows_cols = [extract_narr_row_col(data_bounds=data_bounds,
-                                          line=line.strip())
+        rows_cols = [extract_row_col(data_bounds=data_bounds,
+                                     line=line.strip(),
+                                     reanalysis=reanalysis)
                      for line in coords_fd]
 
     # Filter out the None values
@@ -498,16 +516,17 @@ def determine_narr_min_max_row_col(data_bounds, data_path):
                             min_col=min_col, max_col=max_col)
 
 
-def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
-                                  data_path):
-    """Determine the grid of NARR points which cover the data
+def determine_gridded_points(debug, gdal_objs, data_bounds,
+                             data_path, reanalysis):
+    """Determine the grid of reanalysis points which cover the data
 
     Args:
         debug <bool>: Perform debug output or not
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+        data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
-        data_path <str>: The directory for the NARR coodinate file
+        data_path <str>: The directory for the coodinate file
+        reanalysis <str>: Reanalysis source: NARR or MERRA
 
     Returns:
         grid_points <dict>: Dictionary of the gridded points
@@ -518,10 +537,13 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
     logger = logging.getLogger(__name__)
 
     # Determine full path to the file
-    data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
+    if reanalysis == "NARR":
+        data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
+    else:
+        data_path = os.path.join(data_path, MERRA_COORDINATES_FILENAME)
 
     # Determine buffered points
-    min_max = determine_narr_min_max_row_col(data_bounds, data_path)
+    min_max = determine_min_max_row_col(data_bounds, data_path, reanalysis)
 
     grid_rows = min_max.max_row - min_max.min_row + 1
     grid_cols = min_max.max_col - min_max.min_col + 1
@@ -529,9 +551,10 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
     # Using the mins and maxs read the coordinates again
     # but keep a complete rectangular grid of them
     with open(data_path, 'r') as coords_fd:
-        points = [convert_narr_line_to_point_info(gdal_objs=gdal_objs,
-                                                  min_max=min_max,
-                                                  line=line.strip())
+        points = [convert_line_to_point_info(gdal_objs=gdal_objs,
+                                             min_max=min_max,
+                                             line=line.strip(),
+                                             reanalysis=reanalysis)
                   for line in coords_fd]
 
     # Filter out the None values (Only keeps the grid we want)
@@ -545,8 +568,8 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
         grid_points.append({'index': index,
                             'row': point.row-min_max.min_row,
                             'col': point.col-min_max.min_col,
-                            'narr_row': point.row,
-                            'narr_col': point.col,
+                            'reanalysis_row': point.row,
+                            'reanalysis_col': point.col,
                             'run_modtran': is_in_data(gdal_objs=gdal_objs,
                                                       point=point),
                             'point': point})
@@ -557,15 +580,16 @@ def determine_gridded_narr_points(debug, gdal_objs, data_bounds,
     return (grid_points, grid_rows, grid_cols)
 
 
-def generate_point_grid(debug, gdal_objs, data_bounds, data_path):
+def generate_point_grid(debug, gdal_objs, data_bounds, data_path, reanalysis):
     """Creates a point grid file for later processing
 
     Args:
         debug <bool>: Perform debug output or not
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        data_bounds <DataBoundInfo>: Contains adjusted data boundry
+        data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
-        data_path <str>: The directory for the NARR coodinate file
+        data_path <str>: The directory for the coodinate file
+        reanalysis <str>: Reanalysis source: NARR or MERRA
 
     Notes: The file format contains lines of the following information.
                'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
@@ -574,14 +598,14 @@ def generate_point_grid(debug, gdal_objs, data_bounds, data_path):
 
            Each line in the file represents for the purpose of this
            application a (row, col) coodinate pair that coinsides with the
-           rows and cols of the NARR data.
+           rows and cols of the reanalysis data.
     """
 
     logger = logging.getLogger(__name__)
 
     # Determine grid points
-    (grid_points, grid_rows, grid_cols) = determine_gridded_narr_points(
-        debug, gdal_objs, data_bounds, data_path)
+    (grid_points, grid_rows, grid_cols) = determine_gridded_points(
+        debug, gdal_objs, data_bounds, data_path, reanalysis)
 
     raster_data = (gdal_objs.data_ds.GetRasterBand(1)
                    .ReadAsArray(0, 0, gdal_objs.nsamps, gdal_objs.nlines))
@@ -754,16 +778,18 @@ def main():
     # Figure out the gdal objects
     gdal_objs = initialize_gdal_objects(espa_metadata=espa_metadata)
 
-    # Determin NARR adjusted data bounds
+    # Determine adjusted data bounds
     data_bounds = determine_adjusted_data_bounds(espa_metadata=espa_metadata,
-                                                 gdal_objs=gdal_objs)
+                                                 gdal_objs=gdal_objs,
+                                                 reanalysis=args.reanalysis)
     logger.debug(str(data_bounds))
 
     # Generate the point grid
     generate_point_grid(debug=args.debug,
                         gdal_objs=gdal_objs,
                         data_bounds=data_bounds,
-                        data_path=args.data_path)
+                        data_path=args.data_path,
+                        reanalysis=args.reanalysis)
 
     logger.info('*** Determine Grid Points - Complete ***')
 
