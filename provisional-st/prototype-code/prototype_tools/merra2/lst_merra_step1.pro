@@ -136,6 +136,28 @@ PRO lst_merra_step1, home, $
    temp = double(tmp)
    height = double(hgt)
    sh = double(shm)
+
+   ;##### Inserted code suggestion for after 21hours MERRA data use
+   if hour GE 21 THEN BEGIN
+        ;define file containing merra (PLUS one day) data for current landsat 
+        ;scene
+        filename_2 = home+directory+'merra2_file2.nc4'
+        fileID_2 = NCDF_OPEN(filename_2)
+
+        fileinq_struct=NCDF_INQUIRE(fileID_2)
+
+        tmp_id_2 = NCDF_VARID(fileID_2, 'T')
+        hgt_id_2 = NCDF_VARID(fileID_2,'H')
+        shm_id_2 = NCDF_VARID(fileID_2, 'QV')
+        NCDF_VARGET, fileID_2, tmp_id_2, tmp_2
+        NCDF_VARGET, fileID_2, hgt_id_2, hgt_2
+        NCDF_VARGET, fileID_2, shm_id_2, shm_2
+
+        temp_2 = double(tmp_2)
+        height_2 = double(hgt_2)
+        sh_2 = double(shm_2)
+   ENDIF
+
    ;
    ; HDF ROUTINES
    ; 
@@ -171,7 +193,7 @@ PRO lst_merra_step1, home, $
    p = [ 1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, $
                 600, 550, 500, 450, 400, 350, 300, 250, 200, 150, 100, 70, 50, 40, $
                 30, 20, 10, 7, 5, 4, 3, 2, 1, 0.7, 0.5, 0.4, 0.3, 0.1 ]
-                
+
    ;determine three hour increment before and after acquisition time
    rem1 = hour MOD 3
    rem2 = 3 - rem1
@@ -179,14 +201,31 @@ PRO lst_merra_step1, home, $
    hour2 = hour + rem2
    hour1index = hour1/3
    hour2index = hour2/3
-   
-   ;define arrays for before and after landsat acquisition
-   hgt_1 = height[*,*,*,hour1index]
-   hgt_2 = height[*,*,*,hour2index]
-   tmp_1 = temp[*,*,*,hour1index]
-   tmp_2 = temp[*,*,*,hour2index]
-   sh_1 = sh[*,*,*,hour1index]
-   sh_2 = sh[*,*,*,hour2index]
+
+   IF hour GE 21 THEN BEGIN
+        ;Define arrays for before and after landsat acquisition.  The values
+        ;after the Landsat acquisition come from midnight the next day. 
+        PRINT, "Getting MERRA-2 data from 2 files."
+        hgt_1 = height[*,*,*,hour1index]
+        hgt_2 = height_2[*,*,*,0]
+        tmp_1 = temp[*,*,*,hour1index]
+        tmp_2 = temp_2[*,*,*,0]
+        sh_1 = sh[*,*,*,hour1index]
+        sh_2 = sh_2[*,*,*,0]
+        p1000_hgt_1 = height[*,*,0,hour1index]
+        p1000_hgt_2 = height[*,*,0,0]
+   ENDIF ELSE BEGIN
+       ;define arrays for before and after landsat acquisition
+        PRINT, "Getting MERRA-2 data from a single file."
+       hgt_1 = height[*,*,*,hour1index]
+       hgt_2 = height[*,*,*,hour2index]
+       tmp_1 = temp[*,*,*,hour1index]
+       tmp_2 = temp[*,*,*,hour2index]
+       sh_1 = sh[*,*,*,hour1index]
+       sh_2 = sh[*,*,*,hour2index]
+       p1000_hgt_1 = height[*,*,0,hour1index]
+       p1000_hgt_2 = height[*,*,0,hour2index]
+   ENDELSE
 
    PRINT, "hour1index", hour1index 
    ;PRINT, "displaying hgt_1" 
@@ -195,8 +234,6 @@ PRO lst_merra_step1, home, $
    ;PRINT, "displaying hgt_2" 
    ;PRINT, hgt_2
 
-   p1000_hgt_1 = height[*,*,0,hour1index]
-   p1000_hgt_2 = height[*,*,0,hour2index]
    PRINT, "displaying p1000_hgt_1" 
    PRINT, p1000_hgt_1
    PRINT, "displaying p1000_hgt_2" 
