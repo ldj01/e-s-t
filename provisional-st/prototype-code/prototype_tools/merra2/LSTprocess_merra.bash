@@ -124,7 +124,9 @@ echo "zone = $zone"
 whichLandsat="${SPACECRAFT_ID:(-1)}"
 if [[ "${whichLandsat}" -eq 8 ]]
 then
-	whichLandsat=11
+        # RRRR TMP We are using 10 in the ESPA code.
+	# whichLandsat=11
+	whichLandsat=10
 fi
 
 echo "whichLandsat = $whichLandsat"

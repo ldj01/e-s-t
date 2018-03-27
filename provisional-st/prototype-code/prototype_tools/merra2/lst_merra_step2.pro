@@ -173,22 +173,24 @@ PRO lst_merra_step2, home, $
 
          SPAWN, command, specs
 
-         ;PRINT, "specs:", specs
-         ;PRINT, "specs[0]:", specs[0]
-         ;PRINT, "specs[1]:", specs[1]
-         ;PRINT, "specs[2]:", specs[2]
-         ;PRINT, "specs[3]:", specs[3]
-         ;PRINT, "specs[4]:", specs[4]
-         ;PRINT, "specs[5]:", specs[5]
-         ;PRINT, "specs[6]:", specs[6]
-         ;PRINT, "specs[7]:", specs[7]
-         ;PRINT, "specs[8]:", specs[8]
+         PRINT, "specs:", specs
+         PRINT, "specs[0]:", specs[0]
+         PRINT, "specs[1]:", specs[1]
+         PRINT, "specs[2]:", specs[2]
+         PRINT, "specs[3]:", specs[3]
+         PRINT, "specs[4]:", specs[4]
+         PRINT, "specs[5]:", specs[5]
+         PRINT, "specs[6]:", specs[6]
+         PRINT, "specs[7]:", specs[7]
+         PRINT, "specs[8]:", specs[8]
 
          ; Our directory structure is a bit different from RIT's.
          ; lat_lon = specs[6]
          ; height = specs[7]
-         lat_lon = specs[8]
-         height = specs[9]
+         ; lat_lon = specs[8]
+         ; height = specs[9]
+         lat_lon = specs[7]
+         height = specs[8]
 
          PRINT, "lat_lon:", lat_lon
          PRINT, "height:", height
