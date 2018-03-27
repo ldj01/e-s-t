@@ -12,6 +12,7 @@ include $(TOP)/make.config
 static_install_path = $(st_algorithm_dir)/static_data
 
 STATIC_DATA_FILES = \
+    aster_ged_tile_list.txt           \
     modtran_head.txt                  \
     modtran_tail.txt                  \
     narr_coordinates.txt              \

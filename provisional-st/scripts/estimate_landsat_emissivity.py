@@ -401,13 +401,14 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
     del data
 
 
-def generate_tiles(src_info, coefficients, url, wkt,
+def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
                    no_data_value, intermediate):
     """Generate tiles for emissivity mean and NDVI from ASTER data
 
     Args:
         src_info <SourceInfo>: Information about the source data
         coefficients <CoefficientInfo>: coefficients for the math
+        st_data_dir <str>: Location of the ST data files 
         url <str>: URL to retrieve the file from
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
@@ -426,6 +427,14 @@ def generate_tiles(src_info, coefficients, url, wkt,
     - Extract the NDVI
     - Generate the Landsat EMIS from the 13 and 14 band data
     '''
+
+    logger = logging.getLogger(__name__)
+
+    # Read the ASTER GED tile list
+    ged_tile_file = 'aster_ged_tile_list.txt'
+    with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file: 
+        tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file] 
+
     ls_emis_mean_filenames = list()
     aster_ndvi_mean_filenames = list()
     for (lat, lon) in [(lat, lon)
@@ -441,6 +450,11 @@ def generate_tiles(src_info, coefficients, url, wkt,
         else:
             filename = ASTER_GED_P_FORMAT.format(lat, lon)
 
+        # Skip the tile if it isn't in the ASTER GED database 
+        if filename not in tiles:
+            logger.info('Skipping tile {} not in ASTER GED'.format(filename))
+            continue
+
         # Build the output tile names
         ls_emis_tile_name = ''.join([filename, '_emis.tif'])
         aster_ndvi_tile_name = ''.join([filename, '_ndvi.tif'])
@@ -452,9 +466,10 @@ def generate_tiles(src_info, coefficients, url, wkt,
                                 filename=filename,
                                 intermediate=intermediate))
 
-        # Skip the tile if it isn't available
+        # Fail if a tile can't be read, but it is in the ASTER GED
         if not aster_data_available:
-            continue
+            logger.error('Cannot reach tile {} in ASTER GED'.format(filename))
+            return (list(), list())
 
         # Add the tile names to the list for mosaic building and warping
         ls_emis_mean_filenames.append(ls_emis_tile_name)
@@ -486,14 +501,15 @@ def generate_tiles(src_info, coefficients, url, wkt,
     return (ls_emis_mean_filenames, aster_ndvi_mean_filenames)
 
 
-def build_ls_emis_data(server_name, server_path, src_info, coefficients,
-                       ls_emis_warped_name, aster_ndvi_warped_name,
-                       no_data_value, intermediate):
+def build_ls_emis_data(server_name, server_path, st_data_dir, src_info, 
+                       coefficients, ls_emis_warped_name, 
+                       aster_ndvi_warped_name, no_data_value, intermediate):
     """Build estimated Landsat Emissivity Data
 
     Args:
         server_name <str>: Name of the ASTER GED server
         server_path <str>: Path on the ASTER GED server
+        st_data_dir <str>: Location of the ST data files 
         src_info <SourceInfo>: Information about the source data
         coefficients <CoefficientInfo>: coefficients for the math
         ls_emis_warped_name <str>: Path to the warped emissivity file
@@ -517,6 +533,7 @@ def build_ls_emis_data(server_name, server_path, src_info, coefficients,
     (ls_emis_mean_filenames, aster_ndvi_mean_filenames) = (
         generate_tiles(src_info=src_info,
                        coefficients=coefficients,
+                       st_data_dir=st_data_dir,
                        url=url,
                        wkt=geographic_wkt,
                        no_data_value=no_data_value,
@@ -618,7 +635,7 @@ def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
 
 
 def generate_emissivity_data(xml_filename, server_name, server_path,
-                             no_data_value, intermediate):
+                             st_data_dir, no_data_value, intermediate):
     """Provides the main processing algorithm for generating the estimated
        Landsat emissivity product.  It produces the final emissivity product.
 
@@ -626,6 +643,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
         xml_filename <str>: Filename for the ESPA Metadata XML
         server_name <str>: Name of the ASTER GED server
         server_path <str>: Path on the ASTER GED server
+        st_data_dir <str>: Location of the ST data files
         no_data_value <int>: No data (fill) value to use
         intermediate <bool>: Keep any intermediate products generated
     """
@@ -685,6 +703,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     logger.info('Build thermal emissivity band and retrieve ASTER NDVI')
     build_ls_emis_data(server_name=server_name,
                        server_path=server_path,
+                       st_data_dir=st_data_dir,
                        src_info=src_info,
                        coefficients=coefficients,
                        ls_emis_warped_name=ls_emis_warped_name,
@@ -876,10 +895,18 @@ def main():
         # Register all the gdal drivers
         gdal.AllRegister()
 
+        # Get the data directory from the environment
+        if 'ST_DATA_DIR' not in os.environ:
+            raise Exception('Environment variable ST_DATA_DIR is'
+                            ' not defined')
+        else:
+            st_data_dir = os.environ.get('ST_DATA_DIR')
+
         # Call the main processing routine
         generate_emissivity_data(xml_filename=args.xml_filename,
                                  server_name=args.aster_ged_server_name,
                                  server_path=args.aster_ged_server_path,
+                                 st_data_dir=st_data_dir,
                                  no_data_value=NO_DATA_VALUE,
                                  intermediate=args.intermediate)
     except Exception:
