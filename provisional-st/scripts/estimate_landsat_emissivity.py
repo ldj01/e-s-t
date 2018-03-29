@@ -36,7 +36,7 @@ from osgeo import gdal, osr
 
 
 from espa import Metadata
-from st_exceptions import NoTilesError
+from st_exceptions import NoTilesError, InaccessibleTileError
 
 
 # Import local modules
@@ -193,13 +193,12 @@ ASTER_GED_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
 ASTER_GED_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
 
 
-def extract_aster_data(url, filename, intermediate):
+def extract_aster_data(url, filename):
     """Extracts the internal band(s) data for later processing
 
     Args:
         url <str>: URL to retrieve the file from
         filename <str>: Base HDF filename to extract from
-        intermediate <bool>: Keep any intermediate products generated
 
     Returns:
         <numpy.2darray>: Mean Band 13 data
@@ -271,11 +270,6 @@ def extract_aster_data(url, filename, intermediate):
     (x_res, y_res, samps, lines) = (
         emis_util.data_resolution_and_size(lat_ds_name,
                                            x_min, x_max, y_min, y_max))
-
-    # Remove the HDF5 tile since we no longer need it
-    if not intermediate:
-        if os.path.exists(h5_file_path):
-            os.unlink(h5_file_path)
 
     # Build the geo transform
     geo_transform = [x_min, x_res, 0, y_max, 0, -y_res]
@@ -402,7 +396,7 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
 
 
 def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
-                   no_data_value, intermediate):
+                   no_data_value):
     """Generate tiles for emissivity mean and NDVI from ASTER data
 
     Args:
@@ -412,7 +406,6 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
         url <str>: URL to retrieve the file from
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
-        intermediate <bool>: Keep any intermediate products generated
 
     Returns:
         list(<str>): Mean emissivity tile names
@@ -463,13 +456,12 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
         (aster_b13_data, aster_b14_data, aster_ndvi_data, samps, lines,
          transform, aster_data_available) = (
              extract_aster_data(url=url,
-                                filename=filename,
-                                intermediate=intermediate))
+                                filename=filename))
 
         # Fail if a tile can't be read, but it is in the ASTER GED
         if not aster_data_available:
-            logger.error('Cannot reach tile {} in ASTER GED'.format(filename))
-            return (list(), list())
+            raise InaccessibleTileError(
+                'Cannot reach tile {} in ASTER GED'.format(filename))
 
         # Add the tile names to the list for mosaic building and warping
         ls_emis_mean_filenames.append(ls_emis_tile_name)
@@ -536,8 +528,7 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
                        st_data_dir=st_data_dir,
                        url=url,
                        wkt=geographic_wkt,
-                       no_data_value=no_data_value,
-                       intermediate=intermediate))
+                       no_data_value=no_data_value))
 
     # Check to see that we downloaded at least one ASTER tile for processing.
     if len(ls_emis_mean_filenames) == 0:
@@ -896,11 +887,7 @@ def main():
         gdal.AllRegister()
 
         # Get the data directory from the environment
-        if 'ST_DATA_DIR' not in os.environ:
-            raise Exception('Environment variable ST_DATA_DIR is'
-                            ' not defined')
-        else:
-            st_data_dir = os.environ.get('ST_DATA_DIR')
+        st_data_dir = emis_util.get_env_var('ST_DATA_DIR', None) 
 
         # Call the main processing routine
         generate_emissivity_data(xml_filename=args.xml_filename,
