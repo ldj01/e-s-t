@@ -13,6 +13,8 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 * Version change
 * Add ASTER GED tile list, and refrain from attempting to download tiles that
   are not on the list
+* Avoid duplicate downloads by emissivity and emissivity standard deviation
+  scripts 
 
 ## Installation
 
