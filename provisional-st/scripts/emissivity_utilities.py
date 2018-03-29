@@ -527,3 +527,23 @@ def get_satellite_sensor_code(xml_filename):
 
     raise Exception('Satellite-Sensor code ({0}) not understood'
                     .format(satellite_sensor_code))
+
+
+def get_env_var(variable, default):
+    """Looks up the requested environment variable
+
+    Args:
+        variable <str>: Environment variable to get
+        default <str,int,None>: Default value for the environment variable
+
+    Returns:
+        <str>: Value of the environment variable
+    """
+
+    result = os.environ.get(variable, default)
+    if result == None:
+        raise RuntimeError(
+            'You must specify {} in the environment'.format(variable))
+
+    return result
+

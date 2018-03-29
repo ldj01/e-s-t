@@ -35,7 +35,7 @@ from osgeo import gdal, osr
 
 
 from espa import Metadata
-from st_exceptions import NoTilesError
+from st_exceptions import NoTilesError, InaccessibleTileError
 
 
 # Import local modules
@@ -76,7 +76,8 @@ def extract_aster_data(url, filename, intermediate):
     # Build the HDF5 filename for the tile
     h5_file_path = ''.join([filename, '.h5'])
 
-    emis_util.download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
+    if not os.path.exists(h5_file_path):
+        emis_util.download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
 
     # There are cases where the emissivity data will not be available
     # (for example, in water regions).
@@ -264,8 +265,8 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
 
         # Fail if a tile can't be read, but it is in the ASTER GED
         if not aster_data_available:
-            logger.error('Cannot reach tile {} in ASTER GED'.format(filename))
-            return (list())
+            raise InaccessibleTileError(
+                'Cannot reach tile {} in ASTER GED'.format(filename))
 
         # Add the tile names to the list for mosaic building and warping
         ls_emis_stdev_filenames.append(ls_emis_stdev_tile_name)
@@ -495,11 +496,7 @@ def main():
         gdal.AllRegister()
 
         # Get the data directory from the environment
-        if 'ST_DATA_DIR' not in os.environ:
-            raise Exception('Environment variable ST_DATA_DIR is'
-                            ' not defined')
-        else:
-            st_data_dir = os.environ.get('ST_DATA_DIR')
+        st_data_dir = emis_util.get_env_var('ST_DATA_DIR', None)
 
         # Call the main processing routine
         generate_emissivity_data(xml_filename=args.xml_filename,
