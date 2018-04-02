@@ -6,7 +6,7 @@
 #include <math.h>
 
 
-#define ST_VERSION "1.1.0"
+#define ST_VERSION "1.1.1"
 #define ST_NO_DATA_VALUE (-9999.0)
 
 

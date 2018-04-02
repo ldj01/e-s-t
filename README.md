@@ -1,8 +1,8 @@
-## Surface Temperature 1.1.0 Release Notes
+## Surface Temperature 1.1.1 Release Notes
 ## Note: The productions produced by this software are considered provisional.
-Release Date: March 2018
+Release Date: April 2018
 
-See git tag [st-rit-v1.1.0]
+See git tag [st-rit-v1.1.1]
 
 This project contains application source code for producing Surface Temperature products.
 
@@ -11,8 +11,10 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ## Release Notes
 * Version change
-* Convert intermediate band files to integer and scale them 
-* Remove pre-collection software 
+* Add ASTER GED tile list, and refrain from attempting to download tiles that
+  are not on the list
+* Avoid duplicate downloads by emissivity and emissivity standard deviation
+  scripts 
 
 ## Installation
 
