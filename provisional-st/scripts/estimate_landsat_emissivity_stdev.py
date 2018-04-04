@@ -27,6 +27,7 @@
 
 import os
 import sys
+import math
 import logging
 
 
@@ -197,7 +198,7 @@ def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
 
 
 def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
-                   intermediate):
+                   intermediate, antimeridian_crossing):
     """Generate tiles for emissivity standard deviation from ASTER data
 
     Args:
@@ -207,6 +208,7 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
         intermediate <bool>: Keep any intermediate products generated
+        antimeridian_crossing <boolean>: Flag for scene crossing 180 meridian
 
     Returns:
         list(<str>): Standard deviation emissivity tile names
@@ -229,11 +231,18 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
         tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file]
 
     ls_emis_stdev_filenames = list()
+
+    if antimeridian_crossing:
+        lon_range = range(int(src_info.bound.west), 180) + \
+                    range(int(src_info.bound.east), -181, -1)
+    else:
+        lon_range = xrange(int(src_info.bound.west),
+                           int(src_info.bound.east)+1)
+
     for (lat, lon) in [(lat, lon)
                        for lat in xrange(int(src_info.bound.south),
                                          int(src_info.bound.north)+1)
-                       for lon in xrange(int(src_info.bound.west),
-                                         int(src_info.bound.east)+1)]:
+                       for lon in lon_range]:
 
         # Build the base filename using the correct format
         filename = ''
@@ -312,13 +321,23 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
     # Save the source proj4 string to use during warping
     src_proj4 = ds_srs.ExportToProj4()
 
+    # Check for antimeridian crossing
+    start_longitude = int(math.floor(src_info.bound.west))
+    end_longitude = int(math.floor(src_info.bound.east))
+
+    if start_longitude > 0 and end_longitude < 0:
+        antimeridian_crossing = True
+    else:
+        antimeridian_crossing = False
+
     (ls_emis_stdev_filenames) = (
         generate_tiles(src_info=src_info,
                        st_data_dir=st_data_dir,
                        url=url,
                        wkt=geographic_wkt,
                        no_data_value=no_data_value,
-                       intermediate=intermediate))
+                       intermediate=intermediate,
+                       antimeridian_crossing=antimeridian_crossing))
 
     # Check to see that we downloaded at least one ASTER tile for processing.
     if len(ls_emis_stdev_filenames) == 0:
@@ -326,6 +345,11 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
 
     # Define the temporary names
     ls_emis_stdev_mosaic_name = 'landsat_emis_stdev_mosaic.tif'
+
+    # If the image crosses the 180 meridian, shift the tile longitudes to use
+    # the 0..360 range so the mosaic is not confused
+    if antimeridian_crossing:
+        emis_util.shift_tiles(ls_emis_stdev_filenames)
 
     # Mosaic the estimated Landsat EMIS stdev tiles into the temp EMIS stdev
     logger.info('Building mosaic for estimated Landsat EMIS standard deviation')

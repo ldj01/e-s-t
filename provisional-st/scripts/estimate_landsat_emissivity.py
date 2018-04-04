@@ -27,6 +27,7 @@
 
 import os
 import sys
+import math
 import logging
 from collections import namedtuple
 
@@ -398,7 +399,7 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
 
 
 def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
-                   no_data_value):
+                   no_data_value, antimeridian_crossing):
     """Generate tiles for emissivity mean and NDVI from ASTER data
 
     Args:
@@ -408,6 +409,7 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
         url <str>: URL to retrieve the file from
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
+        antimeridian_crossing <boolean>: Flag for scene crossing 180 meridian 
 
     Returns:
         list(<str>): Mean emissivity tile names
@@ -432,11 +434,18 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
 
     ls_emis_mean_filenames = list()
     aster_ndvi_mean_filenames = list()
+
+    if antimeridian_crossing:
+        lon_range = range(int(src_info.bound.west), 180) + \
+                    range(int(src_info.bound.east), -181, -1)
+    else:
+        lon_range = xrange(int(src_info.bound.west),
+                           int(src_info.bound.east)+1)
+
     for (lat, lon) in [(lat, lon)
                        for lat in xrange(int(src_info.bound.south),
                                          int(src_info.bound.north)+1)
-                       for lon in xrange(int(src_info.bound.west),
-                                         int(src_info.bound.east)+1)]:
+                       for lon in lon_range]:
 
         # Build the base filename using the correct format
         filename = ''
@@ -530,13 +539,23 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
     # Save the source proj4 string to use during warping
     src_proj4 = ds_srs.ExportToProj4()
 
+    # Check for antimeridian crossing
+    start_longitude = int(math.floor(src_info.bound.west))
+    end_longitude = int(math.floor(src_info.bound.east))
+
+    if start_longitude > 0 and end_longitude < 0:
+        antimeridian_crossing = True
+    else:
+        antimeridian_crossing = False
+
     (ls_emis_mean_filenames, aster_ndvi_mean_filenames) = (
         generate_tiles(src_info=src_info,
                        coefficients=coefficients,
                        st_data_dir=st_data_dir,
                        url=url,
                        wkt=geographic_wkt,
-                       no_data_value=no_data_value))
+                       no_data_value=no_data_value,
+                       antimeridian_crossing=antimeridian_crossing))
 
     # Check to see that we downloaded at least one ASTER tile for processing.
     if len(ls_emis_mean_filenames) == 0:
@@ -545,6 +564,12 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
     # Define the temporary names
     ls_emis_mosaic_name = 'landsat_emis_mosaic.tif'
     aster_ndvi_mosaic_name = 'aster_ndvi_mosaic.tif'
+
+    # If the image crosses the 180 meridian, shift the tile longitudes to use
+    # the 0..360 range so the mosaic is not confused
+    if antimeridian_crossing:
+        emis_util.shift_tiles(ls_emis_mean_filenames) 
+        emis_util.shift_tiles(aster_ndvi_mean_filenames) 
 
     # Mosaic the estimated Landsat EMIS tiles into the temp EMIS
     logger.info('Building mosaic for estimated Landsat EMIS')

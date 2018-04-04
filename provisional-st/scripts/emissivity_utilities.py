@@ -316,6 +316,88 @@ def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
             logger.info(output)
 
 
+def shift_longitude(tile_name, shifted_tile_name, offset):
+    """Shift the longitude of the tile data and put the results in the 
+       requested output file
+
+    Args:
+        tile_name <str>: Filename of tile to shift 
+        shifted_tile_name <str>: Filename of output tile to place results 
+        offset <int>: Number of degrees to add to the longitude 
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # Set up the base command
+    cmd = ['gdal_translate', '-a_ullr']
+
+    # Get the current locations
+    tile_src = gdal.Open(tile_name)
+    ulx, xres, xskew, uly, yskew, yres = tile_src.GetGeoTransform()
+
+    # Compute the adjusted longitude locations
+    lrx = ulx + (tile_src.RasterXSize * xres)
+    lry = uly + (tile_src.RasterYSize * yres)
+    new_ulx = ulx + offset
+    new_lrx = lrx + offset
+
+    # Close the dataset
+    tile_src = None
+
+    # Add updated coordinates to the command
+    cmd.extend([str(new_ulx), str(uly), str(new_lrx), str(lry)])
+
+    # Add source and destination files to the command
+    cmd.extend([tile_name, shifted_tile_name])
+
+    # Convert to a string for the execution
+    cmd = ' '.join(cmd)
+
+    output = ''
+    try:
+        logger.info('Executing [{0}]'.format(cmd))
+        output = util.System.execute_cmd(cmd)
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+
+# Shift tile longitudes
+def shift_tiles(tiles):
+    """Shift the longitude of the tiles that need it to ensure they are in
+       the 0..360 range.  This is intended to be used in antimeridian crossing
+       cases.  Making the longitude range contiguous enables mosaicking using
+       GDAL tools.
+
+    Args:
+        tiles <list(<str>)>: List of tiles to shift 
+    """
+
+    logger = logging.getLogger(__name__)
+
+    for tile in tiles:
+        longitude = int(tile.split(".")[3])
+
+        # Only shift the longitude of the tiles with negative longitude
+        if longitude < 0:
+
+            # Name the shifted output file
+            shifted_tile = tile + '_shifted'
+
+            # Shift the longitude values
+            shift_longitude(tile, shifted_tile, 360)
+
+            # Move destination file back to source file
+            output = ''
+            try:
+                cmd = 'mv {0} {1}'.format(shifted_tile, tile)
+                logger.info('Executing [{0}]'.format(cmd))
+                output = util.System.execute_cmd(cmd)
+            finally:
+                if len(output) > 0:
+                    logger.info(output)
+
+
 def write_emissivity_product(samps, lines, transform, wkt, no_data_value,
                              filename, file_data):
     """Creates the emissivity band file
