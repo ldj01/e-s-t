@@ -28,7 +28,7 @@ import st_utilities as util
 # T - Air temperature
 PARMS_TO_EXTRACT = ['H', 'QV', 'T']
 AUX_PATH_TEMPLATE = '{0:0>4}/{1:0>2}/{2:0>2}'
-AUX_NAME_TEMPLATE = 'merra.{0:04}{1:02}{2:02}.{3}'
+AUX_NAME_TEMPLATE = 'merra2.{0:04}{1:02}{2:02}.{3}'
 
 PRESSURE_LAYERS = [1000, 975, 950, 925, 900, 875, 850, 825, 800,
                    775, 750, 725, 700, 650, 600, 550, 500, 450,

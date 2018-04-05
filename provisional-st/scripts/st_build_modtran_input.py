@@ -44,8 +44,8 @@ INVALID_DATA_VALUE = 9.999e+20
 # The number of rows and columns present in the NARR data
 NARR_ROWS = 277
 NARR_COLS = 349
-MERRA_ROWS = 144 
-MERRA_COLS = 288 
+MERRA_ROWS = 361 
+MERRA_COLS = 576
 
 # The pressure levels contained in the NARR data
 NARR_PRESSURE_LAYERS = [1000, 975, 950, 925, 900,
@@ -123,8 +123,8 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
-                        required=False, default='MERRA',
-                        help='Reanalysis source - NARR or MERRA')
+                        required=False, default='MERRA2',
+                        help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -1115,7 +1115,7 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
                                             interp_factor=interp_factor,
                                             reanalysis=reanalysis)
 
-    if reanalysis == "MERRA":
+    if reanalysis == "MERRA2":
         # Check for missing values at each pressure level and fill them.
         # This is only done for MERRA.  For NARR, missing values are considered
         # an error case.

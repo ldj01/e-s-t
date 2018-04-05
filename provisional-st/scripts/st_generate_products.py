@@ -60,8 +60,8 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
-                        required=False, default='MERRA',
-                        help='Reanalysis source - NARR or MERRA')
+                        required=False, default='MERRA2',
+                        help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -132,7 +132,7 @@ def determine_grid_points(xml_filename, data_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA 
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
         debug <bool>: Debug logging and processing
     """
 
@@ -159,7 +159,7 @@ def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         aux_path <str>: Directory for the auxiliary data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA 
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
         debug <bool>: Debug logging and processing
     """
 
@@ -190,7 +190,7 @@ def build_modtran_input(xml_filename, data_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA 
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
         debug <bool>: Debug logging and processing
     """
 
@@ -353,7 +353,7 @@ def cleanup_temporary_data(reanalysis):
     """Cleanup/remove all the ST temporary files and directories 
 
     Args:
-        reanalysis <str>: Reanalysis source: NARR or MERRA 
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
     """
 
     GRID_POINT_ELEVATION_NAME = 'grid_elevations.txt'
@@ -386,7 +386,7 @@ def cleanup_temporary_data(reanalysis):
 
     if reanalysis == "NARR":
         parameters = NARR_PARAMETERS
-    else: # MERRA
+    else: # MERRA2
         parameters = MERRA_PARAMETERS
 
     for directory in parameters:
@@ -476,7 +476,7 @@ def main():
 
     extract_auxiliary_data(xml_filename=args.xml_filename,
                            aux_path=".",
-                           # MERRA auxiliary archive is not set up yet
+                           # MERRA2 auxiliary archive is not set up yet
                            # TODO aux_path or something like it will be
                            # TODO needed eventually, and it is now for NARR
                            #aux_path=aux_path,

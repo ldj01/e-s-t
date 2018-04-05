@@ -31,7 +31,10 @@ from st_grid_points import PointInfo, write_grid_points
 
 # Name of the static coordinates file
 NARR_COORDINATES_FILENAME = 'narr_coordinates.txt'
-MERRA_COORDINATES_FILENAME = 'merra_coordinates.txt'
+MERRA2_COORDINATES_FILENAME = 'merra2_coordinates.txt'
+
+# Number of columns
+MERRA2_COLS = 576
 
 # Geometric values for the Earth
 RADIUS_EARTH_IN_METERS = 6378137.0
@@ -81,8 +84,8 @@ def retrieve_command_line_arguments():
 
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
-                        required=False, default='MERRA',
-                        help='Reanalysis source - NARR or MERRA')
+                        required=False, default='MERRA2',
+                        help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -176,7 +179,7 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
     Args:
         espa_metadata <espa.Metadata>: The metadata for the data
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         <DataBoundInfo>: Contains adjusted data boundary information
@@ -184,8 +187,8 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
 
     if reanalysis == "NARR":
         adjustment = 32000 * 1.5
-    else: # MERRA
-        adjustment = 139000 * 1.5
+    else: # MERRA-2
+        adjustment = 69500 * 2.0 
 
     north_lat = float(espa_metadata.xml_object.
                       global_metadata.bounding_coordinates.north)
@@ -241,21 +244,29 @@ def check_within_bounds(data_bounds, lon, lat):
                 False - If not within the bounds
     """
 
-    if (data_bounds.north_lat > lat and data_bounds.south_lat < lat and
-            data_bounds.east_lon > lon and data_bounds.west_lon < lon):
+    if data_bounds.east_lon > data_bounds.west_lon:
+        if (data_bounds.north_lat > lat and data_bounds.south_lat < lat and
+                data_bounds.east_lon > lon and data_bounds.west_lon < lon):
 
-        return True
+            return True
+    else: # antimeridian crossing
+        if (data_bounds.north_lat > lat and data_bounds.south_lat < lat and
+                (data_bounds.east_lon > lon or data_bounds.west_lon < lon)):
+
+            return True
 
     return False
 
 
-def convert_line_to_point_info(gdal_objs, min_max, line, reanalysis):
+def convert_line_to_point_info(gdal_objs, min_max, line, reanalysis, 
+                               cross_antimeridian):
     """Converts a line of information into a PointInfo
 
     Args:
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
         min_max <MinMaxRowColInfo>: Contains the min and max rows and columns
         line <str>: The line of information read from the coordinate file
+        cross_antimeridian <str>: Flag for scene crossing 180 degree meridian 
 
     Returns:
         <PointInfo>: Contains point information from the coordinates file
@@ -271,10 +282,18 @@ def convert_line_to_point_info(gdal_objs, min_max, line, reanalysis):
         lon = fix_narr_longitude(float(lon))
     lon = float(lon)
 
-    if (min_max.min_row <= row and
+    # For the antimeridian crossing case, for columns, the longitude min/max 
+    # values are for the subranges on either side of the meridian.
+    if (((not cross_antimeridian) and
+        min_max.min_row <= row and
             min_max.max_row >= row and
             min_max.min_col <= col and
-            min_max.max_col >= col):
+            min_max.max_col >= col) or
+        (cross_antimeridian and
+        min_max.min_row <= row and
+            min_max.max_row >= row and
+            (min_max.min_col <= col or
+            min_max.max_col >= col))):
 
         (map_x, map_y, height) = gdal_objs.ll_to_data.TransformPoint(lon, lat)
 
@@ -391,8 +410,22 @@ def center_grid_point(gdal_objs, points, samp, line):
     index = 0
     for point in points:
 
-        distance = haversine_distance(lon, lat,
-                                      point['point'].lon, point['point'].lat)
+        # If the distance between pixel and point is too great, it's an
+        # antimeridian crossing case, so make sure the distance doesn't wrap
+        # around the world
+        if abs(lon - point['point'].lon) > 180:
+            if lon < 0:
+                distance = haversine_distance(lon + 360, lat,
+                                              point['point'].lon,
+                                              point['point'].lat)
+            else:
+                distance = haversine_distance(lon - 360, lat,
+                                              point['point'].lon,
+                                              point['point'].lat)
+        else:
+            distance = haversine_distance(lon, lat, point['point'].lon,
+                                          point['point'].lat)
+                                      
         grid_points.append((distance, index))
         index += 1
 
@@ -459,7 +492,7 @@ def extract_row_col(data_bounds, line, reanalysis):
     Args:
         data_bounds <DataBoundInfo>: Contains adjusted data boundary information
         line <str>: The line of information read from the coordinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         row <int>: The row for the point
@@ -482,14 +515,16 @@ def extract_row_col(data_bounds, line, reanalysis):
         return (row, col)
 
 
-def determine_min_max_row_col(data_bounds, data_path, reanalysis):
+def determine_min_max_row_col(data_bounds, data_path, reanalysis,
+                              cross_antimeridian):
     """Determine the reanalysis points that are within the data bounds
 
     Args:
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The full path to the reanalysis coordinates file
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        cross_antimeridian <str>: Flag for scene crossing 180 meridian 
 
     Returns:
         <MinMaxRowColInfo>: Contains the min and max rows and columns
@@ -502,6 +537,7 @@ def determine_min_max_row_col(data_bounds, data_path, reanalysis):
                                      reanalysis=reanalysis)
                      for line in coords_fd]
 
+
     # Filter out the None values
     remaining = [point for point in rows_cols if point is not None]
 
@@ -511,6 +547,20 @@ def determine_min_max_row_col(data_bounds, data_path, reanalysis):
     max_row = max(rows)
     min_col = min(cols)
     max_col = max(cols)
+
+    if cross_antimeridian:
+        # We need to find the values extending from the low and high ranges.
+        # For example, in [1, 2, 3, 573, 574, 575, 576] we want 3 and 573, not 
+        # 1 and 576, so they are the max/min of the low/high range.  To do 
+        # this, find the break in the sequence.
+        previous = cols[0]
+        for col in cols[1:]:
+            if col != previous + 1:
+                min_col = col
+                max_col = previous
+                break
+            else:
+                previous = col
 
     return MinMaxRowColInfo(min_row=min_row, max_row=max_row,
                             min_col=min_col, max_col=max_col)
@@ -526,7 +576,7 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The directory for the coodinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         grid_points <dict>: Dictionary of the gridded points
@@ -537,16 +587,27 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
     logger = logging.getLogger(__name__)
 
     # Determine full path to the file
+
     if reanalysis == "NARR":
         data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
     else:
-        data_path = os.path.join(data_path, MERRA_COORDINATES_FILENAME)
+        data_path = os.path.join(data_path, MERRA2_COORDINATES_FILENAME)
+
+    if data_bounds.east_lon > data_bounds.west_lon:
+        cross_antimeridian = False
+    else:
+        cross_antimeridian = True
 
     # Determine buffered points
-    min_max = determine_min_max_row_col(data_bounds, data_path, reanalysis)
+    min_max = determine_min_max_row_col(data_bounds, data_path, reanalysis,
+                                        cross_antimeridian)
 
     grid_rows = min_max.max_row - min_max.min_row + 1
-    grid_cols = min_max.max_col - min_max.min_col + 1
+    if min_max.max_col > min_max.min_col:
+        grid_cols = min_max.max_col - min_max.min_col + 1
+    else:
+        # Handle the antimeridian crossing case
+        grid_cols = MERRA2_COLS - min_max.min_col + min_max.max_col + 1 
 
     # Using the mins and maxs read the coordinates again
     # but keep a complete rectangular grid of them
@@ -554,7 +615,9 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
         points = [convert_line_to_point_info(gdal_objs=gdal_objs,
                                              min_max=min_max,
                                              line=line.strip(),
-                                             reanalysis=reanalysis)
+                                             reanalysis=reanalysis,
+                                             cross_antimeridian=
+                                             cross_antimeridian)
                   for line in coords_fd]
 
     # Filter out the None values (Only keeps the grid we want)
@@ -565,9 +628,30 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
     index = 0
     grid_points = list()
     for point in points:
+
+        # For antimeridian crossing, you can't determine the column by 
+        # subtracting the minimum column from the reanalysis column.  The
+        # columns are in 2 groups.  An example is [1, 2, 3, 573, 574, 575, 576].
+        # The second group [573, 574, 575, 576] needs to come first, so
+        # the columns for that group should be [0, 1, 2, 3], or the original
+        # column - offset 573.  The first group [1, 2, 3] should follow at
+        # columns [4, 5, 6].  The offset for them is the size of the second
+        # group (576 - 573 + 1) but the 0 index start eliminates the +1.  For
+        # antimeridian min_column and max_column (573 and 3 in this case) apply
+        # only to the respective groups.
+        if cross_antimeridian:
+            if point.col <= min_max.max_col:
+                # First group described above
+                col_offset = min_max.min_col - MERRA2_COLS
+            else:
+                # Second group described above
+                col_offset = min_max.min_col
+        else:
+            col_offset = min_max.min_col
+        
         grid_points.append({'index': index,
                             'row': point.row-min_max.min_row,
-                            'col': point.col-min_max.min_col,
+                            'col': point.col-col_offset,
                             'reanalysis_row': point.row,
                             'reanalysis_col': point.col,
                             'run_modtran': is_in_data(gdal_objs=gdal_objs,
@@ -589,7 +673,7 @@ def generate_point_grid(debug, gdal_objs, data_bounds, data_path, reanalysis):
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The directory for the coodinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Notes: The file format contains lines of the following information.
                'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
