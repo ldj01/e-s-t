@@ -1,6 +1,6 @@
 ## Surface Temperature 1.1.0 Release Notes
 ## Note: The productions produced by this software are considered provisional.
-Release Date: March 2018
+Release Date: May 2018
 
 See git tag [st-rit-v1.1.0]
 
@@ -11,8 +11,8 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ## Release Notes
 * Version change
-* Convert intermediate band files to integer and scale them 
-* Remove pre-collection software 
+* Support global processing (within constraints of available inputs) by using
+  MERRA-2 reanalysis input 
 
 ## Installation
 
@@ -55,6 +55,7 @@ See `surface_temperature.py --help` for command line details.
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
 * ST_AUX_DIR - Points to the local NARR data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+* ST_MERRA_AUX_DIR - Points to the local MERRA-2 data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
   - `export ST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
 * ST_DATA_DIR - Points to the installed static file
   - `export ST_DATA_DIR="/usr/local/espa-surface-temperature/st/static_data"`
