@@ -10,9 +10,11 @@ TOP = ..
 include $(TOP)/make.config
 
 SCRIPTS = st_aux_narr_from_CISL_RDA_archive.py \
+          st_aux_merra_from_NASA_archive.py \
           st_aux_update_narr_data.py
 MODULES = st_aux_utilities.py \
           st_aux_config.py \
+          st_aux_merra_config.py \
           st_aux_exception.py \
           st_aux_parameters.py \
           st_aux_http_session.py \
