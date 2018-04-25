@@ -55,8 +55,9 @@ See `surface_temperature.py --help` for command line details.
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
 * ST_AUX_DIR - Points to the local NARR data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
-* ST_MERRA_AUX_DIR - Points to the local MERRA-2 data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
   - `export ST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
+* ST_MERRA_AUX_DIR - Points to the local MERRA-2 data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+  - `export ST_MERRA_AUX_DIR="/usr/local/auxiliaries/LST/MERRA2"`
 * ST_DATA_DIR - Points to the installed static file
   - `export ST_DATA_DIR="/usr/local/espa-surface-temperature/st/static_data"`
 * MODTRAN_PATH - Points to the installed MODTRAN location
