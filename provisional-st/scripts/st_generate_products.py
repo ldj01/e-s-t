@@ -458,8 +458,11 @@ def main():
     # Determine ST data locations
     data_path = proc_cfg.get('processing', 'st_data_path')
 
-    # Determine NARR data locations
-    aux_path = proc_cfg.get('processing', 'st_aux_path')
+    # Determine auxiliary (NARR or MERRA2) data locations
+    if args.reanalysis == 'MERRA2':
+        aux_path = proc_cfg.get('processing', 'st_merra_aux_path')
+    else:
+        aux_path = proc_cfg.get('processing', 'st_aux_path')
 
     # Determine MODTRAN 'DATA' location
     modtran_data_path = proc_cfg.get('processing', 'modtran_data_path')
@@ -475,11 +478,7 @@ def main():
                           debug=args.debug)
 
     extract_auxiliary_data(xml_filename=args.xml_filename,
-                           aux_path=".",
-                           # MERRA2 auxiliary archive is not set up yet
-                           # TODO aux_path or something like it will be
-                           # TODO needed eventually, and it is now for NARR
-                           #aux_path=aux_path,
+                           aux_path=aux_path,
                            reanalysis=args.reanalysis,
                            debug=args.debug)
 
