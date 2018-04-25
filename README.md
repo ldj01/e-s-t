@@ -83,6 +83,9 @@ The following input data are required to generate the Surface Temperature produc
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  External users will need to set up an alternate ASTER GED data retrieval method.  One potential method is to create a NASA Earthdata account as [described here] (http://e4ftl01.cr.usgs.gov/ASTT), and update the automated ST procedure to supply the login information before accessing the ASTER GED data.
 * North American Regional Reanalysis (NARR)
   - For NARR data, it would be best to use the `st_auxiliary_data` software provided in this project to download and build your own archive for the dates you require.  This software archives a reduced set of parameters from each source file, only using the parameters required for ST generation.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+* Modern-Era Retrospective analysis for Research and Applications, Version 2 
+  (MERRA-2)
+  - For MERRA-2 data, it would be best to use the `st_auxiliary_data` software provided in this project to download and build your own archive for the dates you require.  This software archives a reduced set of parameters from each source file, only using the parameters required for ST generation.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.
