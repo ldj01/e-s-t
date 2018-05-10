@@ -150,6 +150,12 @@ def calculate_distance(src_info, fill_value):
     # Multiply by pixel size in km
     distance_data = distance_data * 0.03
 
+    # If there are no cloud pixels, the distance transform acts like there's a
+    # cloud off the upper left corner.  Fill with a predefined value instead.
+    number_cloud_pixels = np.count_nonzero(qa_cloud_mask)
+    if number_cloud_pixels == 0:
+        distance_data.fill(200) 
+
     # Cleanup no data locations.  Skip the right shift since PQA_FILL is 0
     qa_fill_mask = np.bitwise_and(qa_data, PQA_SINGLE_BIT)
     qa_fill_locations = np.where(qa_fill_mask == 1)

@@ -273,46 +273,64 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     # equal to the nearest value from the unknown matrix.
     tau_interp = np.array([0.0, 0.425, 0.625, 0.775, 0.925, 1.0])
     cld_interp = np.array([0, 0.5, 3.0, 7.5, 25.0, 82.5, 200.0])
+    tau_interp_length = len(tau_interp)
+    cld_interp_length = len(cld_interp)
 
     # Define the highest values in the vectors. These are the last values.
     tau_highest = tau_interp[-1]
     cld_highest = cld_interp[-1]
 
     # From input transmission values, find closest indices from tau_interp
-    # vector, calculate step in vector, then calculate fractional tau index.
+    # vector.
     tau_close_index = np.searchsorted(tau_interp, flat_transmission_values,
                                       side='right')
     tau_close_index = tau_close_index - 1
+
+    # Add a bin to handle values that are outside the range.
+    tau_interp = np.append(tau_interp, 1.0)
+
+    # Calculate step in vector.
     tau_step = tau_interp[tau_close_index + 1] - tau_interp[tau_close_index]
-    tau_frac_index = tau_close_index + ((flat_transmission_values
+
+    # Calculate fractional tau index.
+    with np.errstate(divide='ignore'):
+        tau_frac_index = tau_close_index + ((flat_transmission_values
                                          - tau_interp[tau_close_index])
                                         / tau_step)
-    one_locations = np.where(tau_frac_index == tau_highest)
-    tau_frac_index[one_locations] = len(tau_interp) - 1
+    high_locations = np.where(flat_transmission_values >= tau_highest)
+    tau_frac_index[high_locations] = tau_interp_length - 1
 
     # Memory cleanup
     del tau_interp
     del tau_close_index
     del tau_step
-    del one_locations
+    del high_locations
 
     # From input cloud distance values, find closest indices from cld_interp
-    # vector, calculate step in vector, then calculate fractional cloud index.
+    # vector.
     cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances,
                                       side='right')
     cld_close_index = cld_close_index - 1
+
+    # Add a bin to handle values that are outside the range.
+    cld_interp = np.append(cld_interp, 200.0)
+
+    # Calculate step in vector.
     cld_step = cld_interp[cld_close_index + 1] - cld_interp[cld_close_index]
-    cld_frac_index = cld_close_index + ((flat_cloud_distances
+
+    # Calculate fractional cloud index.
+    with np.errstate(divide='ignore'):
+        cld_frac_index = cld_close_index + ((flat_cloud_distances
                                          - cld_interp[cld_close_index])
-                                        / cld_step)
-    two_hundred_locations = np.where(cld_frac_index == cld_highest)
-    cld_frac_index[two_hundred_locations] = len(cld_interp) - 1
+                                         / cld_step)
+    high_locations = np.where(flat_cloud_distances >= cld_highest)
+    cld_frac_index[high_locations] = cld_interp_length - 1
 
     # Memory cleanup
     del cld_interp
     del cld_close_index
     del cld_step
-    del two_hundred_locations
+    del high_locations
 
     # Merge the arrays so they represent coordinates in the unknown_error_matrix
     # grid to map_coordinates.
