@@ -24,19 +24,23 @@ else ()
         set (XML_LIBS ${LIBXML2_LIBRARIES})
     else ()
         set (XML_INCLUDES $ENV{XML2INC})
-        set (XML_LIBS $ENV{XML2LIB})
+        set (XML_LIBS -L$ENV{XML2LIB} -lxml2)
     endif ()
 endif ()
 set (XML_INCLUDES ${XML_INCLUDES} CACHE PATH "XML2 header file path" FORCE)
 set (XML_LIBS ${XML_LIBS} CACHE STRING "XML2 libraries" FORCE)
 
-set (HDFEOS_GCTPINC ${HDFEOS_GCTPINC} CACHE PATH "HDFEOS GCTP header file path"
-     FORCE)
-set (HDFEOS_GCTPLIBS ${HDFEOS_GCTPLIB} CACHE STRING "HDFEOS GCTP libraries"
-     FORCE)
+if (NOT GCTP_INCLUDES)
+    set (GCTP_INCLUDES $ENV{HDFEOS_GCTPINC})
+endif ()
+if (NOT GCTP_LIBS)
+    set (GCTP_LIBS "-L$ENV{HDFEOS_GCTPLIB} -lGctp -lm")
+endif ()
+set (GCTP_INCLUDES ${GCTP_INCLUDES} CACHE PATH "GCTP header file path" FORCE)
+set (GCTP_LIBS ${GCTP_LIBS} CACHE STRING "GCTP libraries" FORCE)
 
-set (ESPA_INCLUDES ${ESPA_INC} CACHE PATH "ESPA header file path" FORCE)
-set (ESPA_LIBS ${ESPA_LIB} CACHE PATH "ESPA library path" FORCE)
+set (ESPA_INCLUDES $ENV{ESPAINC} CACHE PATH "ESPA header file path" FORCE)
+set (ESPA_LIBS $ENV{ESPALIB} CACHE PATH "ESPA library path" FORCE)
 
 enable_testing()
 
