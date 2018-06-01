@@ -25,3 +25,7 @@ class MissingBandError(STError):
 class NoTilesError(STError):
     """Exception to use for not finding any tiles"""
     pass
+
+class InaccessibleTileError(STError):
+    """Exception to use for not being able to access a tile"""
+    pass

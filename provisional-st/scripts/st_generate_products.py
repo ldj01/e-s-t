@@ -311,6 +311,29 @@ def generate_qa(xml_filename, debug):
             logger.info(output)
 
 
+def convert_intermediate_bands(xml_filename, debug):
+    """Run the tool to convert and scale the intermediate bands 
+
+    Args:
+        xml_filename <str>: XML metadata filename
+        debug <bool>: Debug logging and processing
+    """
+
+    output = ''
+    try:
+        cmd = ['st_convert_bands.py',
+               '--xml', xml_filename]
+
+        if debug:
+            cmd.append('--debug')
+
+        output = util.System.execute_cmd(' '.join(cmd))
+    finally:
+        if len(output) > 0:
+            logger = logging.getLogger(__name__)
+            logger.info(output)
+
+
 def cleanup_temporary_data():
     """Cleanup/remove all the ST temporary files and directories 
     """
@@ -480,11 +503,15 @@ def main():
     generate_qa(xml_filename=args.xml_filename,
                 debug=args.debug)
 
-    # Clean up files and directories according to user selections.
+    # Clean up files and directories according to user selections, or
+    # for intermediate bands convert them if they are to be kept.
     if not args.temporary:
         cleanup_temporary_data()
 
-    if not args.intermediate:
+    if args.intermediate:
+        convert_intermediate_bands(xml_filename=args.xml_filename,
+                                   debug=args.debug)
+    else:
         cleanup_intermediate_bands()
 
     logger.info('*** ST Generate Products - Complete ***')

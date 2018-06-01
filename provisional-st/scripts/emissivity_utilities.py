@@ -517,14 +517,9 @@ def get_satellite_sensor_code(xml_filename):
         <str>: Satellite sensor code
     """
 
-    old_prefixes = ['LT4', 'LT5', 'LE7', 'LT8', 'LC8', 'LO8']
     collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
 
     base_name = os.path.basename(xml_filename)
-
-    satellite_sensor_code = base_name[0:3]
-    if satellite_sensor_code in old_prefixes:
-        return satellite_sensor_code
 
     satellite_sensor_code = base_name[0:4]
     if satellite_sensor_code in collection_prefixes:
@@ -532,3 +527,22 @@ def get_satellite_sensor_code(xml_filename):
 
     raise Exception('Satellite-Sensor code ({0}) not understood'
                     .format(satellite_sensor_code))
+
+
+def get_env_var(variable, default):
+    """Looks up the requested environment variable
+
+    Args:
+        variable <str>: Environment variable to get
+        default <str,int,None>: Default value for the environment variable
+
+    Returns:
+        <str>: Value of the environment variable
+    """
+
+    result = os.environ.get(variable, default)
+    if result == None:
+        raise RuntimeError(
+            'You must specify {} in the environment'.format(variable))
+
+    return result
