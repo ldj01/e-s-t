@@ -44,6 +44,11 @@ set (ESPA_LIBS $ENV{ESPALIB} CACHE PATH "ESPA library path" FORCE)
 
 enable_testing()
 
+add_custom_target(rit-aux
+                  COMMAND "${CMAKE_COMMAND}"
+                          -DCMAKE_INSTALL_COMPONENT=rit-aux
+                          -P "${CMAKE_BINARY_DIR}/cmake_install.cmake")
+
 add_subdirectory(scripts)
 add_subdirectory(provisional-st)
 add_subdirectory(st_auxiliary_data)
