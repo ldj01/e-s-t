@@ -34,13 +34,10 @@ import sys
 import logging
 import datetime
 from argparse import ArgumentParser
+from lxml import objectify as objectify
 from osgeo import gdal, osr
 import numpy as np
-
-
-# Import the metadata api found in the espa-product-formatter project
-import metadata_api
-
+from espa import Metadata
 
 # Import local modules
 import st_utilities as util
@@ -92,11 +89,7 @@ class BuildSTData(object):
         '''
 
         # Read the XML metadata
-        espa_xml = metadata_api.parse(self.xml_filename, silence=True)
-        # Grab the global metadata object
-        global_metadata = espa_xml.get_global_metadata()
-        # Grab the bands metadata object
-        bands = espa_xml.get_bands()
+        metadata = Metadata(xml_filename=self.xml_filename)
 
         self.thermal_name = ''
         self.transmittance_name = ''
@@ -105,26 +98,26 @@ class BuildSTData(object):
         self.emissivity_name = ''
 
         # Find the TOA bands to extract information from
-        for band in bands.band:
-            if (band.product == 'st_intermediate' and
-                    band.name == 'st_thermal_radiance'):
-                self.thermal_name = band.get_file_name()
+        for band in metadata.xml_object.bands.band:
+            if (band.get("product") == 'st_intermediate' and
+                    band.get("name") == 'st_thermal_radiance'):
+                self.thermal_name = str(band.file_name)
 
-            if (band.product == 'st_intermediate' and
-                    band.name == 'st_atmospheric_transmittance'):
-                self.transmittance_name = band.get_file_name()
+            if (band.get("product") == 'st_intermediate' and
+                    band.get("name") == 'st_atmospheric_transmittance'):
+                self.transmittance_name = str(band.file_name)
 
-            if (band.product == 'st_intermediate' and
-                    band.name == 'st_upwelled_radiance'):
-                self.upwelled_name = band.get_file_name()
+            if (band.get("product") == 'st_intermediate' and
+                    band.get("name") == 'st_upwelled_radiance'):
+                self.upwelled_name = str(band.file_name)
 
-            if (band.product == 'st_intermediate' and
-                    band.name == 'st_downwelled_radiance'):
-                self.downwelled_name = band.get_file_name()
+            if (band.get("product") == 'st_intermediate' and
+                    band.get("name") == 'st_downwelled_radiance'):
+                self.downwelled_name = str(band.file_name)
 
-            if (band.product == 'st_intermediate' and
-                    band.name == 'emis'):
-                self.emissivity_name = band.get_file_name()
+            if (band.get("product") == 'st_intermediate' and
+                    band.get("name") == 'emis'):
+                self.emissivity_name = str(band.file_name)
 
         # Error if we didn't find the required TOA bands in the data
         if len(self.thermal_name) <= 0:
@@ -144,11 +137,9 @@ class BuildSTData(object):
                             ' in the input data')
 
         # Save for later
-        self.satellite = global_metadata.satellite
+        self.satellite = metadata.xml_object.global_metadata.satellite
 
-        del bands
-        del global_metadata
-        del espa_xml
+        del metadata
 
     def generate_data(self):
         '''
@@ -327,67 +318,69 @@ class BuildSTData(object):
         self.logger.info('Adding {0} to {1}'.format(st_img_filename,
                                                     self.xml_filename))
         # Add the estimated Surface Temperature product to the metadata
-        espa_xml = metadata_api.parse(self.xml_filename, silence=True)
-        bands = espa_xml.get_bands()
-        sensor_code = product_id[0:4]
+        metadata = Metadata(xml_filename=self.xml_filename)
+
+        # Create an element maker and band element
+        em = objectify.ElementMaker(annotate=False, namespace=None, nsmap=None)
+        st_band = em.band()
 
         # Find the TOA Band 1 to use for the specific band details
         base_band = None
-        for band in bands.band:
-            if band.product == 'toa_refl' and band.name == 'toa_band1':
+        for band in metadata.xml_object.bands.band:
+            if (band.get("product") == 'toa_refl' and
+                    band.get("name") == 'toa_band1'):
                 base_band = band
 
         if base_band is None:
             raise Exception('Failed to find the TOA band 1'
                             ' in the input data')
 
-        st_band = metadata_api.band(product='st',
-                                     source='toa_refl',
-                                     name='surface_temperature',
-                                     category='image',
-                                     data_type='INT16',
-                                     scale_factor=SCALE_FACTOR,
-                                     add_offset=0,
-                                     nlines=base_band.get_nlines(),
-                                     nsamps=base_band.get_nsamps(),
-                                     fill_value=str(self.no_data_value))
+        # Set attributes for the band element
+        st_band.set('product', 'st')
+        st_band.set('source', 'toa_refl')
+        st_band.set('name', 'surface_temperature')
+        st_band.set('category', 'image')
+        st_band.set('data_type', 'INT16')
+        st_band.set('scale_factor', "%.6f" % SCALE_FACTOR)
+        st_band.set('add_offset', "%.6f" % 0.0)
+        st_band.set('nlines', str(int(base_band.get("nlines"))))
+        st_band.set('nsamps', str(int(base_band.get("nsamps"))))
+        st_band.set('fill_value', str(self.no_data_value))
 
-        st_band.set_short_name('{0}ST'.format(sensor_code))
-        st_band.set_long_name('Surface Temperature')
-        st_band.set_file_name(st_img_filename)
-        st_band.set_data_units('temperature (kelvin)')
+        # Add elements to the band object
+        st_band.short_name = em.element('{0}ST'.format(product_id[0:4]))
+        st_band.long_name = em.element('Surface Temperature')
+        st_band.file_name = em.element(str(st_img_filename))
 
-        pixel_size = metadata_api.pixel_size(base_band.pixel_size.x,
-                                             base_band.pixel_size.x,
-                                             base_band.pixel_size.units)
-        st_band.set_pixel_size(pixel_size)
+        # Create a pixel size element and add attributes to it
+        st_band.pixel_size = em.element()
+        st_band.pixel_size.set('x', str(base_band.pixel_size.get('x')))
+        st_band.pixel_size.set('y', str(base_band.pixel_size.get('x')))
+        st_band.pixel_size.set('units', str(base_band.pixel_size.get('units')))
 
-        st_band.set_resample_method('none')
+        st_band.resample_method = em.element('none')
+        st_band.data_units = em.element('temperature (kelvin)')
 
-        valid_range = metadata_api.valid_range(min=1500, max=3730)
-        st_band.set_valid_range(valid_range)
+        # Create a valid range element and add attributes to it
+        st_band.valid_range = em.element()
+        st_band.valid_range.set('min', '1500')
+        st_band.valid_range.set('max', '3730')
+
+        st_band.app_version = em.element(str(util.Version.app_version()))
 
         # Set the date, but first clean the microseconds off of it
-        production_date = (
-            datetime.datetime.strptime(datetime.datetime.now().
-                                       strftime('%Y-%m-%dT%H:%M:%S'),
-                                       '%Y-%m-%dT%H:%M:%S'))
+        production_date = ('{0}Z'.format(datetime.datetime.now()
+                                         .strftime('%Y-%m-%dT%H:%M:%S')))
+        st_band.production_date = em.element(str(production_date))
 
-        st_band.set_production_date(production_date)
-
-        st_band.set_app_version(util.Version.app_version())
-
-        bands.add_band(st_band)
-
-        # Write the XML metadata file out
-        with open(self.xml_filename, 'w') as metadata_fd:
-            metadata_api.export(metadata_fd, espa_xml)
+        # Add the new band to the XML, validate it, and write it
+        metadata.xml_object.bands.append(st_band)
+        metadata.validate()
+        metadata.write(xml_filename=self.xml_filename)
 
         # Memory cleanup
+        del metadata
         del st_band
-        del bands
-        del espa_xml
-        del st_data
 
 
 def main():
