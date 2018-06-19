@@ -208,9 +208,6 @@ def process_point_dir((point_path, modtran_data_path)):
         os.chdir(current_directory)
 
 
-PROC_CFG_FILENAME = 'processing.conf'
-
-
 def main():
     """Main processing for building the points list
     """

@@ -63,7 +63,33 @@ def retrieve_command_line_arguments():
                         required=False, default=False,
                         help='Output debug messages and/or keep debug data')
 
+    parser.add_argument('--num_threads',
+                        action='store', dest='num_threads',
+                        required=False,
+                        help='Number of MODTRAN processes to run at once')
+
+    espa_group_parser = parser.add_mutually_exclusive_group(required=False)
+
+    espa_group_parser.add_argument('--espa',
+                                   action='store_true', dest='espa',
+                                   required=False, default=True,
+                                   help='Use ESPA processing ' +
+                                   'configuration file')
+
+    espa_group_parser.add_argument('--no-espa',
+                                   action='store_false', dest='espa',
+                                   required=False,
+                                   help='Do not use ESPA processing ' +
+                                   'configuration file')
+
+    espa_group_parser.set_defaults(espa=True)
+
     args = parser.parse_args()
+
+    # If using the espa config file, num_threads is optional
+    # If not using the espa config file, provide a default num_threads
+    if not args.espa and args.num_threads is None:
+            args.num_threads = 1
 
     # Verify that the --xml parameter was specified
     if args.xml_filename is None:
@@ -253,7 +279,7 @@ def run_modtran(modtran_data_path, process_count, debug):
     try:
         cmd = ['st_run_modtran.py',
                '--modtran_data_path', modtran_data_path,
-               '--process_count', process_count]
+               '--process_count', str(process_count)]
 
         if debug:
             cmd.append('--debug')
@@ -426,11 +452,15 @@ def main():
 
     logger.info('*** Begin ST Generate Products ***')
 
+    if (args.espa):
     # Retrieve the processing configuration
     proc_cfg = retrieve_cfg(PROC_CFG_FILENAME)
 
-    # Determine number of process to use
+        # Determine number of processes to use
+        if args.num_threads is None:
     process_count = proc_cfg.get('processing', 'omp_num_threads')
+        else:
+            process_count = args.num_threads
 
     # Determine ST data locations
     data_path = proc_cfg.get('processing', 'st_data_path')
@@ -444,6 +474,34 @@ def main():
     # Determine the server name and path to get the ASTER data from
     server_name = proc_cfg.get('processing', 'aster_ged_server_name')
     server_path = proc_cfg.get('processing', 'aster_ged_server_path')
+    else:
+        # Determine number of processes to use
+        process_count = args.num_threads
+
+        # Determine ST data locations
+        if 'ST_DATA_DIR' not in os.environ:
+            raise Exception('[ST_DATA_DIR] not found in environment')
+        data_path = os.environ.get('ST_DATA_DIR')
+
+        # Determine auxiliary (NARR or MERRA2) data locations
+        aux_path_variable = '{0}_AUX_DIR'.format(args.reanalysis)
+        if aux_path_variable not in os.environ:
+            raise Exception('[{0}] not found in environment'.
+                    format(aux_path_variable))
+        aux_path = os.environ.get(aux_path_variable)
+
+        # Determine MODTRAN 'DATA' location
+        if 'MODTRAN_DATA' not in os.environ:
+            raise Exception('[MODTRAN_DATA] not found in environment')
+        modtran_data_path = os.environ.get('MODTRAN_DATA')
+
+        # Determine the server name and path to get the ASTER data from
+        if 'ASTER_GED_SERVER' not in os.environ:
+            raise Exception('[ASTER_GED_SERVER] not found in environment')
+        server_name = os.environ.get('ASTER_GED_SERVER')
+        if 'ASTER_GED_PATH' not in os.environ:
+            raise Exception('[ASTER_GED_PATH] not found in environment')
+        server_path = os.environ.get('ASTER_GED_PATH')
 
     # -------------- Generate the products --------------
     determine_grid_points(xml_filename=args.xml_filename,
