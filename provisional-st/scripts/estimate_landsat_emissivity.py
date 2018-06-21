@@ -26,7 +26,6 @@
 '''
 
 import os
-import urlparse
 import sys
 import logging
 from collections import namedtuple
@@ -43,11 +42,6 @@ from st_exceptions import NoTilesError, InaccessibleTileError
 # Import local modules
 import st_utilities as util
 import emissivity_utilities as emis_util
-
-# Format latitude as optional negative sign plus 2 digits (0-padded)
-#ASTER_GED_LAT_FORMAT='{0: 03d}'
-# Format longitude as optional negative sign plus 3 digits (0-padded)
-#ASTER_GED_LON_FORMAT='{0: 04d}'
 
 
 CoefficientInfo = namedtuple('CoefficientInfo',
@@ -220,23 +214,9 @@ def extract_aster_data(url, filename):
 
     logger = logging.getLogger(__name__)
 
-    # Set the base filename for the tile
-    h5_file_path = filename
-
-    # Try to access the file directly, if url is just a path
-    local_h5_file_path = ''.join([url, h5_file_path])
-    if os.path.exists(local_h5_file_path):
-        h5_file_path = local_h5_file_path
-    else:
-        # Try parsing the URL, if url includes file://hostname/path
-        url_parts = urlparse.urlparse(local_h5_file_path)
-        local_h5_file_path = os.path.abspath(os.path.join(url_parts.netloc,
-                                                          url_parts.path))
-        if os.path.exists(local_h5_file_path):
-            h5_file_path = local_h5_file_path
-
-    if not os.path.exists(h5_file_path):
-        emis_util.download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
+    # Get accessible tile file
+    tile_info = emis_util.locate_aster_ged_tile(url=url, filename=filename)
+    h5_file_path = tile_info.h5_file_path
 
     # There are cases where the emissivity data will not be available
     # (for example, in water regions).

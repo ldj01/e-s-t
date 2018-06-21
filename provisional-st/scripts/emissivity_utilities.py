@@ -25,6 +25,7 @@
 '''
 
 import os
+import urlparse
 import logging
 import math
 import datetime
@@ -108,6 +109,8 @@ BoundInfo = namedtuple('BoundInfo',
                        ('north', 'south', 'east', 'west'))
 SourceInfo = namedtuple('SourceInfo',
                         ('bound', 'extent', 'proj4', 'toa'))
+TileInfo = namedtuple('TileInfo',
+                      ('h5_file_path', 'downloaded'))
 
 
 def get_band_info(band):
@@ -259,6 +262,42 @@ def retrieve_metadata_information(espa_metadata):
                                   swir1=bi_swir1,
                                   bt=bi_bt))
 
+
+def locate_aster_ged_tile(url, filename):
+    """Locate the specified tile, either on disk or download if needed
+
+    Args:
+        url <str>: URL to retrieve the file from
+        filename <str>: Tile filename
+
+    Returns:
+        <TileInfo>: tile filename and downloaded flag
+    """
+    h5_file_path = None
+    downloaded = False
+
+    # Try to access the file directly in local directory
+    if os.path.exists(filename):
+        h5_file_path = filename
+        downloaded = True
+    else: # Try to access the file directly via URL
+        # If URL is just a path
+        local_h5_file_path = ''.join([url, filename])
+        if os.path.exists(local_h5_file_path):
+            h5_file_path = local_h5_file_path
+        else:
+            # Try parsing the URL, if url includes file://hostname/path
+            url_parts = urlparse.urlparse(local_h5_file_path)
+            local_h5_file_path = os.path.abspath(os.path.join(url_parts.netloc,
+                                                              url_parts.path))
+            if os.path.exists(local_h5_file_path):
+                h5_file_path = local_h5_file_path
+            else:
+                download_aster_ged_tile(url=url, h5_file_path=filename)
+                h5_file_path = filename
+                downloaded = True
+
+    return TileInfo(h5_file_path, downloaded)
 
 def download_aster_ged_tile(url, h5_file_path):
     """Retrieves the specified tile from the host
