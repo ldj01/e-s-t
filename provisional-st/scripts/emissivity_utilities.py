@@ -41,8 +41,13 @@ from st_exceptions import MissingBandError
 # Import local modules
 import st_utilities as util
 
-# Filename format to use for ASTER GED tiles
+# Formats to use for ASTER GED tile names
+# Filename format is modifiable by command-line argument
 __aster_ged_filename_format = ''
+# Format latitude as optional negative sign plus 2 digits (0-padded)
+ASTER_GED_LAT_FORMAT='{0: 03d}'
+# Format longitude as optional negative sign plus 3 digits (0-padded)
+ASTER_GED_LON_FORMAT='{0: 04d}'
 
 def extract_raster_data(name, band_number):
     """Extracts raster data for the specified dataset and band number

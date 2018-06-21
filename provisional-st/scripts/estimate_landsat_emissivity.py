@@ -44,8 +44,10 @@ from st_exceptions import NoTilesError, InaccessibleTileError
 import st_utilities as util
 import emissivity_utilities as emis_util
 
-ASTER_GED_LAT_FORMAT='{0: 03d}'
-ASTER_GED_LON_FORMAT='{0: 04d}'
+# Format latitude as optional negative sign plus 2 digits (0-padded)
+#ASTER_GED_LAT_FORMAT='{0: 03d}'
+# Format longitude as optional negative sign plus 3 digits (0-padded)
+#ASTER_GED_LON_FORMAT='{0: 04d}'
 
 
 CoefficientInfo = namedtuple('CoefficientInfo',
@@ -436,7 +438,7 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
 
     logger = logging.getLogger(__name__)
 
-    # Read the ASTER GED tile list
+    # Read the ASTER GED tile list, stripping off filename extension
     ged_tile_file = 'aster_ged_tile_list.txt'
     with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file: 
         tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file] 
@@ -453,12 +455,13 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
                        for lon in xrange(int(src_info.bound.west),
                                          int(src_info.bound.east)+1)]:
 
-        # Build the base filename using the correct format
+        # Build the filename using the correct format
         filename = filename_format.format(
-            ASTER_GED_LAT_FORMAT.format(lat).strip(),
-            ASTER_GED_LON_FORMAT.format(lon).strip())
+            emis_util.ASTER_GED_LAT_FORMAT.format(lat).strip(),
+            emis_util.ASTER_GED_LON_FORMAT.format(lon).strip())
 
-        # Skip the tile if it isn't in the ASTER GED database 
+        # Skip the tile if it isn't in the ASTER GED tile list
+        # (ignore filename extension)
         if filename[:tilename_end] not in tiles:
             logger.info('Skipping tile {} not in ASTER GED'.format(filename))
             continue
@@ -884,7 +887,6 @@ def main():
 
     if args.debug:
         debug_level = logging.DEBUG
-
 
     # Configure logging
     logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
