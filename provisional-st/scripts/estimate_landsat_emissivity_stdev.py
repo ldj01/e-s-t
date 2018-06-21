@@ -43,15 +43,12 @@ import st_utilities as util
 import emissivity_utilities as emis_util
 
 
-ASTER_GED_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
-ASTER_GED_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
-
 def extract_aster_data(url, filename, intermediate):
     """Extracts the internal band(s) data for later processing
 
     Args:
         url <str>: URL to retrieve the file from
-        filename <str>: Base HDF filename to extract from
+        filename <str>: HDF filename to extract from
         intermediate <bool>: Keep any intermediate products generated
 
     Returns:
@@ -71,11 +68,9 @@ def extract_aster_data(url, filename, intermediate):
 
     logger = logging.getLogger(__name__)
 
-    # Build the HDF5 filename for the tile
-    h5_file_path = ''.join([filename, '.h5'])
-
-    if not os.path.exists(h5_file_path):
-        emis_util.download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
+    # Get accessible tile file
+    tile_info = emis_util.locate_aster_ged_tile(url=url, filename=filename)
+    h5_file_path = tile_info.h5_file_path
 
     # There are cases where the emissivity data will not be available
     # (for example, in water regions).
@@ -120,7 +115,7 @@ def extract_aster_data(url, filename, intermediate):
                                            x_min, x_max, y_min, y_max))
 
     # Remove the HDF5 tile since we no longer need it
-    if not intermediate:
+    if not intermediate and tile_info.downloaded:
         if os.path.exists(h5_file_path):
             os.unlink(h5_file_path)
 
@@ -221,12 +216,16 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
 
     logger = logging.getLogger(__name__)
 
-    # Read the ASTER GED tile list
+    # Read the ASTER GED tile list, stripping off filename extension
     ged_tile_file = 'aster_ged_tile_list.txt'
     with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file:
         tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file]
 
+    # Get the length of names in the tile list
+    tilename_end = len(tiles[0]) - 1
+
     ls_emis_stdev_filenames = list()
+    filename_format = emis_util.get_aster_ged_filename_format()
     for (lat, lon) in [(lat, lon)
                        for lat in xrange(int(src_info.bound.south),
                                          int(src_info.bound.north)+1)
@@ -234,14 +233,13 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
                                          int(src_info.bound.east)+1)]:
 
         # Build the base filename using the correct format
-        filename = ''
-        if lon < 0:
-            filename = ASTER_GED_N_FORMAT.format(lat, lon)
-        else:
-            filename = ASTER_GED_P_FORMAT.format(lat, lon)
+        filename = filename_format.format(
+            emis_util.ASTER_GED_LAT_FORMAT.format(lat).strip(),
+            emis_util.ASTER_GED_LON_FORMAT.format(lon).strip())
 
-        # Skip the tile if it isn't in the ASTER GED database
-        if filename not in tiles:
+        # Skip the tile if it isn't in the ASTER GED tile list
+        # (ignore filename extension)
+        if filename[:tilename_end] not in tiles:
             logger.info('Skipping tile {} not in ASTER GED'.format(filename))
             continue
 

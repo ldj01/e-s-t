@@ -189,16 +189,12 @@ def snow_and_ndsi_locations(src_info, no_data_value):
     return (snow_locations, ndsi_no_data_locations)
 
 
-ASTER_GED_N_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
-ASTER_GED_P_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
-
-
 def extract_aster_data(url, filename):
     """Extracts the internal band(s) data for later processing
 
     Args:
         url <str>: URL to retrieve the file from
-        filename <str>: Base HDF filename to extract from
+        filename <str>: HDF filename to extract from
 
     Returns:
         <numpy.2darray>: Mean Band 13 data
@@ -218,10 +214,9 @@ def extract_aster_data(url, filename):
 
     logger = logging.getLogger(__name__)
 
-    # Build the HDF5 filename for the tile
-    h5_file_path = ''.join([filename, '.h5'])
-
-    emis_util.download_aster_ged_tile(url=url, h5_file_path=h5_file_path)
+    # Get accessible tile file
+    tile_info = emis_util.locate_aster_ged_tile(url=url, filename=filename)
+    h5_file_path = tile_info.h5_file_path
 
     # There are cases where the emissivity data will not be available
     # (for example, in water regions).
@@ -423,28 +418,31 @@ def generate_tiles(src_info, coefficients, st_data_dir, url, wkt,
 
     logger = logging.getLogger(__name__)
 
-    # Read the ASTER GED tile list
+    # Read the ASTER GED tile list, stripping off filename extension
     ged_tile_file = 'aster_ged_tile_list.txt'
     with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file: 
         tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file] 
 
+    # Get the length of names in the tile list
+    tilename_end = len(tiles[0]) - 1
+
     ls_emis_mean_filenames = list()
     aster_ndvi_mean_filenames = list()
+    filename_format = emis_util.get_aster_ged_filename_format()
     for (lat, lon) in [(lat, lon)
                        for lat in xrange(int(src_info.bound.south),
                                          int(src_info.bound.north)+1)
                        for lon in xrange(int(src_info.bound.west),
                                          int(src_info.bound.east)+1)]:
 
-        # Build the base filename using the correct format
-        filename = ''
-        if lon < 0:
-            filename = ASTER_GED_N_FORMAT.format(lat, lon)
-        else:
-            filename = ASTER_GED_P_FORMAT.format(lat, lon)
+        # Build the filename using the correct format
+        filename = filename_format.format(
+            emis_util.ASTER_GED_LAT_FORMAT.format(lat).strip(),
+            emis_util.ASTER_GED_LON_FORMAT.format(lon).strip())
 
-        # Skip the tile if it isn't in the ASTER GED database 
-        if filename not in tiles:
+        # Skip the tile if it isn't in the ASTER GED tile list
+        # (ignore filename extension)
+        if filename[:tilename_end] not in tiles:
             logger.info('Skipping tile {} not in ASTER GED'.format(filename))
             continue
 

@@ -25,6 +25,7 @@
 '''
 
 import os
+import urlparse
 import logging
 import math
 import datetime
@@ -41,6 +42,13 @@ from st_exceptions import MissingBandError
 # Import local modules
 import st_utilities as util
 
+# Formats to use for ASTER GED tile names
+# Filename format is modifiable by command-line argument
+__aster_ged_filename_format = ''
+# Format latitude as optional negative sign plus 2 digits (0-padded)
+ASTER_GED_LAT_FORMAT='{0: 03d}'
+# Format longitude as optional negative sign plus 3 digits (0-padded)
+ASTER_GED_LON_FORMAT='{0: 04d}'
 
 def extract_raster_data(name, band_number):
     """Extracts raster data for the specified dataset and band number
@@ -101,6 +109,8 @@ BoundInfo = namedtuple('BoundInfo',
                        ('north', 'south', 'east', 'west'))
 SourceInfo = namedtuple('SourceInfo',
                         ('bound', 'extent', 'proj4', 'toa'))
+TileInfo = namedtuple('TileInfo',
+                      ('h5_file_path', 'downloaded'))
 
 
 def get_band_info(band):
@@ -253,6 +263,43 @@ def retrieve_metadata_information(espa_metadata):
                                   bt=bi_bt))
 
 
+def locate_aster_ged_tile(url, filename):
+    """Locate the specified tile, either on disk or download if needed
+
+    Args:
+        url <str>: URL to retrieve the file from
+        filename <str>: Tile filename
+
+    Returns:
+        <TileInfo>: tile filename and downloaded flag
+    """
+    h5_file_path = None
+    downloaded = False
+
+    # If the file exists in the current working directory, that means it was
+    # previously downloaded to here
+    if os.path.exists(filename):
+        h5_file_path = filename
+        downloaded = True
+    else: # See if the file is accessible locally, but in another directory
+        # If URL is just a path
+        local_h5_file_path = ''.join([url, filename])
+        if os.path.exists(local_h5_file_path):
+            h5_file_path = local_h5_file_path
+        else:
+            # Try parsing the URL, if url includes file://hostname/path
+            url_parts = urlparse.urlparse(local_h5_file_path)
+            local_h5_file_path = os.path.abspath(os.path.join(url_parts.netloc,
+                                                              url_parts.path))
+            if os.path.exists(local_h5_file_path):
+                h5_file_path = local_h5_file_path
+            else:
+                download_aster_ged_tile(url=url, h5_file_path=filename)
+                h5_file_path = filename
+                downloaded = True
+
+    return TileInfo(h5_file_path, downloaded)
+
 def download_aster_ged_tile(url, h5_file_path):
     """Retrieves the specified tile from the host
 
@@ -268,11 +315,9 @@ def download_aster_ged_tile(url, h5_file_path):
     url_path = ''.join([url, h5_file_path])
     status_code = util.Web.http_transfer_file(url_path, h5_file_path)
 
-    # Check for and handle tiles that are not available in the
-    # ASTER data
+    # If a tile is requested, it is expected to be there
     if status_code != requests.codes['ok']:
-        if status_code != requests.codes['not_found']:
-            raise Exception('HTTP - Transfer Failed')
+        raise Exception('HTTP - Transfer Failed')
 
 
 def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
@@ -473,6 +518,13 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='Path on the ASTER GED server')
 
+    parser.add_argument('--aster-ged-filename-format',
+                        action='store', dest='aster_ged_filename_format',
+                        required=False,
+                        default='AG100.v003.{0}.{1}.0001.subset.h5',
+                        help='ASTER GED filename format, default ' +
+                        'AG100.v003.{0}.{1}.0001.subset.h5')
+
     parser.add_argument('--intermediate',
                         action='store_true', dest='intermediate',
                         required=False, default=False,
@@ -503,6 +555,8 @@ def retrieve_command_line_arguments():
     if args.aster_ged_server_path == '':
         raise Exception('The --aster-ged-server-path provided was empty')
 
+    global __aster_ged_filename_format
+    __aster_ged_filename_format = args.aster_ged_filename_format
 
     return args
 
@@ -546,3 +600,6 @@ def get_env_var(variable, default):
             'You must specify {} in the environment'.format(variable))
 
     return result
+
+def get_aster_ged_filename_format():
+    return __aster_ged_filename_format
