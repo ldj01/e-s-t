@@ -41,6 +41,8 @@ from st_exceptions import MissingBandError
 # Import local modules
 import st_utilities as util
 
+# Filename format to use for ASTER GED tiles
+__aster_ged_filename_format = ''
 
 def extract_raster_data(name, band_number):
     """Extracts raster data for the specified dataset and band number
@@ -268,11 +270,9 @@ def download_aster_ged_tile(url, h5_file_path):
     url_path = ''.join([url, h5_file_path])
     status_code = util.Web.http_transfer_file(url_path, h5_file_path)
 
-    # Check for and handle tiles that are not available in the
-    # ASTER data
+    # If a tile is requested, it is expected to be there
     if status_code != requests.codes['ok']:
-        if status_code != requests.codes['not_found']:
-            raise Exception('HTTP - Transfer Failed')
+        raise Exception('HTTP - Transfer Failed')
 
 
 def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
@@ -473,6 +473,13 @@ def retrieve_command_line_arguments():
                         required=False, default=None,
                         help='Path on the ASTER GED server')
 
+    parser.add_argument('--aster-ged-filename-format',
+                        action='store', dest='aster_ged_filename_format',
+                        required=False,
+                        default='AG100.v003.{0}.{1}.0001.subset.h5',
+                        help='ASTER GED filename format, default ' +
+                        'AG100.v003.{0}.{1}.0001.subset.h5')
+
     parser.add_argument('--intermediate',
                         action='store_true', dest='intermediate',
                         required=False, default=False,
@@ -503,6 +510,8 @@ def retrieve_command_line_arguments():
     if args.aster_ged_server_path == '':
         raise Exception('The --aster-ged-server-path provided was empty')
 
+    global __aster_ged_filename_format
+    __aster_ged_filename_format = args.aster_ged_filename_format
 
     return args
 
@@ -546,3 +555,7 @@ def get_env_var(variable, default):
             'You must specify {} in the environment'.format(variable))
 
     return result
+
+def get_aster_ged_filename_format():
+    global __aster_ged_filename_format
+    return __aster_ged_filename_format

@@ -232,6 +232,8 @@ class Web(object):
 
         session.mount('http://', requests.adapters.HTTPAdapter(max_retries=3))
         session.mount('https://', requests.adapters.HTTPAdapter(max_retries=3))
+        requests_log = logging.getLogger("urllib3")
+        requests_log.setLevel(logging.ERROR)
 
         status_code = requests.codes['ok']
         retry_attempt = 0
@@ -258,8 +260,8 @@ class Web(object):
                 done = True
                 logger.info('HTTP - Transfer Complete')
 
-            except Exception:
-                logger.exception('HTTP - Transfer Issue')
+            except Exception as e:
+                logger.error('HTTP - Transfer Issue: ' + str(e))
 
                 if req is not None:
                     status_code = req.status_code
