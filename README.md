@@ -1,8 +1,5 @@
-## Surface Temperature 1.1.1 Release Notes
+## Surface Temperature Release Notes
 ## Note: The productions produced by this software are considered provisional.
-Release Date: April 2018
-
-See git tag [st-rit-v1.1.1]
 
 This project contains application source code for producing Surface Temperature products.
 
@@ -10,11 +7,7 @@ This project contains application source code for producing Surface Temperature 
 See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads/provisional/land_surface_temperature/provisional_st_README_v10.pdf) product guide (which is an unofficial and provisional version) for information about the Surface Temperature products.
 
 ## Release Notes
-* Version change
-* Add ASTER GED tile list, and refrain from attempting to download tiles that
-  are not on the list
-* Avoid duplicate downloads by emissivity and emissivity standard deviation
-  scripts 
+* Converted build system from Makefiles to CMake.
 
 ## Installation
 
@@ -46,8 +39,12 @@ git checkout version_<version>
 ```
 * Build and install the application specific software
 ```
+mkdir build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX:PATH=<installation_path>
 make
 make install
+make install-date # optional, install the provisional-st/static_data files
+make rit-aux      # optional, install the st_auxiliary_data scripts
 ```
 
 ## Usage

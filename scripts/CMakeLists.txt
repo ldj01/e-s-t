@@ -1,0 +1,3 @@
+file(GLOB SCRIPTS "*.py")
+
+install(PROGRAMS ${SCRIPTS} DESTINATION bin)
