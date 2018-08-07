@@ -1,0 +1,9 @@
+To run the st-tests.py unit tests, you will need the following environment
+variables set (shown here with an example path):
+
+ESPA_UNIT_TEST_DATA_DIR=/LOSRLPGD02/data2/rockvam/level2_test_data
+ST_DATA_DIR=/pcache/level1/dev/rockvam/level2/software/espa-surface-temperature/st/static_data
+MERRA2_AUX_DIR=/pcache/level1/dev/rockvam/level2/auxiliary/LST/sample_orig_NARR_MERRA
+ASTER_GED_SERVER=e4ftl01
+ASTER_GED_PATH=/ASTT/AG100.003/2000.01.01/
+
