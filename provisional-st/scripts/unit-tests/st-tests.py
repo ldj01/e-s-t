@@ -19,7 +19,7 @@ class TestST(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestST, self).__init__(*args, **kwargs)
         self.unit_test_data_dir = os.path.join(
-            os.environ['ESPA_UNIT_TEST_DATA_DIR'], 
+            os.environ['ESPA_UNIT_TEST_DATA_DIR'],
             'espa-surface-temperature')
 
     def setUp(self):
@@ -50,7 +50,9 @@ class TestST(unittest.TestCase):
             os.unlink(os.path.basename(cf))
 
     def test_run(self):
-        pass
+        # This base class also runs as a unit test, so clear out the list
+        # since setUpTestLinks was not run
+        self.link_files = []
 
     def run_test_case(self, cmd):
         status = subprocess.call(cmd)
@@ -70,13 +72,13 @@ class TestST(unittest.TestCase):
                 filecmp.cmp(check_file, os.path.basename(check_file)))
 
     def compare_updated_xml(self, extension):
-        # Compare the updated XML file with the expected one, which is 
+        # Compare the updated XML file with the expected one, which is
         # named with the given extension
-        expected_xml_filename = os.path.join(self.unit_test_data_dir, 
+        expected_xml_filename = os.path.join(self.unit_test_data_dir,
                 self.xml_filename + extension)
         print "Comparing", self.xml_filename, "to", expected_xml_filename
         # Ignore app_version and production_date
-        diff_cmd = ["diff", "-I", "production_date", "-I", "app_version", 
+        diff_cmd = ["diff", "-I", "production_date", "-I", "app_version",
             self.xml_filename, expected_xml_filename]
         status = subprocess.call(diff_cmd)
         self.assertEqual(status, 0)
@@ -126,7 +128,37 @@ class TestAuxMerra(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_extract_auxiliary_merra_data.py", "--xml", 
+        cmd = ["../st_extract_auxiliary_merra_data.py", "--xml",
+               self.xml_filename, "--aux_path", self.aux_path]
+        self.run_test_case(cmd)
+
+class TestAuxNarr(TestST):
+    """Test st_extract_auxiliary_narr_data.py
+
+       Note the majority of the tests in this set are based on the
+       MERRA2 outputs. This test case does NARR extraction, but the results
+       are not used by any other test cases.
+    """
+
+    def setUp(self):
+        super(TestAuxNarr, self).setUp()
+
+        self.aux_path = os.environ['NARR_AUX_DIR']
+        self.assertTrue(os.path.exists(self.aux_path))
+
+        self.setUpTestLinks()
+
+        self.check_dirs = [
+            os.path.join(self.unit_test_data_dir, 'HGT_t0'),
+            os.path.join(self.unit_test_data_dir, 'HGT_t1'),
+            os.path.join(self.unit_test_data_dir, 'SPFH_t0'),
+            os.path.join(self.unit_test_data_dir, 'SPFH_t1'),
+            os.path.join(self.unit_test_data_dir, 'TMP_t0'),
+            os.path.join(self.unit_test_data_dir, 'TMP_t1')
+            ]
+
+    def test_run(self):
+        cmd = ["../st_extract_auxiliary_narr_data.py", "--xml",
                self.xml_filename, "--aux_path", self.aux_path]
         self.run_test_case(cmd)
 
@@ -172,17 +204,17 @@ class TestEmissivity(TestST):
     def setUp(self):
         super(TestEmissivity, self).setUp()
 
-        # This test modifies the XML file, so instead of linking to it, 
+        # This test modifies the XML file, so instead of linking to it,
         # make a copy.  Also remove it from the link_files list.
         shutil.copyfile(
-            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            os.path.join(self.unit_test_data_dir, self.xml_filename),
             self.xml_filename)
         self.link_files = []
 
         self.link_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, '*bt_band6*')))
         self.link_files.extend(
-            glob.glob(os.path.join(self.unit_test_data_dir, 
+            glob.glob(os.path.join(self.unit_test_data_dir,
                 '*toa_band[2345]*')))
         self.setUpTestLinks()
 
@@ -201,7 +233,7 @@ class TestEmissivity(TestST):
         self.check_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, '[a-z]*ndvi*.tif')))
         self.check_files.extend(
-            glob.glob(os.path.join(self.unit_test_data_dir, 
+            glob.glob(os.path.join(self.unit_test_data_dir,
                 'landsat_emis_[mw]*.tif')))
 
     def test_run(self):
@@ -224,10 +256,10 @@ class TestEmissivityStdev(TestST):
     def setUp(self):
         super(TestEmissivityStdev, self).setUp()
 
-        # This test modifies the XML file, so instead of linking to it, 
+        # This test modifies the XML file, so instead of linking to it,
         # make a copy.  Also remove it from the link_files list.
         shutil.copyfile(
-            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            os.path.join(self.unit_test_data_dir, self.xml_filename),
             self.xml_filename)
         self.link_files = []
 
@@ -242,18 +274,18 @@ class TestEmissivityStdev(TestST):
         # Do not test for existence of aster_ged_path, it may be a cloud bucket
 
         self.check_files = glob.glob(
-            os.path.join(self.unit_test_data_dir, 'LE07*_emis_*'))
+            os.path.join(self.unit_test_data_dir, 'LE07*_emis_stdev.*'))
         # Check the tif files from one ASTER granule
         self.check_files.extend(
-            glob.glob(os.path.join(self.unit_test_data_dir, 
+            glob.glob(os.path.join(self.unit_test_data_dir,
                 'AG*emis_stdev.tif')))
         # Intermediate files
         self.check_files.extend(
-            glob.glob(os.path.join(self.unit_test_data_dir, 
+            glob.glob(os.path.join(self.unit_test_data_dir,
                 'landsat_emis_stdev*.tif')))
 
     def test_run(self):
-        cmd = ["../estimate_landsat_emissivity_stdev.py", "--xml", 
+        cmd = ["../estimate_landsat_emissivity_stdev.py", "--xml",
                 self.xml_filename, "--intermediate",
                "--aster-ged-server-name", self.aster_ged_server,
                "--aster-ged-server-path", self.aster_ged_path]
@@ -281,10 +313,10 @@ class TestModtran(TestST):
         # Modtran output files are created in the point directories
         # So set up special list of output files to check in the subdir
         self.check_subdir_files = glob.glob(
-            os.path.join(self.unit_test_data_dir, '*', '*', '*', '*', 
+            os.path.join(self.unit_test_data_dir, '*', '*', '*', '*',
                 'st_modtran.data'))
         self.check_subdir_files.extend(
-            glob.glob(os.path.join(self.unit_test_data_dir, '*', '*', '*', '*', 
+            glob.glob(os.path.join(self.unit_test_data_dir, '*', '*', '*', '*',
                 'st_modtran.hdr')))
 
         # Modtran runs and creates output directly in the point directories
@@ -317,7 +349,7 @@ class TestModtran(TestST):
         # Compare the output that was created in the point directories
         for check_subdir_file in self.check_subdir_files:
             local_subdir_file = check_subdir_file.replace(
-                os.path.join(self.unit_test_data_dir, ""))
+                os.path.join(self.unit_test_data_dir, ""),"")
             print "Comparing", local_subdir_file
             self.assertTrue(
                 filecmp.cmp(check_subdir_file, local_subdir_file));
@@ -331,10 +363,10 @@ class TestAtmosParam(TestST):
         self.data_path = os.environ['ST_DATA_DIR']
         self.assertTrue(os.path.exists(self.data_path))
 
-        # This test modifies the XML file, so instead of linking to it, 
+        # This test modifies the XML file, so instead of linking to it,
         # make a copy.  Also remove it from the link_files list.
         shutil.copyfile(
-            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            os.path.join(self.unit_test_data_dir, self.xml_filename),
             self.xml_filename)
         self.link_files = []
 
@@ -353,14 +385,17 @@ class TestAtmosParam(TestST):
         self.setUpTestLinks()
 
         self.check_files = glob.glob(
-            os.path.join(self.unit_test_data_dir, 'LE07*_st_*'))
-        self.check_files.extend([os.path.join(self.unit_test_data_dir, 
+            os.path.join(self.unit_test_data_dir, 'LE07*_st_*radiance.*'))
+        self.check_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir,
+                'LE07*_st_*transmittance.*')))
+        self.check_files.extend([os.path.join(self.unit_test_data_dir,
             'atmospheric_parameters.txt')])
-        self.check_files.extend([os.path.join(self.unit_test_data_dir, 
+        self.check_files.extend([os.path.join(self.unit_test_data_dir,
             'used_points.txt')])
 
     def test_run(self):
-        cmd = ["../../src/st_atmospheric_parameters", "--xml", 
+        cmd = ["../../src/st_atmospheric_parameters", "--xml",
                 self.xml_filename]
         self.run_test_case(cmd)
         self.compare_updated_xml(".atmos")
@@ -374,11 +409,11 @@ class TestBuildSTData(TestST):
         self.data_path = os.environ['ST_DATA_DIR']
         self.assertTrue(os.path.exists(self.data_path))
 
-        # This test modifies the XML file, so instead of linking to it, 
+        # This test modifies the XML file, so instead of linking to it,
         # make a copy.  Also remove it from the link_files list.
         # Use the XML file that contains the ST intermediate outputs.
         shutil.copyfile(
-            os.path.join(self.unit_test_data_dir, 
+            os.path.join(self.unit_test_data_dir,
                 self.xml_filename + ".build.in"),
             self.xml_filename)
         self.link_files = []
@@ -406,6 +441,103 @@ class TestBuildSTData(TestST):
         current_processor.generate_data()
         self.do_checks()
         self.compare_updated_xml(".st")
+
+class TestDistToCloud(TestST):
+    """Test st_generate_distance_to_cloud.py """
+
+    def setUp(self):
+        super(TestDistToCloud, self).setUp()
+
+        # This test modifies the XML file, so instead of linking to it,
+        # make a copy.  Also remove it from the link_files list.
+        shutil.copyfile(
+            os.path.join(self.unit_test_data_dir, self.xml_filename),
+            self.xml_filename)
+        self.link_files = []
+
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*pixel_qa*')))
+        self.setUpTestLinks()
+
+        self.check_files = glob.glob(
+            os.path.join(self.unit_test_data_dir, 'LE07*_st_cloud_distance.*'))
+
+    def test_run(self):
+        cmd = ["../st_generate_distance_to_cloud.py", "--xml",
+                self.xml_filename]
+        self.run_test_case(cmd)
+        self.compare_updated_xml(".dist")
+
+class TestQA(TestST):
+    """Test st_generate_qa.py """
+
+    def setUp(self):
+        super(TestQA, self).setUp()
+
+        # This test modifies the XML file, so instead of linking to it,
+        # make a copy.  Also remove it from the link_files list.
+        shutil.copyfile(
+            os.path.join(self.unit_test_data_dir,
+                self.xml_filename + ".build.in"),
+            self.xml_filename)
+        self.link_files = []
+
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir,
+                'LE07*_st_*cloud*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir,
+                'LE07*_st_*radiance.*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir,
+                'LE07*_st_*transmittance.*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*_emis*')))
+        self.setUpTestLinks()
+
+        self.check_files = glob.glob(
+            os.path.join(self.unit_test_data_dir, 'LE07*_st_uncertainty*'))
+
+    def test_run(self):
+        cmd = ["../st_generate_qa.py", "--xml",
+                self.xml_filename]
+        self.run_test_case(cmd)
+        self.compare_updated_xml(".qa")
+
+class TestConvert(TestST):
+    """Test st_convert_bands.py """
+
+    def setUp(self):
+        super(TestConvert, self).setUp()
+
+        # This test modifies the XML file, so instead of linking to it,
+        # make a copy.  Also remove it from the link_files list.
+        shutil.copyfile(
+            os.path.join(self.unit_test_data_dir,
+                self.xml_filename + ".convert.in"),
+            self.xml_filename)
+        self.link_files = []
+
+        file_list = []
+        file_list.extend(glob.glob(os.path.join(self.unit_test_data_dir,
+            'LE07*_st_*cloud*')))
+        file_list.extend(glob.glob(os.path.join(self.unit_test_data_dir,
+            'LE07*_st_*radiance*')))
+        file_list.extend(glob.glob(os.path.join(self.unit_test_data_dir,
+            'LE07*_st_*transmittance*')))
+        file_list.extend(glob.glob(os.path.join(self.unit_test_data_dir,
+            'LE07*_emis*')))
+        self.link_files.extend(filter(lambda x:'converted' not in x, file_list))
+        self.setUpTestLinks()
+
+        self.check_files = glob.glob(
+            os.path.join(self.unit_test_data_dir, 'LE07*_converted*'))
+
+    def test_run(self):
+        cmd = ["../st_convert_bands.py", "--xml",
+                self.xml_filename]
+        self.run_test_case(cmd)
+        self.compare_updated_xml(".convert")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
