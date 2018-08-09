@@ -164,6 +164,10 @@ def process_point_dir((point_path, modtran_data_path)):
     current_directory = os.getcwd()
 
     # Get the real paths to simplify the logic a bit
+    if not os.path.isdir(point_path):
+        message = 'Point directory {0} does not exist'.format(point_path)
+        raise Exception(message)
+
     r_paths = [os.path.realpath(path)
                for path in glob.glob(os.path.join(point_path, '*', '*', '*'))]
 
@@ -186,7 +190,7 @@ def process_point_dir((point_path, modtran_data_path)):
 
             finally:
                 if len(output) > 0:
-                    logger.info(output)
+                    logger.debug(output)
 
             if not os.path.isfile(TAPE6):
                 raise ModtranProcessingError('Missing MODTRAN output file'

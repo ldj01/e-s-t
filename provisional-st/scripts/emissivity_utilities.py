@@ -288,7 +288,7 @@ def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
 
     logger = logging.getLogger(__name__)
 
-    cmd = ['gdalwarp', '-wm', '2048', '-multi',
+    cmd = ['gdalwarp', '-wm', '2048', '-wo', 'NUM_THREADS=2',
            '-tr', str(target_info.toa.bt.pixel_size.x),
            str(target_info.toa.bt.pixel_size.y),
            '-s_srs', ''.join(["'", src_proj4, "'"]),

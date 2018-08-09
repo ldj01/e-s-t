@@ -150,6 +150,8 @@ def initialize_gdal_objects(espa_metadata):
     logger.debug('Filename: {}'.format(toa_bt_filename))
 
     data_ds = gdal.Open(toa_bt_filename)
+    if data_ds is None:
+        raise MissingBandError('Missing TOA Brightness Temperature Band')
 
     # Create the data SRS
     data_srs = osr.SpatialReference()

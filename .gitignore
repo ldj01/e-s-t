@@ -1,2 +1,4 @@
 *.o
 not-validated-prototype_lst/src/lst_point_atmos_parms
+provisional-st/src/st_atmospheric_parameters
+*.pyc

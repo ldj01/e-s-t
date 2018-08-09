@@ -53,5 +53,5 @@ clean:
 
 #-----------------------------------------------------------------------------
 check:
-	@cd unit-tests; python unit-tests.py
+	@cd unit-tests; python st-tests.py
 

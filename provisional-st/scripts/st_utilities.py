@@ -425,7 +425,7 @@ class Geo(object):
 
         logger = logging.getLogger(__name__)
 
-        cmd = ['gdalwarp', '-wm', '2048', '-multi',
+        cmd = ['gdalwarp', '-wm', '2048', '-wo', 'NUM_THREADS=2',
                '-srcnodata', str(no_data_value),
                '-dstnodata', str(no_data_value)]
         cmd.extend(src_names)

@@ -286,7 +286,7 @@ def convert_band(espa_metadata, xml_filename, no_data_value, scale_factor,
 
     # Build converted intermediate band filename
     img_filename = ''.join([xml_filename.split('.xml')[0],
-                            '_' + band_name, '.img'])
+                            '_' + band_name, '_converted.img'])
 
     # Write updated intermediate product
     write_product(samps=samps,

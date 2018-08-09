@@ -36,7 +36,7 @@ from osgeo import gdal, osr
 
 
 from espa import Metadata
-from st_exceptions import NoTilesError, InaccessibleTileError
+from st_exceptions import NoTilesError, InaccessibleTileError, MissingBandError
 
 
 # Import local modules
@@ -427,6 +427,8 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     # Determine output information
     sensor_code = emis_util.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.toa.red.name)
+    if dataset is None:
+        raise MissingBandError('Missing TOA Red Band')
     output_srs = osr.SpatialReference()
     output_srs.ImportFromWkt(dataset.GetProjection())
     output_transform = dataset.GetGeoTransform()
