@@ -8,6 +8,7 @@ import subprocess
 import filecmp
 import shutil
 import sys
+import logging
 
 # Import the ST modules that are not standalone scripts
 sys.path.insert(0, '..')
@@ -67,6 +68,19 @@ class TestST(unittest.TestCase):
             print "Comparing", check_file
             self.assertTrue(
                 filecmp.cmp(check_file, os.path.basename(check_file)))
+
+    def compare_updated_xml(self, extension):
+        # Compare the updated XML file with the expected one, which is 
+        # named with the given extension
+        expected_xml_filename = os.path.join(self.unit_test_data_dir, 
+                self.xml_filename + extension)
+        print "Comparing", self.xml_filename, "to", expected_xml_filename
+        # Ignore app_version and production_date
+        diff_cmd = ["diff", "-I", "production_date", "-I", "app_version", 
+            self.xml_filename, expected_xml_filename]
+        status = subprocess.call(diff_cmd)
+        self.assertEqual(status, 0)
+        os.unlink(self.xml_filename)
 
 class TestGridPoints(TestST):
     """Test st_determine_grid_points.py """
@@ -158,6 +172,13 @@ class TestEmissivity(TestST):
     def setUp(self):
         super(TestEmissivity, self).setUp()
 
+        # This test modifies the XML file, so instead of linking to it, 
+        # make a copy.  Also remove it from the link_files list.
+        shutil.copyfile(
+            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            self.xml_filename)
+        self.link_files = []
+
         self.link_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, '*bt_band6*')))
         self.link_files.extend(
@@ -189,6 +210,7 @@ class TestEmissivity(TestST):
                "--aster-ged-server-name", self.aster_ged_server,
                "--aster-ged-server-path", self.aster_ged_path]
         self.run_test_case(cmd)
+        self.compare_updated_xml(".emis")
         # Clean up any leftover ASTER files, not already in the check_files list
         check_files_base = map(lambda x:os.path.basename(x), self.check_files)
         for aster_file in glob.glob("AG100.v003*"):
@@ -201,6 +223,13 @@ class TestEmissivityStdev(TestST):
 
     def setUp(self):
         super(TestEmissivityStdev, self).setUp()
+
+        # This test modifies the XML file, so instead of linking to it, 
+        # make a copy.  Also remove it from the link_files list.
+        shutil.copyfile(
+            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            self.xml_filename)
+        self.link_files = []
 
         self.link_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, '*bt_band6*')))
@@ -229,6 +258,7 @@ class TestEmissivityStdev(TestST):
                "--aster-ged-server-name", self.aster_ged_server,
                "--aster-ged-server-path", self.aster_ged_path]
         self.run_test_case(cmd)
+        self.compare_updated_xml(".emis_stdev")
         # Clean up any leftover ASTER files, not already in the check_files list
         check_files_base = map(lambda x:os.path.basename(x), self.check_files)
         for aster_file in glob.glob("AG100.v003*"):
@@ -333,15 +363,7 @@ class TestAtmosParam(TestST):
         cmd = ["../../src/st_atmospheric_parameters", "--xml", 
                 self.xml_filename]
         self.run_test_case(cmd)
-        # Compare the XML file with the expected one
-        # Ignore app_version and production_date
-        print "Comparing", self.xml_filename
-        diff_cmd = ["diff", "-I", "production_date", "-I", "app_version", 
-            self.xml_filename,
-            os.path.join(self.unit_test_data_dir, self.xml_filename + ".atmos")]
-        status = subprocess.call(diff_cmd)
-        self.assertEqual(status, 0)
-        os.unlink(self.xml_filename)
+        self.compare_updated_xml(".atmos")
 
 class TestBuildSTData(TestST):
     """Test build_st_data.py """
@@ -354,25 +376,36 @@ class TestBuildSTData(TestST):
 
         # This test modifies the XML file, so instead of linking to it, 
         # make a copy.  Also remove it from the link_files list.
+        # Use the XML file that contains the ST intermediate outputs.
         shutil.copyfile(
-            os.path.join(self.unit_test_data_dir, self.xml_filename), 
+            os.path.join(self.unit_test_data_dir, 
+                self.xml_filename + ".build.in"),
             self.xml_filename)
         self.link_files = []
 
-        #self.link_files.extend(
-        #    glob.glob(os.path.join(self.unit_test_data_dir, '*bt_band6*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*_st_*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*_emis*img')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*_emis*hdr')))
         self.setUpTestLinks()
 
-        #self.check_files = [
-        #    os.path.join(self.unit_test_data_dir, 'grid_points.bin'),
-        #    os.path.join(self.unit_test_data_dir, 'grid_points.hdr')
-        #    ]
+        self.check_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*_st.*')))
 
     def test_run(self):
+        logging.basicConfig(format=('%(asctime)s.%(msecs)03d %(process)d'
+                                    ' %(levelname)-8s'
+                                    ' %(filename)s:%(lineno)d:%(funcName)s'
+                                    ' -- %(message)s'),
+                            datefmt='%Y-%m-%d %H:%M:%S',
+                            level=logging.DEBUG)
         current_processor = build_st_data.BuildSTData(
             xml_filename=self.xml_filename)
         current_processor.generate_data()
         self.do_checks()
+        self.compare_updated_xml(".st")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
