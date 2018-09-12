@@ -453,27 +453,27 @@ def main():
     logger.info('*** Begin ST Generate Products ***')
 
     if (args.espa):
-    # Retrieve the processing configuration
-    proc_cfg = retrieve_cfg(PROC_CFG_FILENAME)
+        # Retrieve the processing configuration
+        proc_cfg = retrieve_cfg(PROC_CFG_FILENAME)
 
         # Determine number of processes to use
         if args.num_threads is None:
-    process_count = proc_cfg.get('processing', 'omp_num_threads')
+            process_count = proc_cfg.get('processing', 'omp_num_threads')
         else:
             process_count = args.num_threads
 
-    # Determine ST data locations
-    data_path = proc_cfg.get('processing', 'st_data_path')
+        # Determine ST data locations
+        data_path = proc_cfg.get('processing', 'st_data_path')
 
-    # Determine NARR data locations
-    aux_path = proc_cfg.get('processing', 'st_aux_path')
+        # Determine NARR data locations
+        aux_path = proc_cfg.get('processing', 'st_aux_path')
 
-    # Determine MODTRAN 'DATA' location
-    modtran_data_path = proc_cfg.get('processing', 'modtran_data_path')
+        # Determine MODTRAN 'DATA' location
+        modtran_data_path = proc_cfg.get('processing', 'modtran_data_path')
 
-    # Determine the server name and path to get the ASTER data from
-    server_name = proc_cfg.get('processing', 'aster_ged_server_name')
-    server_path = proc_cfg.get('processing', 'aster_ged_server_path')
+        # Determine the server name and path to get the ASTER data from
+        server_name = proc_cfg.get('processing', 'aster_ged_server_name')
+        server_path = proc_cfg.get('processing', 'aster_ged_server_path')
     else:
         # Determine number of processes to use
         process_count = args.num_threads
