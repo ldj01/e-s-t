@@ -61,6 +61,7 @@ def retrieve_command_line_arguments():
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
                         required=False, default='MERRA2',
+                        choices=['NARR','MERRA2'],
                         help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
@@ -169,10 +170,12 @@ def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
             cmd = ['st_extract_auxiliary_narr_data.py',
                    '--xml', xml_filename,
                    '--aux_path', aux_path]
-        else: # MERRA
+        elif reanalysis == "MERRA2":
             cmd = ['st_extract_auxiliary_merra_data.py',
                    '--xml', xml_filename,
                    '--aux_path', aux_path]
+        else:
+            raise Exception('Unknown reanalysis type [{}]'.format(reanalysis))
 
         if debug:
             cmd.append('--debug')
@@ -386,8 +389,10 @@ def cleanup_temporary_data(reanalysis):
 
     if reanalysis == "NARR":
         parameters = NARR_PARAMETERS
-    else: # MERRA2
+    elif reanalysis == "MERRA2":
         parameters = MERRA_PARAMETERS
+    else:
+        raise Exception('Unknown reanalysis type [{}]'.format(reanalysis))
 
     for directory in parameters:
         if os.path.exists(directory):
@@ -461,8 +466,10 @@ def main():
     # Determine auxiliary (NARR or MERRA2) data locations
     if args.reanalysis == 'MERRA2':
         aux_path = proc_cfg.get('processing', 'st_merra_aux_path')
-    else:
+    elif reanalysis == "NARR":
         aux_path = proc_cfg.get('processing', 'st_aux_path')
+    else:
+        raise Exception('Unknown reanalysis type [{}]'.format(reanalysis))
 
     # Determine MODTRAN 'DATA' location
     modtran_data_path = proc_cfg.get('processing', 'modtran_data_path')

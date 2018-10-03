@@ -85,6 +85,7 @@ def retrieve_command_line_arguments():
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
                         required=False, default='MERRA2',
+                        choices=['NARR','MERRA2'],
                         help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
@@ -189,8 +190,10 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
 
     if reanalysis == "NARR":
         adjustment = 32000 * 1.5
-    else: # MERRA-2
+    elif reanalysis == "MERRA2":
         adjustment = 69500 * 2.0 
+    else:
+        raise Exception('Unknown reanalysis source {0}'.format(reanalysis))
 
     north_lat = float(espa_metadata.xml_object.
                       global_metadata.bounding_coordinates.north)
@@ -592,8 +595,10 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
 
     if reanalysis == "NARR":
         data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
-    else:
+    elif reanalysis == "MERRA2":
         data_path = os.path.join(data_path, MERRA2_COORDINATES_FILENAME)
+    else:
+        data_path = None
 
     if data_bounds.east_lon > data_bounds.west_lon:
         cross_antimeridian = False

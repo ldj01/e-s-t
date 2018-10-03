@@ -44,6 +44,7 @@ INVALID_DATA_VALUE = 9.999e+20
 # The number of rows and columns present in the NARR data
 NARR_ROWS = 277
 NARR_COLS = 349
+# The number of rows and columns present in the MERRA2 data
 MERRA_ROWS = 361 
 MERRA_COLS = 576
 
@@ -55,7 +56,7 @@ NARR_PRESSURE_LAYERS = [1000, 975, 950, 925, 900,
                         300, 275, 250, 225, 200,
                         175, 150, 125, 100]
 
-# The pressure levels contained in the MERRA data
+# The pressure levels contained in the MERRA2 data
 MERRA_PRESSURE_LAYERS = [1000, 975, 950, 925, 900, 875, 850, 825, 800,
                          775, 750, 725, 700, 650, 600, 550, 500, 450,
                          400, 350, 300, 250, 200, 150, 100, 70, 50, 40,
@@ -124,6 +125,7 @@ def retrieve_command_line_arguments():
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
                         required=False, default='MERRA2',
+                        choices=['NARR','MERRA2'],
                         help='Reanalysis source - NARR or MERRA2')
 
     parser.add_argument('--debug',
@@ -180,7 +182,7 @@ def load_pressure_file(parameter, layer, reanalysis):
     Args:
         parameter <str>: The parameter to load
         layer <str>: The pressure layer to load for the parameter
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
        [<col>[<row>]]: Two-Dimensional list of the reanalysis points for the
@@ -198,7 +200,7 @@ def load_pressure_file(parameter, layer, reanalysis):
             point_values = [[float(data_fd.readline())
                              for dummy1 in xrange(NARR_COLS)]
                             for dummy2 in xrange(NARR_ROWS)]
-        else:
+        elif reanalysis == "MERRA2":
             point_values = [[float(data_fd.readline())
                              for dummy1 in xrange(MERRA_COLS)]
                             for dummy2 in xrange(MERRA_ROWS)]
@@ -211,7 +213,7 @@ def load_pressure_layers(parameters, layers, reanalysis):
     Args:
         parameters [<str>]: All the parameters to load
         layers [<str>]: All the pressure layers to load for each parameter
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         <dict>: dict[parameters]->dict[layers]->[<col>[<row>]]
@@ -303,7 +305,7 @@ def determine_geometric_hgt(data, point, layer, time, reanalysis):
         point <GridPointInfo>: The current point information
         layer <str>: The layer to get the height for
         time <int>: Time 0 or Time 1
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         <float>: The geometric height for the layer
@@ -311,15 +313,20 @@ def determine_geometric_hgt(data, point, layer, time, reanalysis):
 
     # Geopotential height at time
     if reanalysis == "NARR":
-        hgt = data[NARR_HGT_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
+        hgt = data[NARR_HGT_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
         # For NARR, invalid data is an error case.
         if hgt == INVALID_DATA_VALUE:
             raise InvalidDataPointError('Invalid data point value [HGT]')
-    else:
-        hgt = data[MERRA_HGT_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
-        # For MERRA, invalid data is filled.
+    elif reanalysis == "MERRA2":
+        hgt = data[MERRA_HGT_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
+        # For MERRA2, invalid data is filled.
         if hgt == INVALID_DATA_VALUE:
             return INVALID_DATA_VALUE
+    else:
+        raise InvalidDataPointError('Unable to locate height value for {0}'.
+                format(reanalysis))
 
     rad_lat = math.radians(point.lat)
     sin_lat = math.sin(rad_lat)
@@ -357,7 +364,7 @@ def determine_rh_temp(data, point, layer, time, reanalysis):
         point <GridPointInfo>: The current point information
         layer <str>: The layer to get the relative humidity for
         time <int>: Time 0 or Time 1
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         <float>: Relative humidity for the point layer
@@ -367,9 +374,11 @@ def determine_rh_temp(data, point, layer, time, reanalysis):
     if reanalysis == "NARR":
 
         # Specific humidity at time
-        spfh = data[NARR_SPFH_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
+        spfh = data[NARR_SPFH_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
         # Temperature at time
-        temp = data[NARR_TMP_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
+        temp = data[NARR_TMP_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
 
         # For NARR, invalid data is an error case.
         if spfh == INVALID_DATA_VALUE:
@@ -377,18 +386,24 @@ def determine_rh_temp(data, point, layer, time, reanalysis):
         if temp == INVALID_DATA_VALUE:
             raise InvalidDataPointError('Invalid data point value [TMP]')
 
-    else: # MERRA
+    elif reanalysis == "MERRA2":
 
         # Specific humidity at time
-        spfh = data[MERRA_SPFH_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
+        spfh = data[MERRA_SPFH_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
         # Temperature at time
-        temp = data[MERRA_TMP_PARMS[time]][layer][point.reanalysis_row-1][point.reanalysis_col-1]
+        temp = data[MERRA_TMP_PARMS[time]][layer]\
+                [point.reanalysis_row-1][point.reanalysis_col-1]
 
-        # For MERRA, invalid data is filled.
+        # For MERRA2, invalid data is filled.
         if spfh == INVALID_DATA_VALUE:
             return (INVALID_DATA_VALUE, INVALID_DATA_VALUE)
         if temp == INVALID_DATA_VALUE:
             return (INVALID_DATA_VALUE, INVALID_DATA_VALUE)
+
+    else:
+        raise InvalidDataPointError('Unable to locate humidity value for {0}'.
+                format(reanalysis))
 
     # Calculate vapor pressure at given temperature - hpa
     goff_pow_1 = math.pow(10.0, (11.344 * (1.0 - (temp / 373.16)))) - 1.0
@@ -421,7 +436,7 @@ def interpolate_to_pressure_layers(data, point, layers, interp_factor,
         point <GridPointInfo>: The current point information
         layers [<str>]: All the pressure layers to load for each parameter
         interp_factor <float>: The interpolation factor to use
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
 
     Returns:
         <dict>: dict[layers]->LayerInfo
@@ -431,19 +446,15 @@ def interpolate_to_pressure_layers(data, point, layers, interp_factor,
     for layer in layers:
         # Geometric height at t0
         hgt_m0 = determine_geometric_hgt(data, point, layer, 0, reanalysis)
-        # print(hgt_m0)
 
         # Geometric height at t1
         hgt_m1 = determine_geometric_hgt(data, point, layer, 1, reanalysis)
-        # print(hgt_m1)
 
         # Relative humidity at t0
         (rh_v0, temp_v0) = determine_rh_temp(data, point, layer, 0, reanalysis)
-        # print(rh_v0, temp_v0)
 
         # Relative humidity at t1
         (rh_v1, temp_v1) = determine_rh_temp(data, point, layer, 1, reanalysis)
-        # print(rh_v1, temp_v1)
 
         '''
         Linearly interpolate geometric height, relative humidity, and
@@ -936,6 +947,7 @@ def extrapolate_bottom(layer_index, values, field):
 
     """The bottom element of the selected atmospheric parameter is missing, so
        extrapolate its value from higher elements.
+       Used only for MERRA2.
 
     Args:
         layer_index <int>: Pressure layer index 
@@ -973,6 +985,7 @@ def extrapolate_top(layer_index, values, field):
 
     """One of the top elements of the selected atmospheric parameter is missing,
        so extrapolate its value from lower elements.
+       Used only for MERRA2.
 
     Args:
         layer_index <int>: Pressure layer index 
@@ -1005,6 +1018,7 @@ def interpolate_middle(above, layer_index, values, field):
 
     """A middle element of the selected atmospheric parameter is missing, so
        interpolate its value from lower and higher elements.
+       Used only for MERRA2.
 
     Args:
         above <int>: Index of closest element above this one with valid data 
@@ -1038,6 +1052,7 @@ def fill_missing_values(layer_index, values, field):
 
     """For the selected atmospheric parameter, extrapolate or interpolate to 
        fill it a missing value.  In some cases fill in nearby values, too.
+       Used only for MERRA2.
 
     Args:
         layer_index <int>: Pressure layer index 
@@ -1084,7 +1099,7 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
         head_template <str>: The template for the head of the tape5 file
         tail_template <str>: The template for the tail of the tape5 file
         ground_altitudes [<float>]: The standard altitudes we need to process
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
     """
 
     logger = logging.getLogger(__name__)
@@ -1106,8 +1121,10 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
 
     if reanalysis == "NARR":
         PRESSURE_LAYERS = NARR_PRESSURE_LAYERS
-    else: # MERRA
+    elif reanalysis == "MERRA2":
         PRESSURE_LAYERS = MERRA_PRESSURE_LAYERS
+    else:
+        PRESSURE_LAYERS = []
 
     values = interpolate_to_pressure_layers(data=data,
                                             point=point,
@@ -1117,7 +1134,7 @@ def generate_tape5_files_for_point(grid_elevation_file, std_atmos, data, point,
 
     if reanalysis == "MERRA2":
         # Check for missing values at each pressure level and fill them.
-        # This is only done for MERRA.  For NARR, missing values are considered
+        # This is only done for MERRA2.  For NARR, missing values are considered
         # an error case.
         for (layer_index, layer) in enumerate(PRESSURE_LAYERS):
 
@@ -1151,7 +1168,7 @@ def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
         data_path <str>: The directory for the reanalysis data files
         std_atmos [StdAtmosInfo]: The standard atmosphere
         grid_points [GridPointInfo]: List of the grid point information
-        reanalysis <str>: Reanalysis source: NARR or MERRA
+        reanalysis <str>: Reanalysis source: NARR or MERRA2
     """
 
     # Load the MODTRAN head and tail template files
@@ -1163,10 +1180,12 @@ def generate_modtran_tape5_files(espa_metadata, data_path, std_atmos,
         data = load_pressure_layers(parameters=NARR_PARAMETERS,
                                     layers=NARR_PRESSURE_LAYERS,
                                     reanalysis=reanalysis)
-    else:
+    elif reanalysis == "MERRA2":
         data = load_pressure_layers(parameters=MERRA_PARAMETERS,
                                     layers=MERRA_PRESSURE_LAYERS,
                                     reanalysis=reanalysis)
+    else:
+        data = None
 
     # Get the dates and determine the day-of-year
     (acq_date, t0_date, t1_date) = util.REANALYSIS.dates(espa_metadata)
