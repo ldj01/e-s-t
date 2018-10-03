@@ -134,40 +134,46 @@ def calculate_distance(src_info, fill_value):
     logger.info('Building distance to cloud band')
 
     # Read the pixel QA input
-    qa_data = extract_raster_data(src_info.qa_filename, 1)
+    qa_data = util.Dataset.extract_raster_data(src_info.qa_filename, 1)
 
     # Make a layer that is only set for cloud locations
     qa_cloud_shifted_mask = np.right_shift(qa_data, PQA_CLOUD)
     qa_cloud_mask = np.bitwise_and(qa_cloud_shifted_mask, PQA_SINGLE_BIT)
 
-    # Make cloud pixels the background, and non-cloud the foreground, since
-    # distance_transform_edt finds the distance to the closest background pixel
-    qa_cloud_background = np.logical_not(qa_cloud_mask)
-
-    # Calculate the distance to clouds
-    distance_data = ndimage.distance_transform_edt(qa_cloud_background)
-
-    # Multiply by pixel size in km
-    distance_data = distance_data * 0.03
-
-    # If there are no cloud pixels, the distance transform acts like there's a
-    # cloud off the upper left corner.  Fill with a predefined value instead.
     number_cloud_pixels = np.count_nonzero(qa_cloud_mask)
-    if number_cloud_pixels == 0:
-        distance_data.fill(200) 
 
-    # Cleanup no data locations.  Skip the right shift since PQA_FILL is 0
-    qa_fill_mask = np.bitwise_and(qa_data, PQA_SINGLE_BIT)
-    qa_fill_locations = np.where(qa_fill_mask == 1)
-    distance_data[qa_fill_locations] = fill_value
+    if number_cloud_pixels == 0:
+        # If there are no cloud pixels, the distance transform acts like there's
+        # a cloud off the upper left corner.  Fill with a predefined value 
+        # instead, the QA max cloud bin.
+        distance_data = np.full_like(qa_cloud_mask, util.MAX_CLOUD_BIN)
+
+    else:
+        # Make cloud pixels the background, and non-cloud the foreground, since
+        # distance_transform_edt finds the distance to the closest background 
+        # pixel
+        qa_cloud_background = np.logical_not(qa_cloud_mask)
+
+        # Calculate the distance to clouds
+        distance_data = ndimage.distance_transform_edt(qa_cloud_background)
+
+        # Multiply by pixel size in km
+        distance_data = distance_data * 0.03
+
+        # Cleanup no data locations.  Skip the right shift since PQA_FILL is 0
+        qa_fill_mask = np.bitwise_and(qa_data, PQA_SINGLE_BIT)
+        qa_fill_locations = np.where(qa_fill_mask == 1)
+        distance_data[qa_fill_locations] = fill_value
+
+        # Memory cleanup
+        del qa_fill_mask
+        del qa_cloud_background
+        del qa_fill_locations
 
     # Memory cleanup
     del qa_data
-    del qa_fill_mask
-    del qa_fill_locations
     del qa_cloud_shifted_mask
     del qa_cloud_mask
-    del qa_cloud_background
 
     return distance_data
 
@@ -309,7 +315,7 @@ def generate_distance(xml_filename, no_data_value):
     src_info = retrieve_metadata_information(espa_metadata)
 
     # Determine output information
-    sensor_code = get_satellite_sensor_code(xml_filename)
+    sensor_code = util.Landsat.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.qa_filename)
     output_srs = osr.SpatialReference()
     output_srs.ImportFromWkt(dataset.GetProjection())
@@ -322,8 +328,8 @@ def generate_distance(xml_filename, no_data_value):
     distance_to_cloud = calculate_distance(src_info, no_data_value)
 
     # Build distance to cloud filename
-    distance_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                     '_st_cloud_distance', '.img'])
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
+    distance_img_filename = ''.join([product_id, '_st_cloud_distance', '.img'])
 
     # Write distance to cloud product
     write_distance_to_cloud_product(samps=samps,
@@ -339,31 +345,6 @@ def generate_distance(xml_filename, no_data_value):
                                    sensor_code=sensor_code,
                                    no_data_value=no_data_value)
 
-
-def get_satellite_sensor_code(xml_filename):
-    """Derives the satellite-sensor code from the XML filename
-
-    Args:
-        xml_filename <str>: Filename for the ESPA Metadata XML
-
-    Returns:
-        <str>: Satellite sensor code
-    """
-
-    collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
-
-    base_name = os.path.basename(xml_filename)
-
-    satellite_sensor_code = base_name[0:4]
-    if satellite_sensor_code in collection_prefixes:
-        return satellite_sensor_code
-
-    raise Exception('Satellite-Sensor code ({0}) not understood'
-                    .format(satellite_sensor_code))
-
-
-# Specify the no data value we will be using.
-NO_DATA_VALUE = -9999
 
 
 def main():
@@ -396,7 +377,7 @@ def main():
 
         # Call the main processing routine
         generate_distance(xml_filename=args.xml_filename,
-                          no_data_value=NO_DATA_VALUE)
+                          no_data_value=util.INTERMEDIATE_NO_DATA_VALUE)
 
     except Exception:
         logger.exception('Processing failed')

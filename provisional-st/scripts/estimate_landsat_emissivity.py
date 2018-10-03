@@ -44,6 +44,8 @@ from st_exceptions import NoTilesError, InaccessibleTileError, MissingBandError
 import st_utilities as util
 import emissivity_utilities as emis_util
 
+ASTER_EMISSIVITY_MEAN_SCALE_FACTOR = 0.001
+NDVI_SCALE_FACTOR = 0.01
 
 CoefficientInfo = namedtuple('CoefficientInfo',
                              ('estimated_1', 'estimated_2', 'estimated_3',
@@ -105,14 +107,16 @@ def generate_landsat_ndvi(src_info, no_data_value):
     logger.info('Building TOA based NDVI band for Landsat data')
 
     # NIR ----------------------------------------------------------------
-    nir_data = emis_util.extract_raster_data(src_info.toa.nir.name, 1)
+    nir_data = util.Dataset.extract_raster_data(src_info.toa.nir.name, 1)
     nir_no_data_locations = np.where(nir_data == no_data_value)
-    nir_data = nir_data * src_info.toa.nir.scale_factor
+    nir_data = nir_data * src_info.toa.nir.scale_factor \
+            + src_info.toa.nir.add_offset
 
     # RED ----------------------------------------------------------------
-    red_data = emis_util.extract_raster_data(src_info.toa.red.name, 1)
+    red_data = util.Dataset.extract_raster_data(src_info.toa.red.name, 1)
     red_no_data_locations = np.where(red_data == no_data_value)
-    red_data = red_data * src_info.toa.red.scale_factor
+    red_data = red_data * src_info.toa.red.scale_factor \
+        + src_info.toa.red.add_offset
 
     # NDVI ---------------------------------------------------------------
     ndvi_data = ((nir_data - red_data) / (nir_data + red_data))
@@ -154,14 +158,16 @@ def snow_and_ndsi_locations(src_info, no_data_value):
     logger.info('Building TOA based NDSI band for Landsat data')
 
     # GREEN --------------------------------------------------------------
-    green_data = emis_util.extract_raster_data(src_info.toa.green.name, 1)
+    green_data = util.Dataset.extract_raster_data(src_info.toa.green.name, 1)
     green_no_data_locations = np.where(green_data == no_data_value)
-    green_data = green_data * src_info.toa.green.scale_factor
+    green_data = green_data * src_info.toa.green.scale_factor \
+        + src_info.toa.green.add_offset
 
     # SWIR1 --------------------------------------------------------------
-    swir1_data = emis_util.extract_raster_data(src_info.toa.swir1.name, 1)
+    swir1_data = util.Dataset.extract_raster_data(src_info.toa.swir1.name, 1)
     swir1_no_data_locations = np.where(swir1_data == no_data_value)
-    swir1_data = swir1_data * src_info.toa.swir1.scale_factor
+    swir1_data = swir1_data * src_info.toa.swir1.scale_factor \
+        + src_info.toa.swir1.add_offset
 
     # NDSI ---------------------------------------------------------------
     with np.errstate(divide='ignore'):
@@ -254,11 +260,11 @@ def extract_aster_data(url, filename):
     logger.debug(lat_ds_name)
     logger.debug(lon_ds_name)
 
-    aster_b13_data = emis_util.extract_raster_data(emis_ds_name, 4)
-    aster_b14_data = emis_util.extract_raster_data(emis_ds_name, 5)
-    aster_ndvi_data = emis_util.extract_raster_data(ndvi_ds_name, 1)
-    aster_lat_data = emis_util.extract_raster_data(lat_ds_name, 1)
-    aster_lon_data = emis_util.extract_raster_data(lon_ds_name, 1)
+    aster_b13_data = util.Dataset.extract_raster_data(emis_ds_name, 4)
+    aster_b14_data = util.Dataset.extract_raster_data(emis_ds_name, 5)
+    aster_ndvi_data = util.Dataset.extract_raster_data(ndvi_ds_name, 1)
+    aster_lat_data = util.Dataset.extract_raster_data(lat_ds_name, 1)
+    aster_lon_data = util.Dataset.extract_raster_data(lon_ds_name, 1)
 
     # Determine the minimum and maximum latitude and longitude
     x_min = aster_lon_data.min()
@@ -312,14 +318,14 @@ def generate_estimated_emis_tile(coefficients, tile_name,
     aster_b13_no_data_locations = np.where(aster_b13_data == no_data_value)
 
     # Scale the data
-    aster_b13_data = aster_b13_data * 0.001
+    aster_b13_data = aster_b13_data * ASTER_EMISSIVITY_MEAN_SCALE_FACTOR
 
     # Save the no data and gap locations.
     aster_b14_gap_locations = np.where(aster_b14_data == 0)
     aster_b14_no_data_locations = np.where(aster_b14_data == no_data_value)
 
     # Scale the data
-    aster_b14_data = aster_b14_data * 0.001
+    aster_b14_data = aster_b14_data * ASTER_EMISSIVITY_MEAN_SCALE_FACTOR
 
     # ------------------------------------------------------------
     # Create the estimated Landsat EMIS data
@@ -379,7 +385,7 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
     ndvi_no_data_locations = np.where(ndvi_data == no_data_value)
 
     # Scale the data
-    data = ndvi_data * 0.01
+    data = ndvi_data * NDVI_SCALE_FACTOR
 
     # Re-apply the no data locations.
     data[ndvi_no_data_locations] = no_data_value
@@ -633,12 +639,12 @@ def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
     """
 
     # Load the warped estimated Landsat EMIS into memory
-    ls_emis_data = emis_util.extract_raster_data(ls_emis_warped_name, 1)
+    ls_emis_data = util.Dataset.extract_raster_data(ls_emis_warped_name, 1)
     ls_emis_gap_locations = np.where(ls_emis_data == 0)
     ls_emis_no_data_locations = np.where(ls_emis_data == no_data_value)
 
     # Load the warped ASTER NDVI into memory
-    aster_ndvi_data = emis_util.extract_raster_data(aster_ndvi_warped_name, 1)
+    aster_ndvi_data = util.Dataset.extract_raster_data(aster_ndvi_warped_name,1)
     aster_ndvi_gap_locations = np.where(aster_ndvi_data == 0)
     aster_ndvi_no_data_locations = np.where(aster_ndvi_data == no_data_value)
 
@@ -678,10 +684,12 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     espa_metadata = Metadata(xml_filename)
     espa_metadata.parse()
 
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
+
     src_info = emis_util.retrieve_metadata_information(espa_metadata)
 
     # Determine output information
-    sensor_code = emis_util.get_satellite_sensor_code(xml_filename)
+    sensor_code = util.Landsat.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.toa.red.name)
     if dataset is None:
         raise MissingBandError('Missing TOA Red Band')
@@ -821,6 +829,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del bare_locations
 
     # Set fill values on granule edge to nan
+    # FIXME it seems like this should be handled better, perhaps set to no_data_value ?
     fill_locations = np.where(np.isnan(fv_L))
     ls_emis_final[fill_locations] = np.nan
 
@@ -865,8 +874,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del ndsi_no_data_locations
 
     # Write emissivity data and metadata
-    ls_emis_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                    '_emis', '.img'])
+    ls_emis_img_filename = ''.join([product_id, '_emis', '.img'])
 
     emis_util.write_emissivity_product(samps=samps,
                                        lines=lines,
@@ -884,12 +892,6 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
     # Memory cleanup
     del ls_emis_final
-
-
-
-# Specify the no data value we will be using, it also matches the
-# no_data_value for the ASTER data we extract and use
-NO_DATA_VALUE = -9999
 
 
 def main():
@@ -929,7 +931,7 @@ def main():
                                  server_name=args.aster_ged_server_name,
                                  server_path=args.aster_ged_server_path,
                                  st_data_dir=st_data_dir,
-                                 no_data_value=NO_DATA_VALUE,
+                                 no_data_value=util.INTERMEDIATE_NO_DATA_VALUE,
                                  intermediate=args.intermediate)
     except Exception:
         logger.exception('Processing failed')

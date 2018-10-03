@@ -90,13 +90,13 @@ def extract_aster_data(url, filename, intermediate):
     logger.debug(lat_ds_name)
     logger.debug(lon_ds_name)
 
-    aster_b13_mean_data = emis_util.extract_raster_data(emis_mean_ds_name, 4)
-    aster_b14_mean_data = emis_util.extract_raster_data(emis_mean_ds_name, 5)
-    aster_b13_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 4)
-    aster_b14_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 5)
-    aster_ndvi_mean_data = emis_util.extract_raster_data(ndvi_mean_ds_name, 1)
-    aster_lat_data = emis_util.extract_raster_data(lat_ds_name, 1)
-    aster_lon_data = emis_util.extract_raster_data(lon_ds_name, 1)
+    aster_b13_mean_data = util.Dataset.extract_raster_data(emis_mean_ds_name, 4)
+    aster_b14_mean_data = util.Dataset.extract_raster_data(emis_mean_ds_name, 5)
+    aster_b13_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 4)
+    aster_b14_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 5)
+    aster_ndvi_mean_data = util.Dataset.extract_raster_data(ndvi_mean_ds_name,1)
+    aster_lat_data = util.Dataset.extract_raster_data(lat_ds_name, 1)
+    aster_lon_data = util.Dataset.extract_raster_data(lon_ds_name, 1)
 
     # Determine the minimum and maximum latitude and longitude
     x_min = aster_lon_data.min()
@@ -366,10 +366,6 @@ def build_ls_emis_data(server_name, server_path, st_data_dir,
                    intermediate=intermediate)
 
 
-# Specify the no data value we will be using, it also matches the
-# no_data_value for the ASTER data we extract and use
-NO_DATA_VALUE = -9999
-
 
 def main():
     """Extract ASTER GED tiles, pull out the bands that ST needs, and convert 
@@ -407,7 +403,7 @@ def main():
         build_ls_emis_data(server_name=args.aster_ged_server_name,
                            server_path=args.aster_ged_server_path,
                            st_data_dir=st_data_dir,
-                           no_data_value=NO_DATA_VALUE,
+                           no_data_value=util.INTERMEDIATE_NO_DATA_VALUE,
                            intermediate=args.intermediate)
     except Exception:
         logger.exception('Processing failed')

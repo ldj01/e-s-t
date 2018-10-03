@@ -35,7 +35,6 @@ PRESSURE_LAYERS = [1000, 975, 950, 925, 900, 875, 850, 825, 800,
                    400, 350, 300, 250, 200, 150, 100, 70, 50, 40,
                    30, 20, 10, 7, 5, 4, 3, 2, 1, 0.7, 0.5, 0.4, 0.3, 0.1]
 
-
 def retrieve_command_line_arguments():
     """Read arguments from the command line
 
@@ -158,12 +157,18 @@ def extract_from_netcdf(aux_set):
     f = nc4.Dataset(aux_set.nc4, 'r')
 
     # Find the index for the hour. 
-    hour_index = aux_set.hour / 3
+    # Datasets are indexed by [time][lev][lat][lon]
+    hour_increment = int(24 / f.variables[aux_set.parameter].shape[0])
+    hour_index = int(aux_set.hour / hour_increment)
 
-    # Don't print "--" for nodata locations.
-    np.ma.masked_print_option.set_display("9.999e+20")
-
+    pressure_layers = f.variables['lev'][:]
     for pressure_index, pressure_layer in enumerate(PRESSURE_LAYERS):
+
+        # Make sure the pressure layer that was read from the file matches
+        # the value we're expecting
+        if abs(pressure_layer - pressure_layers[pressure_index]) > 1.0e-06:
+                raise Exception('Unexpected pressure layer {0} found in file'.
+                        format(pressure_layers[pressure_index]))
 
         # Build the output file.
         output_filename = os.path.join(aux_set.output_dir, str(pressure_layer)
@@ -172,14 +177,11 @@ def extract_from_netcdf(aux_set):
         # Write the data for the pressure layer, time, and parameter. 
         latlon = f.variables[aux_set.parameter][hour_index, pressure_index]
 
-        with open(output_filename, 'w') as output_fd:
-
-            # Write the values
-            for lat in latlon:
-                for lon in lat:
-                    output_fd.write(str(lon) + '\n')
-        output_fd.close()
-
+        if type(latlon) is np.ndarray: # no missing values, not masked array
+            np.savetxt(output_filename, latlon, fmt='%s', delimiter='\n')
+        else: # masked array
+            np.savetxt(output_filename, latlon.filled(9.999e+20),
+                fmt='%s', delimiter='\n')
 
 def extract_merra_aux_data(espa_metadata, aux_path):
     """Extracts the required MERRA data from the auxiliary archive

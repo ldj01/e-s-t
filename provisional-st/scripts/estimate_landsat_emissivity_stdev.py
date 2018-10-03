@@ -43,6 +43,7 @@ from st_exceptions import NoTilesError, InaccessibleTileError, MissingBandError
 import st_utilities as util
 import emissivity_utilities as emis_util
 
+ASTER_EMISSIVITY_STDEV_SCALE_FACTOR = 0.0001
 
 ASTER_GED_NN_FORMAT = 'AG100.v003.{0:02}.{1:04}.0001'
 ASTER_GED_NP_FORMAT = 'AG100.v003.{0:02}.{1:03}.0001'
@@ -103,10 +104,10 @@ def extract_aster_data(url, filename, intermediate):
     logger.debug(lat_ds_name)
     logger.debug(lon_ds_name)
 
-    aster_b13_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 4)
-    aster_b14_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 5)
-    aster_lat_data = emis_util.extract_raster_data(lat_ds_name, 1)
-    aster_lon_data = emis_util.extract_raster_data(lon_ds_name, 1)
+    aster_b13_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 4)
+    aster_b14_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 5)
+    aster_lat_data = util.Dataset.extract_raster_data(lat_ds_name, 1)
+    aster_lon_data = util.Dataset.extract_raster_data(lon_ds_name, 1)
 
     # Determine the minimum and maximum latitude and longitude
     x_min = aster_lon_data.min()
@@ -163,14 +164,16 @@ def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
                                                  no_data_value)
 
     # Scale the data
-    aster_b13_stdev_data = aster_b13_stdev_data * 0.0001
+    aster_b13_stdev_data = aster_b13_stdev_data * \
+            ASTER_EMISSIVITY_STDEV_SCALE_FACTOR
 
     # Save the no data locations.
     aster_b14_stdev_no_data_locations = np.where(aster_b14_stdev_data ==
                                                  no_data_value)
 
     # Scale the data
-    aster_b14_stdev_data = aster_b14_stdev_data * 0.0001
+    aster_b14_stdev_data = aster_b14_stdev_data * \
+            ASTER_EMISSIVITY_STDEV_SCALE_FACTOR
 
     # Create the estimated Landsat EMIS stdev data.
     emis_stdev_data = np.sqrt((aster_b13_stdev_data**2
@@ -389,7 +392,7 @@ def extract_warped_data(ls_emis_stdev_warped_name, no_data_value, intermediate):
     """
 
     # Load the warped estimated Landsat EMIS stdev into memory
-    ls_emis_stdev_data = emis_util.extract_raster_data(
+    ls_emis_stdev_data = util.Dataset.extract_raster_data(
         ls_emis_stdev_warped_name, 1)
     ls_emis_stdev_no_data_locations \
         = np.where(ls_emis_stdev_data == no_data_value)
@@ -420,12 +423,14 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
     # XML metadata
     espa_metadata = Metadata(xml_filename)
-    espa_metadata.parse()
+    espa_xml = espa_metadata.parse()
+
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
 
     src_info = emis_util.retrieve_metadata_information(espa_metadata)
 
     # Determine output information
-    sensor_code = emis_util.get_satellite_sensor_code(xml_filename)
+    sensor_code = util.Landsat.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.toa.red.name)
     if dataset is None:
         raise MissingBandError('Missing TOA Red Band')
@@ -466,8 +471,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del ls_emis_stdev_no_data_locations
 
     # Write emissivity standard deviation data and metadata
-    ls_emis_stdev_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                          '_emis_stdev', '.img'])
+    ls_emis_stdev_img_filename = ''.join([product_id, '_emis_stdev', '.img'])
 
     emis_util.write_emissivity_product(samps=samps,
                                        lines=lines,
@@ -485,11 +489,6 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
     # Memory cleanup
     del ls_emis_stdev_data
-
-
-# Specify the no data value we will be using, it also matches the
-# no_data_value for the ASTER data we extract and use
-NO_DATA_VALUE = -9999
 
 
 def main():
@@ -529,7 +528,7 @@ def main():
                                  server_name=args.aster_ged_server_name,
                                  server_path=args.aster_ged_server_path,
                                  st_data_dir=st_data_dir,
-                                 no_data_value=NO_DATA_VALUE,
+                                 no_data_value=util.INTERMEDIATE_NO_DATA_VALUE,
                                  intermediate=args.intermediate)
     except Exception:
         logger.exception('Processing failed')

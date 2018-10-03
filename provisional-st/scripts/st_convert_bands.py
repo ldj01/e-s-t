@@ -28,7 +28,6 @@ from espa import Metadata
 
 SourceInfo = namedtuple('SourceInfo', ('proj4', 'filename'))
 
-NO_DATA_VALUE = -9999
 MAX_INT16 = 32767   # Maximum GDAL signed integer value 
 MIN_INT16 = -32768  # Minimum GDAL signed integer value 
 
@@ -82,27 +81,6 @@ ATMOSPHERIC_TRANSMITTANCE_RANGE_MIN = 0.0
 ATMOSPHERIC_TRANSMITTANCE_RANGE_MAX = 10000.0
 ATMOSPHERIC_TRANSMITTANCE_SOURCE_PRODUCT = 'st_intermediate'
 ATMOSPHERIC_TRANSMITTANCE_BAND_NAME = 'st_atmospheric_transmittance'
-
-
-def extract_raster_data(name, band_number):
-    """Extracts raster data for the specified dataset and band number
-
-    Args:
-        name <str>: Full path dataset name
-        band_number <int>: Band number for the raster to extract
-
-    Returns:
-        <raster>: 2D raster array data
-    """
-
-    dataset = gdal.Open(name)
-    if dataset is None:
-        raise RuntimeError('GDAL failed to open {0}'.format(name))
-
-    raster = (dataset.GetRasterBand(band_number)
-              .ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize))
-
-    return raster
 
 
 def retrieve_command_line_arguments():
@@ -282,11 +260,11 @@ def convert_band(espa_metadata, xml_filename, no_data_value, scale_factor,
     del dataset
 
     # Read band
-    data_array = extract_raster_data(src_info.filename, 1)
+    data_array = util.Dataset.extract_raster_data(src_info.filename, 1)
 
     # Build converted intermediate band filename
-    img_filename = ''.join([xml_filename.split('.xml')[0],
-                            '_' + band_name, '_converted.img'])
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
+    img_filename = ''.join([product_id, '_' + band_name, '_converted.img'])
 
     # Write updated intermediate product
     write_product(samps=samps,
@@ -428,7 +406,7 @@ def main():
 
         # Call the main processing routine
         convert_bands(xml_filename=args.xml_filename,
-                      no_data_value=NO_DATA_VALUE)
+                      no_data_value=util.INTERMEDIATE_NO_DATA_VALUE)
 
     except Exception:
         logger.exception('Processing failed')

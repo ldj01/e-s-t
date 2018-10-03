@@ -84,6 +84,7 @@ class BuildSTData(object):
         self.downwelled_name = ''
         self.emissivity_name = ''
         self.satellite = ''
+        self.product_id = ''
 
     def retrieve_metadata_information(self):
         '''
@@ -104,7 +105,7 @@ class BuildSTData(object):
         self.downwelled_name = ''
         self.emissivity_name = ''
 
-        # Find the TOA bands to extract information from
+        # Find the intermediate bands to extract information from
         for band in bands.band:
             if (band.product == 'st_intermediate' and
                     band.name == 'st_thermal_radiance'):
@@ -126,7 +127,7 @@ class BuildSTData(object):
                     band.name == 'emis'):
                 self.emissivity_name = band.get_file_name()
 
-        # Error if we didn't find the required TOA bands in the data
+        # Error if we didn't find the required bands in the data
         if len(self.thermal_name) <= 0:
             raise Exception('Failed to find the st_thermal_radiance band'
                             ' in the input data')
@@ -145,6 +146,7 @@ class BuildSTData(object):
 
         # Save for later
         self.satellite = global_metadata.satellite
+        self.product_id = global_metadata.product_id
 
         del bands
         del global_metadata
@@ -302,9 +304,8 @@ class BuildSTData(object):
         del radiance_emitted
         del no_data_locations
 
-        product_id = self.xml_filename.split('.xml')[0]
-        st_img_filename = ''.join([product_id, '_st', '.img'])
-        st_hdr_filename = ''.join([product_id, '_st', '.hdr'])
+        st_img_filename = ''.join([self.product_id, '_st', '.img'])
+        st_hdr_filename = ''.join([self.product_id, '_st', '.hdr'])
         st_aux_filename = ''.join([st_img_filename, '.aux', '.xml'])
 
         self.logger.info('Creating {0}'.format(st_img_filename))
@@ -329,7 +330,7 @@ class BuildSTData(object):
         # Add the estimated Surface Temperature product to the metadata
         espa_xml = metadata_api.parse(self.xml_filename, silence=True)
         bands = espa_xml.get_bands()
-        sensor_code = product_id[0:4]
+        sensor_code = self.product_id[0:4]
 
         # Find the TOA Band 1 to use for the specific band details
         base_band = None
