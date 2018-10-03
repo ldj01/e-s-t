@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-
 import os
 import glob
 import unittest
@@ -14,6 +12,7 @@ import logging
 sys.path.insert(0, '..')
 import build_st_data
 
+# Base class to be used for all ST test cases
 class TestST(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -62,9 +61,15 @@ class TestST(unittest.TestCase):
     def do_checks(self):
         for check_dir in self.check_dirs:
             dc = filecmp.dircmp(check_dir, os.path.basename(check_dir))
+            if (len(dc.diff_files) > 0 
+                or len(dc.funny_files) > 0 or len(dc.common_funny) > 0
+                or len(dc.left_only) > 0 or len(dc.right_only) > 0):
+                print dc.report()
             self.assertEqual(len(dc.diff_files), 0)
             self.assertEqual(len(dc.funny_files), 0)
             self.assertEqual(len(dc.common_funny), 0)
+            self.assertEqual(len(dc.left_only), 0)
+            self.assertEqual(len(dc.right_only), 0)
 
         for check_file in self.check_files:
             print "Comparing", check_file
