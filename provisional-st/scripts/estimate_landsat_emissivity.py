@@ -828,10 +828,9 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del ls_emis_bare
     del bare_locations
 
-    # Set fill values on granule edge to nan
-    # FIXME it seems like this should be handled better, perhaps set to no_data_value ?
+    # Set fill values on granule edge to no_data_value
     fill_locations = np.where(np.isnan(fv_L))
-    ls_emis_final[fill_locations] = np.nan
+    ls_emis_final[fill_locations] = no_data_value
 
     # Memory cleanup
     del fv_L
