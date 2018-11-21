@@ -76,7 +76,7 @@ def retrieve_command_line_arguments():
                                    help='Use ESPA processing ' +
                                    'configuration file')
 
-    espa_group_parser.add_argument('--no-espa',
+    espa_group_parser.add_argument('--no_espa',
                                    action='store_false', dest='espa',
                                    required=False,
                                    help='Do not use ESPA processing ' +
