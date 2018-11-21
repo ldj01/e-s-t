@@ -68,6 +68,16 @@ def retrieve_command_line_arguments():
                         required=False,
                         help='Number of MODTRAN processes to run at once')
 
+    parser.add_argument('--scale',
+                        action='store', dest='scale',
+                        required=False, default=util.DEFAULT_SCALE,
+                        help='The scale factor for ST products')
+
+    parser.add_argument('--offset',
+                        action='store', dest='offset',
+                        required=False, default=util.DEFAULT_OFFSET,
+                        help='The offset value for ST products')
+
     espa_group_parser = parser.add_mutually_exclusive_group(required=False)
 
     espa_group_parser.add_argument('--espa',
@@ -167,7 +177,7 @@ def determine_grid_points(xml_filename, data_path, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -192,7 +202,7 @@ def extract_auxiliary_narr_data(xml_filename, aux_path, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -217,7 +227,7 @@ def build_modtran_input(xml_filename, data_path, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -245,7 +255,7 @@ def generate_emissivity_products(xml_filename, server_name, server_path,
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -261,7 +271,7 @@ def generate_emissivity_products(xml_filename, server_name, server_path,
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -286,7 +296,7 @@ def run_modtran(modtran_data_path, process_count, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -309,7 +319,7 @@ def generate_distance_to_cloud(xml_filename, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -332,7 +342,7 @@ def generate_qa(xml_filename, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -355,7 +365,7 @@ def convert_intermediate_bands(xml_filename, debug):
 
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger = logging.getLogger(__name__)
             logger.info(output)
 
@@ -452,7 +462,7 @@ def main():
 
     logger.info('*** Begin ST Generate Products ***')
 
-    if (args.espa):
+    if args.espa:
         # Retrieve the processing configuration
         proc_cfg = retrieve_cfg(PROC_CFG_FILENAME)
 
@@ -486,8 +496,8 @@ def main():
         # Determine auxiliary (NARR or MERRA2) data locations
         aux_path_variable = '{0}_AUX_DIR'.format(args.reanalysis)
         if aux_path_variable not in os.environ:
-            raise Exception('[{0}] not found in environment'.
-                    format(aux_path_variable))
+            raise Exception('[{0}] not found in environment'
+                            .format(aux_path_variable))
         aux_path = os.environ.get(aux_path_variable)
 
         # Determine MODTRAN 'DATA' location
@@ -534,20 +544,20 @@ def main():
     cmd = ' '.join(cmd)
     output = ''
     try:
-        logger.info('Calling [{0}]'.format(cmd))
+        logger.info('Calling [%s]', cmd)
         output = util.System.execute_cmd(cmd)
     except Exception:
         logger.error('Failed creating atmospheric parameters and generating '
                      'intermediate data')
         raise
     finally:
-        if len(output) > 0:
+        if output: # Check if output is empty
             logger.info(output)
 
     # Generate Surface Temperature band
     try:
         current_processor = build_st_data.BuildSTData(
-            xml_filename=args.xml_filename)
+            args.xml_filename, args.scale, args.offset)
         current_processor.generate_data()
     except Exception:
         logger.error('Failed processing Surface Temperature')

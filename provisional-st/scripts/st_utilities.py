@@ -20,6 +20,9 @@ from cStringIO import StringIO
 import requests
 from osgeo import gdal, osr
 
+ST_NO_DATA_VALUE = 0
+DEFAULT_SCALE = 0.00341802
+DEFAULT_OFFSET = 149
 
 class Version(object):
     '''
@@ -80,25 +83,25 @@ class System(object):
 
         output = ''
 
-        logger.info('Executing [{0}]'.format(cmd))
+        logger.info('Executing [%s]', cmd)
         (status, output) = commands.getstatusoutput(cmd)
 
         if status < 0:
             message = 'Application terminated by signal [{0}]'.format(cmd)
-            if len(output) > 0:
+            if output: # Check if output is empty
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
 
         if status != 0:
             message = 'Application failed to execute [{0}]'.format(cmd)
-            if len(output) > 0:
+            if output: # Check if output is empty
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
 
         if os.WEXITSTATUS(status) != 0:
             message = ('Application [{0}] returned error code [{1}]'
                        .format(cmd, os.WEXITSTATUS(status)))
-            if len(output) > 0:
+            if output: # Check if output is empty
                 message = ' Stdout/Stderr is: '.join([message, output])
             raise Exception(message)
 
@@ -190,11 +193,11 @@ class NARR(object):
         # Round acquisition date to nearest minute.
         if acquisition.second >= 30:
             needed_seconds = datetime.timedelta(0, 60 - acquisition.second,
-                -acquisition.microsecond)
+                                                -acquisition.microsecond)
             rounded_acquisition = acquisition + needed_seconds
         else:
             extra_seconds = datetime.timedelta(0, acquisition.second,
-                acquisition.microsecond)
+                                               acquisition.microsecond)
             rounded_acquisition = acquisition - extra_seconds
 
         return (rounded_acquisition, time_0, time_1)
@@ -246,8 +249,8 @@ class Web(object):
                                   headers=headers)
 
                 if not req.ok:
-                    logger.error('HTTP - Transfer of [{0}] - FAILED'
-                                 .format(download_url))
+                    logger.error('HTTP - Transfer of [%s] - FAILED',
+                                 download_url)
                     # The raise_for_status gets caught by this try's except
                     # block
                     req.raise_for_status()
@@ -261,7 +264,7 @@ class Web(object):
                 logger.info('HTTP - Transfer Complete')
 
             except Exception as e:
-                logger.error('HTTP - Transfer Issue: ' + str(e))
+                logger.error('HTTP - Transfer Issue: %s', e)
 
                 if req is not None:
                     status_code = req.status_code
@@ -309,7 +312,7 @@ class Geo(object):
         """Translate map coordinates into image coordinates"""
 
         # Convert the transform from image->map to map->image
-        (success, inv_transform) = gdal.InvGeoTransform(transform)
+        (_, inv_transform) = gdal.InvGeoTransform(transform)
 
         image_x = (inv_transform[0] +
                    map_x * inv_transform[1] +
@@ -442,5 +445,5 @@ class Geo(object):
             logger.error('Failed to mosaic tiles')
             raise
         finally:
-            if len(output) > 0:
+            if output: # Check if output is empty
                 logger.info(output)

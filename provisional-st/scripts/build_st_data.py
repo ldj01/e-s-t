@@ -43,21 +43,22 @@ from espa import Metadata
 import st_utilities as util
 
 
-SCALE_FACTOR = 0.1
-MULT_FACTOR = 10.0
-
-
 class BuildSTData(object):
     '''
     Description:
         Defines the processor for generating the Surface Temperature product.
     '''
 
-    def __init__(self, xml_filename):
+    def __init__(self, xml_filename, scale, offset):
         super(BuildSTData, self).__init__()
 
         # Keep local copies of this
         self.xml_filename = xml_filename
+
+        # Define the scale, offset, and no data values
+        self.scale = scale
+        self.offset = offset
+        self.no_data_value = util.ST_NO_DATA_VALUE
 
         self.st_data_dir = ''
         # Grab the data directory from the environment
@@ -66,10 +67,6 @@ class BuildSTData(object):
                             ' not defined')
         else:
             self.st_data_dir = os.environ.get('ST_DATA_DIR')
-
-        # Specify the no data value we will be using, it also matches the
-        # no_data_value for the ASTER data we extract and use
-        self.no_data_value = -9999
 
         # Setup the logger to use
         self.logger = logging.getLogger(__name__)
@@ -144,7 +141,7 @@ class BuildSTData(object):
     def generate_data(self):
         '''
         Description:
-            Provides the main processing algorithm for building the Surface 
+            Provides the main processing algorithm for building the Surface
             Temperature product.  It produces the final ST product.
         '''
 
@@ -161,8 +158,8 @@ class BuildSTData(object):
         # Read the bands into memory
 
         # Landsat Radiance at sensor for thermal band
-        self.logger.info('Loading intermediate thermal band data [{0}]'
-                         .format(self.thermal_name))
+        self.logger.info('Loading intermediate thermal band data [%s]',
+                         self.thermal_name)
         dataset = gdal.Open(self.thermal_name)
         x_dim = dataset.RasterXSize  # They are all the same size
         y_dim = dataset.RasterYSize
@@ -170,14 +167,14 @@ class BuildSTData(object):
         thermal_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric transmittance
-        self.logger.info('Loading intermediate transmittance band data [{0}]'
-                         .format(self.transmittance_name))
+        self.logger.info('Loading intermediate transmittance band data [%s]',
+                         self.transmittance_name)
         dataset = gdal.Open(self.transmittance_name)
         trans_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
         # Atmospheric path radiance - upwelled radiance
-        self.logger.info('Loading intermediate upwelled band data [{0}]'
-                         .format(self.upwelled_name))
+        self.logger.info('Loading intermediate upwelled band data [%s]',
+                         self.upwelled_name)
         dataset = gdal.Open(self.upwelled_name)
         upwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim, y_dim)
 
@@ -203,15 +200,15 @@ class BuildSTData(object):
         del no_data_locations
 
         # Downwelling sky irradiance
-        self.logger.info('Loading intermediate downwelled band data [{0}]'
-                         .format(self.downwelled_name))
+        self.logger.info('Loading intermediate downwelled band data [%s]',
+                         self.downwelled_name)
         dataset = gdal.Open(self.downwelled_name)
         downwelled_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim,
                                                                y_dim)
 
         # Landsat emissivity estimated from ASTER GED data
-        self.logger.info('Loading intermediate emissivity band data [{0}]'
-                         .format(self.emissivity_name))
+        self.logger.info('Loading intermediate emissivity band data [%s]',
+                         self.emissivity_name)
         dataset = gdal.Open(self.emissivity_name)
         emissivity_data = dataset.GetRasterBand(1).ReadAsArray(0, 0, x_dim,
                                                                y_dim)
@@ -278,7 +275,7 @@ class BuildSTData(object):
         st_data = np.interp(radiance_emitted, bt_radiance_lut, bt_temp_lut)
 
         # Scale the result
-        st_data = st_data * MULT_FACTOR
+        st_data = (st_data - self.offset) / self.scale
 
         # Add the fill and scan gaps back into the results, since they may
         # have been lost
@@ -298,13 +295,13 @@ class BuildSTData(object):
         st_hdr_filename = ''.join([product_id, '_st', '.hdr'])
         st_aux_filename = ''.join([st_img_filename, '.aux', '.xml'])
 
-        self.logger.info('Creating {0}'.format(st_img_filename))
+        self.logger.info('Creating %s', st_img_filename)
         util.Geo.generate_raster_file(envi_driver, st_img_filename,
                                       st_data, x_dim, y_dim, ds_transform,
                                       ds_srs.ExportToWkt(), self.no_data_value,
-                                      gdal.GDT_Int16)
+                                      gdal.GDT_UInt16)
 
-        self.logger.info('Updating {0}'.format(st_hdr_filename))
+        self.logger.info('Updating %s', st_hdr_filename)
         util.Geo.update_envi_header(st_hdr_filename, self.no_data_value)
 
         # Memory cleanup
@@ -315,8 +312,7 @@ class BuildSTData(object):
         if os.path.exists(st_aux_filename):
             os.unlink(st_aux_filename)
 
-        self.logger.info('Adding {0} to {1}'.format(st_img_filename,
-                                                    self.xml_filename))
+        self.logger.info('Adding %s to %s', st_img_filename, self.xml_filename)
         # Add the estimated Surface Temperature product to the metadata
         metadata = Metadata(xml_filename=self.xml_filename)
 
@@ -340,9 +336,9 @@ class BuildSTData(object):
         st_band.set('source', 'toa_refl')
         st_band.set('name', 'surface_temperature')
         st_band.set('category', 'image')
-        st_band.set('data_type', 'INT16')
-        st_band.set('scale_factor', "%.6f" % SCALE_FACTOR)
-        st_band.set('add_offset', "%.6f" % 0.0)
+        st_band.set('data_type', 'UINT16')
+        st_band.set('scale_factor', "%.6f" % self.scale)
+        st_band.set('add_offset', "%.6f" % self.offset)
         st_band.set('nlines', str(int(base_band.get("nlines"))))
         st_band.set('nsamps', str(int(base_band.get("nsamps"))))
         st_band.set('fill_value', str(self.no_data_value))
@@ -402,6 +398,16 @@ def main():
                         required=False, default=None,
                         help='The XML metadata file to use')
 
+    parser.add_argument('--scale',
+                        action='store', dest='scale',
+                        required=False, default=util.DEFAULT_SCALE,
+                        help='The scale factor for ST products')
+
+    parser.add_argument('--offset',
+                        action='store', dest='offset',
+                        required=False, default=util.DEFAULT_OFFSET,
+                        help='The offset value for ST products')
+
     # Optional parameters
     parser.add_argument('--version',
                         action='version',
@@ -431,7 +437,7 @@ def main():
     logger = logging.getLogger(__name__)
 
     try:
-        build_st_data = BuildSTData(args.xml_filename)
+        build_st_data = BuildSTData(args.xml_filename, args.scale, args.offset)
 
         # Call the main processing routine
         build_st_data.generate_data()
