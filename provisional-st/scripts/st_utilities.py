@@ -23,6 +23,13 @@ from osgeo import gdal, osr
 ST_NO_DATA_VALUE = 0
 DEFAULT_SCALE = 0.00341802
 DEFAULT_OFFSET = 149
+INTERMEDIATE_NO_DATA_VALUE = -9999  # No Data Value for ST intermediate bands
+                                    # This must match the no_data_value used
+                                    # by the ASTER GED
+
+MAX_CLOUD_BIN = 200                 # Maximum cloud distance bin center value
+                                    # used to incorporate cloud distance into 
+                                    # ST uncertainty QA band
 
 class Version(object):
     '''
@@ -146,8 +153,8 @@ class System(object):
                 raise
 
 
-class NARR(object):
-    """Provides common NARR data related methods
+class REANALYSIS(object):
+    """Provides common REANALYSIS data related methods
     """
 
     @staticmethod
@@ -159,8 +166,8 @@ class NARR(object):
 
         Returns:
             acquisition <datetime>: Scene center date and time
-            time_0 <datetime>: NARR data datetime before scene center
-            time_1 <datetime>: NARR data datetime after scene center
+            time_0 <datetime>: REANALYSIS data datetime before scene center
+            time_1 <datetime>: REANALYSIS data datetime after scene center
         """
 
         center_time = str(espa_metadata.xml_object
@@ -430,7 +437,7 @@ class Geo(object):
 
         logger = logging.getLogger(__name__)
 
-        cmd = ['gdalwarp', '-wm', '2048', '-multi',
+        cmd = ['gdalwarp', '-wm', '2048', '-wo', 'NUM_THREADS=2',
                '-srcnodata', str(no_data_value),
                '-dstnodata', str(no_data_value)]
         cmd.extend(src_names)
@@ -447,3 +454,61 @@ class Geo(object):
         finally:
             if output: # Check if output is empty
                 logger.info(output)
+
+class Landsat(object):
+    '''
+    Description:
+        Provides methods related to Landsat
+    '''
+
+    @staticmethod
+    def get_satellite_sensor_code(xml_filename):
+        """Derives the satellite-sensor code from the XML filename
+
+        Args:
+            xml_filename <str>: Filename for the ESPA Metadata XML
+
+        Returns:
+            <str>: Satellite sensor code
+        """
+
+        collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
+
+        base_name = os.path.basename(xml_filename)
+
+        satellite_sensor_code = base_name[0:4]
+        if satellite_sensor_code in collection_prefixes:
+            return satellite_sensor_code
+
+        raise Exception('Satellite-Sensor code ({0}) not understood'
+                        .format(satellite_sensor_code))
+
+
+class Dataset(object):
+    '''
+    Description:
+        Provides methods related to datasets in general
+    '''
+
+    @staticmethod
+    def extract_raster_data(name, band_number):
+        """Extracts raster data for the specified dataset and band number
+
+        Args:
+            name <str>: Full path dataset name
+            band_number <int>: Band number for the raster to extract
+
+        Returns:
+            <raster>: 2D raster array data
+        """
+
+        dataset = gdal.Open(name)
+        if dataset is None:
+            raise RuntimeError('GDAL failed to open {0}'.format(name))
+
+        raster = (dataset.GetRasterBand(band_number)
+                  .ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize))
+
+        return raster
+
+

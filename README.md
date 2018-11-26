@@ -7,7 +7,8 @@ This project contains application source code for producing Surface Temperature 
 See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads/provisional/land_surface_temperature/provisional_st_README_v10.pdf) product guide (which is an unofficial and provisional version) for information about the Surface Temperature products.
 
 ## Release Notes
-* Converted build system from Makefiles to CMake.
+* Support global processing (within constraints of available inputs) by using
+  MERRA-2 reanalysis input 
 
 ## Installation
 
@@ -43,7 +44,7 @@ mkdir build && cd build
 cmake .. -DCMAKE_INSTALL_PREFIX:PATH=<installation_path>
 make
 make install
-make install-date # optional, install the provisional-st/static_data files
+make install-data # optional, install the provisional-st/static_data files
 make rit-aux      # optional, install the st_auxiliary_data scripts
 ```
 
@@ -53,8 +54,10 @@ See `surface_temperature.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
-* ST_AUX_DIR - Points to the local NARR data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+* NARR_AUX_DIR - Points to the local NARR data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
   - `export ST_AUX_DIR="/usr/local/auxiliaries/LST/NARR"`
+* MERRA2_AUX_DIR - Points to the local MERRA-2 data archive.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+  - `export ST_MERRA_AUX_DIR="/usr/local/auxiliaries/LST/MERRA2"`
 * ST_DATA_DIR - Points to the installed static file
   - `export ST_DATA_DIR="/usr/local/espa-surface-temperature/st/static_data"`
 * MODTRAN_PATH - Points to the installed MODTRAN location
@@ -80,6 +83,9 @@ The following input data are required to generate the Surface Temperature produc
   - ASTER GED data can be [found here](https://lpdaac.usgs.gov/data_access/data_pool).  External users will need to set up an alternate ASTER GED data retrieval method.  One potential method is to create a NASA Earthdata account as [described here] (http://e4ftl01.cr.usgs.gov/ASTT), and update the automated ST procedure to supply the login information before accessing the ASTER GED data.
 * North American Regional Reanalysis (NARR)
   - For NARR data, it would be best to use the `st_auxiliary_data` software provided in this project to download and build your own archive for the dates you require.  This software archives a reduced set of parameters from each source file, only using the parameters required for ST generation.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
+* Modern-Era Retrospective analysis for Research and Applications, Version 2 
+  (MERRA-2)
+  - For MERRA-2 data, it would be best to use the `st_auxiliary_data` software provided in this project to download and build your own archive for the dates you require.  This software archives a reduced set of parameters from each source file, only using the parameters required for ST generation.  See [ST Auxiliary Data](st_auxiliary_data/README.md).
 
 ### Data Postprocessing
 After compiling the [espa-product-formatter](https://github.com/USGS-EROS/espa-product-formatter) libraries and tools, the `convert_espa_to_gtif` and `convert_espa_to_hdf` command-line tools can be used to convert the ESPA internal file format to HDF or GeoTIFF.  Otherwise the data will remain in the ESPA internal file format, which includes each band in the ENVI file format (i.e. raw binary file with associated ENVI header file) and an overall XML metadata file.

@@ -36,6 +36,8 @@ from espa import Metadata
 SourceInfo = namedtuple('SourceInfo', ('proj4', 'filename'))
 ThermalConstantInfo = namedtuple('ThermalInfo', ('k1', 'k2'))
 
+# send floating-point error messages to stdout for capture in log
+np.seterr(all='print')
 
 def convert_radiance_to_temperature(radiance, k1, k2):
     """Calculates radiance image given temperature image using the inverse 
@@ -272,47 +274,67 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     # for each bin, but we also want anything outside the entire range to be
     # equal to the nearest value from the unknown matrix.
     tau_interp = np.array([0.0, 0.425, 0.625, 0.775, 0.925, 1.0])
-    cld_interp = np.array([0, 0.5, 3.0, 7.5, 25.0, 82.5, 200.0])
+    cld_interp = np.array([0, 0.5, 3.0, 7.5, 25.0, 82.5, util.MAX_CLOUD_BIN])
+    tau_interp_length = len(tau_interp)
+    cld_interp_length = len(cld_interp)
 
     # Define the highest values in the vectors. These are the last values.
     tau_highest = tau_interp[-1]
     cld_highest = cld_interp[-1]
 
     # From input transmission values, find closest indices from tau_interp
-    # vector, calculate step in vector, then calculate fractional tau index.
+    # vector.
     tau_close_index = np.searchsorted(tau_interp, flat_transmission_values,
                                       side='right')
     tau_close_index = tau_close_index - 1
+
+    # Add a bin to handle values that are outside the range.
+    tau_interp = np.append(tau_interp, tau_highest)
+
+    # Calculate step in vector.
     tau_step = tau_interp[tau_close_index + 1] - tau_interp[tau_close_index]
-    tau_frac_index = tau_close_index + ((flat_transmission_values
+
+    # Calculate fractional tau index.  Values outside the range will result
+    # in a divide by zero (since tau_highest is replicated in the last bin),
+    # but will be reset by high_locations.
+    with np.errstate(divide='ignore'):
+        tau_frac_index = tau_close_index + ((flat_transmission_values
                                          - tau_interp[tau_close_index])
                                         / tau_step)
-    one_locations = np.where(tau_frac_index == tau_highest)
-    tau_frac_index[one_locations] = len(tau_interp) - 1
+    high_locations = np.where(flat_transmission_values >= tau_highest)
+    tau_frac_index[high_locations] = tau_interp_length - 1
 
     # Memory cleanup
     del tau_interp
     del tau_close_index
     del tau_step
-    del one_locations
+    del high_locations
 
     # From input cloud distance values, find closest indices from cld_interp
-    # vector, calculate step in vector, then calculate fractional cloud index.
+    # vector.
     cld_close_index = np.searchsorted(cld_interp, flat_cloud_distances,
                                       side='right')
     cld_close_index = cld_close_index - 1
+
+    # Add a bin to handle values that are outside the range.
+    cld_interp = np.append(cld_interp, cld_highest)
+
+    # Calculate step in vector.
     cld_step = cld_interp[cld_close_index + 1] - cld_interp[cld_close_index]
-    cld_frac_index = cld_close_index + ((flat_cloud_distances
+
+    # Calculate fractional cloud index.
+    with np.errstate(divide='ignore'):
+        cld_frac_index = cld_close_index + ((flat_cloud_distances
                                          - cld_interp[cld_close_index])
-                                        / cld_step)
-    two_hundred_locations = np.where(cld_frac_index == cld_highest)
-    cld_frac_index[two_hundred_locations] = len(cld_interp) - 1
+                                         / cld_step)
+    high_locations = np.where(flat_cloud_distances >= cld_highest)
+    cld_frac_index[high_locations] = cld_interp_length - 1
 
     # Memory cleanup
     del cld_interp
     del cld_close_index
     del cld_step
-    del two_hundred_locations
+    del high_locations
 
     # Merge the arrays so they represent coordinates in the unknown_error_matrix
     # grid to map_coordinates.
@@ -331,27 +353,6 @@ def get_unknown_uncertainty(cloud_distances, transmission_values):
     del coordinates
 
     return unknown_uncertainty
-
-
-def extract_raster_data(name, band_number):
-    """Extracts raster data for the specified dataset and band number
-
-    Args:
-        name <str>: Full path dataset name
-        band_number <int>: Band number for the raster to extract
-
-    Returns:
-        <raster>: 2D raster array data
-    """
-
-    dataset = gdal.Open(name)
-    if dataset is None:
-        raise RuntimeError('GDAL failed to open {0}'.format(name))
-
-    raster = (dataset.GetRasterBand(band_number)
-              .ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize))
-
-    return raster
 
 
 def retrieve_command_line_arguments():
@@ -410,8 +411,8 @@ def retrieve_metadata_information(espa_metadata, band_name):
 
     # Error if we didn't find the required intermediate band in the data
     if intermediate_filename is None:
-        raise MissingBandError('Failed to find the intermediate band'
-                               ' in the input data')
+        raise MissingBandError('Failed to find the intermediate band {0}'
+                               ' in the input data'.format(band_name))
 
     return SourceInfo(proj4=proj4, filename=intermediate_filename)
 
@@ -484,13 +485,13 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # tau = transmission
     # Lu = upwelled radiance
     # Ld = downwelled radiance
-    Lobs_array = extract_raster_data(radiance_filename, 1)
-    tau_array = extract_raster_data(transmission_filename, 1)
-    Lu_array = extract_raster_data(upwelled_filename, 1)
-    Ld_array = extract_raster_data(downwelled_filename, 1)
-    emis_array = extract_raster_data(emis_filename, 1)
-    emis_stdev_array = extract_raster_data(emis_stdev_filename, 1)
-    distance_array = extract_raster_data(distance_filename, 1)
+    Lobs_array = util.Dataset.extract_raster_data(radiance_filename, 1)
+    tau_array = util.Dataset.extract_raster_data(transmission_filename, 1)
+    Lu_array = util.Dataset.extract_raster_data(upwelled_filename, 1)
+    Ld_array = util.Dataset.extract_raster_data(downwelled_filename, 1)
+    emis_array = util.Dataset.extract_raster_data(emis_filename, 1)
+    emis_stdev_array = util.Dataset.extract_raster_data(emis_stdev_filename, 1)
+    distance_array = util.Dataset.extract_raster_data(distance_filename, 1)
 
     # Find fill locations.  We don't need to do this for transmission,
     # upwelled radiance, or downwelled radiance since these are created
@@ -624,7 +625,11 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
 
     # Create temperature image that will be used as nominal values around which
     # the uncertainty values will operate
-    LST_Image = convert_radiance_to_temperature(Le_Image, k1, k2) 
+    # No-data values will cause an "invalid value" floating point error when
+    # converting radiance to/from temperature, so suppress them (the no-data
+    # values at fill_locations in the final result are masked out at the end)
+    with np.errstate(invalid='ignore'):
+        LST_Image = convert_radiance_to_temperature(Le_Image, k1, k2)
 
     # Find the deltas around the nominal values
     LST_Minus_Delta = LST_Image - Delta_Temps
@@ -635,8 +640,11 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del Delta_Temps
 
     # Convert from temperature (K) to radiance
-    S_U_Radiance_High = convert_temperature_to_radiance(LST_Plus_Delta, k1, k2)
-    S_U_Radiance_Low = convert_temperature_to_radiance(LST_Minus_Delta, k1, k2)
+    with np.errstate(invalid='ignore'):
+        S_U_Radiance_High = convert_temperature_to_radiance(LST_Plus_Delta,
+                k1, k2)
+        S_U_Radiance_Low = convert_temperature_to_radiance(LST_Minus_Delta,
+                k1, k2)
 
     # Memory Cleanup
     del LST_Minus_Delta
@@ -663,7 +671,8 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     # Again the st_uncertainty values are residuals about some nominal radiance
     # values, so we must convert to residual temperature about some nominal 
     # reference radiance, which we get from the original radiance image
-    Delta_Radiance = st_uncertainty_radiance / 2.0
+    # Multiply instead of dividing by 2.0 to avoid underflow FloatingPointError
+    Delta_Radiance = st_uncertainty_radiance * 0.5
 
     # Find the deltas around the nominal values
     Radiance_Minus_Delta = Le_Image - Delta_Radiance
@@ -674,10 +683,11 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
     del Delta_Radiance 
 
     # Convert from radiance to temperature (K)
-    Temp_uncertainty_High = convert_radiance_to_temperature(Radiance_Plus_Delta,
-                                                            k1, k2)
-    Temp_uncertainty_Low = convert_radiance_to_temperature(Radiance_Minus_Delta,
-                                                           k1, k2)
+    with np.errstate(invalid='ignore'):
+        Temp_uncertainty_High = convert_radiance_to_temperature(
+                Radiance_Plus_Delta, k1, k2)
+        Temp_uncertainty_Low = convert_radiance_to_temperature(
+                Radiance_Minus_Delta, k1, k2)
 
     # Memory Cleanup
     del Radiance_Plus_Delta 
@@ -685,6 +695,7 @@ def calculate_qa(radiance_filename, transmission_filename, upwelled_filename,
 
     # The total uncertainty is the difference between the high and low values
     Temp_Uncertainty = Temp_uncertainty_High - Temp_uncertainty_Low
+    Temp_Uncertainty[~np.isfinite(Temp_Uncertainty)] = 0
     Temp_Uncertainty[Temp_Uncertainty > 100.0] = 0
 
     # Memory Cleanup
@@ -862,7 +873,7 @@ def generate_qa(xml_filename, no_data_value):
     thermal_info = retrieve_thermal_constants(espa_metadata, satellite)
 
     # Determine output information.  Make it like the emissivity band
-    sensor_code = get_satellite_sensor_code(xml_filename)
+    sensor_code = util.Landsat.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(emis_src_info.filename)
     output_srs = osr.SpatialReference()
     output_srs.ImportFromWkt(dataset.GetProjection())
@@ -872,8 +883,8 @@ def generate_qa(xml_filename, no_data_value):
     del dataset
 
     # Build cloud distance filename
-    distance_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                     '_st_cloud_distance', '.img'])
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
+    distance_img_filename = ''.join([product_id, '_st_cloud_distance', '.img'])
 
     # Build QA information in memory
     qa = calculate_qa(radiance_src_info.filename,
@@ -889,8 +900,7 @@ def generate_qa(xml_filename, no_data_value):
                       no_data_value)
 
     # Build QA filename
-    qa_img_filename = ''.join([xml_filename.split('.xml')[0],
-                               '_st_uncertainty', '.img'])
+    qa_img_filename = ''.join([product_id, '_st_uncertainty', '.img'])
 
     # Write QA product
     write_qa_product(samps=samps,
@@ -907,34 +917,9 @@ def generate_qa(xml_filename, no_data_value):
                        no_data_value=no_data_value)
 
 
-def get_satellite_sensor_code(xml_filename):
-    """Derives the satellite-sensor code from the XML filename
-
-    Args:
-        xml_filename <str>: Filename for the ESPA Metadata XML
-
-    Returns:
-        <str>: Satellite sensor code
-    """
-
-    collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
-
-    base_name = os.path.basename(xml_filename)
-
-    satellite_sensor_code = base_name[0:4]
-    if satellite_sensor_code in collection_prefixes:
-        return satellite_sensor_code
-
-    raise Exception('Satellite-Sensor code ({0}) not understood'
-                    .format(satellite_sensor_code))
-
-
-
-# Specify the no data, scale factor, and multiplication factor.
-NO_DATA_VALUE = -9999
+# Specify the scale factor and multiplication factor.
 SCALE_FACTOR = 0.01
 MULT_FACTOR = 100.0
-
 
 def main():
     """Main processing for building the surface temperature QA band
@@ -966,7 +951,7 @@ def main():
 
         # Call the main processing routine
         generate_qa(xml_filename=args.xml_filename,
-                    no_data_value=NO_DATA_VALUE)
+                    no_data_value=util.INTERMEDIATE_NO_DATA_VALUE)
 
     except Exception:
         logger.exception('Processing failed')

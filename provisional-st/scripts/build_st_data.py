@@ -59,6 +59,7 @@ class BuildSTData(object):
         self.scale = scale
         self.offset = offset
         self.no_data_value = util.ST_NO_DATA_VALUE
+        self.i_no_data_value = util.INTERMEDIATE_NO_DATA_VALUE
 
         self.st_data_dir = ''
         # Grab the data directory from the environment
@@ -78,6 +79,7 @@ class BuildSTData(object):
         self.downwelled_name = ''
         self.emissivity_name = ''
         self.satellite = ''
+        self.product_id = ''
 
     def retrieve_metadata_information(self):
         '''
@@ -94,7 +96,7 @@ class BuildSTData(object):
         self.downwelled_name = ''
         self.emissivity_name = ''
 
-        # Find the TOA bands to extract information from
+        # Find the intermediate bands to extract information from
         for band in metadata.xml_object.bands.band:
             if (band.get("product") == 'st_intermediate' and
                     band.get("name") == 'st_thermal_radiance'):
@@ -116,7 +118,7 @@ class BuildSTData(object):
                     band.get("name") == 'emis'):
                 self.emissivity_name = str(band.file_name)
 
-        # Error if we didn't find the required TOA bands in the data
+        # Error if we didn't find the required bands in the data
         if len(self.thermal_name) <= 0:
             raise Exception('Failed to find the st_thermal_radiance band'
                             ' in the input data')
@@ -135,6 +137,7 @@ class BuildSTData(object):
 
         # Save for later
         self.satellite = metadata.xml_object.global_metadata.satellite
+        self.product_id = metadata.xml_object.global_metadata.product_id.text
 
         del metadata
 
@@ -184,14 +187,14 @@ class BuildSTData(object):
             surface_radiance = (thermal_data - upwelled_data) / trans_data
 
         # Fix the no data locations
-        no_data_locations = np.where(thermal_data == self.no_data_value)
-        surface_radiance[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(thermal_data == self.i_no_data_value)
+        surface_radiance[no_data_locations] = self.i_no_data_value
 
-        no_data_locations = np.where(trans_data == self.no_data_value)
-        surface_radiance[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(trans_data == self.i_no_data_value)
+        surface_radiance[no_data_locations] = self.i_no_data_value
 
-        no_data_locations = np.where(upwelled_data == self.no_data_value)
-        surface_radiance[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(upwelled_data == self.i_no_data_value)
+        surface_radiance[no_data_locations] = self.i_no_data_value
 
         # Memory cleanup
         del thermal_data
@@ -232,14 +235,14 @@ class BuildSTData(object):
             radiance_emitted = radiance / emissivity_data
 
         # Fix the no data locations
-        no_data_locations = np.where(surface_radiance == self.no_data_value)
-        radiance_emitted[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(surface_radiance == self.i_no_data_value)
+        radiance_emitted[no_data_locations] = self.i_no_data_value
 
-        no_data_locations = np.where(downwelled_data == self.no_data_value)
-        radiance_emitted[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(downwelled_data == self.i_no_data_value)
+        radiance_emitted[no_data_locations] = self.i_no_data_value
 
-        no_data_locations = np.where(emissivity_data == self.no_data_value)
-        radiance_emitted[no_data_locations] = self.no_data_value
+        no_data_locations = np.where(emissivity_data == self.i_no_data_value)
+        radiance_emitted[no_data_locations] = self.i_no_data_value
 
         # Memory cleanup
         del downwelled_data
@@ -283,16 +286,15 @@ class BuildSTData(object):
                          ' Temperature results')
 
         # Fix the no data locations
-        no_data_locations = np.where(radiance_emitted == self.no_data_value)
+        no_data_locations = np.where(radiance_emitted == self.i_no_data_value)
         st_data[no_data_locations] = self.no_data_value
 
         # Memory cleanup
         del radiance_emitted
         del no_data_locations
 
-        product_id = self.xml_filename.split('.xml')[0]
-        st_img_filename = ''.join([product_id, '_st', '.img'])
-        st_hdr_filename = ''.join([product_id, '_st', '.hdr'])
+        st_img_filename = ''.join([self.product_id, '_st', '.img'])
+        st_hdr_filename = ''.join([self.product_id, '_st', '.hdr'])
         st_aux_filename = ''.join([st_img_filename, '.aux', '.xml'])
 
         self.logger.info('Creating %s', st_img_filename)
@@ -344,7 +346,7 @@ class BuildSTData(object):
         st_band.set('fill_value', str(self.no_data_value))
 
         # Add elements to the band object
-        st_band.short_name = em.element('{0}ST'.format(product_id[0:4]))
+        st_band.short_name = em.element('{0}ST'.format(self.product_id[0:4]))
         st_band.long_name = em.element('Surface Temperature')
         st_band.file_name = em.element(str(st_img_filename))
 

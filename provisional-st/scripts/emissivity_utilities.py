@@ -50,27 +50,6 @@ ASTER_GED_LAT_FORMAT='{0: 03d}'
 # Format longitude as optional negative sign plus 3 digits (0-padded)
 ASTER_GED_LON_FORMAT='{0: 04d}'
 
-def extract_raster_data(name, band_number):
-    """Extracts raster data for the specified dataset and band number
-
-    Args:
-        name <str>: Full path dataset name
-        band_number <int>: Band number for the raster to extract
-
-    Returns:
-        <raster>: 2D raster array data
-    """
-
-    dataset = gdal.Open(name)
-    if dataset is None:
-        raise RuntimeError('GDAL failed to open {0}'.format(name))
-
-    raster = (dataset.GetRasterBand(band_number)
-              .ReadAsArray(0, 0, dataset.RasterXSize, dataset.RasterYSize))
-
-    return raster
-
-
 def data_resolution_and_size(name, x_min, x_max, y_min, y_max):
     """Calculates dataset resolution and retrieves size information
 
@@ -100,7 +79,7 @@ def data_resolution_and_size(name, x_min, x_max, y_min, y_max):
 XYInfo = namedtuple('XYInfo',
                     ('x', 'y'))
 BandInfo = namedtuple('BandInfo',
-                      ('name', 'scale_factor', 'pixel_size'))
+                      ('name', 'scale_factor', 'add_offset', 'pixel_size'))
 ToaInfo = namedtuple('ToaInfo',
                      ('green', 'red', 'nir', 'swir1', 'bt'))
 ExtentInfo = namedtuple('ExtentInfo',
@@ -125,6 +104,7 @@ def get_band_info(band):
 
     return BandInfo(name=str(band.file_name),
                     scale_factor=float(band.get('scale_factor')),
+                    add_offset=float(band.get('add_offset')),
                     pixel_size=XYInfo(x=float(band.pixel_size.get('x')),
                                       y=float(band.pixel_size.get('y'))))
 
@@ -263,6 +243,52 @@ def retrieve_metadata_information(espa_metadata):
                                   bt=bi_bt))
 
 
+def get_aster_ged_tiles_for_src(st_data_dir, src_info, antimeridian_crossing):
+    """Gets the names of ASTER GED tiles for the region of the source image
+
+    Args:
+        st_data_dir <str>: Location of the ST data file
+        src_info <SourceInfo>: Information about the source data
+        antimeridian_crossing <boolean>: Flag for scene crossing 180 meridian
+
+    Returns:
+        Yields (filename): ASTER GED tile filename
+    """
+    # Read the ASTER GED tile list
+    ged_tile_file = 'aster_ged_tile_list.txt'
+    with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file:
+        tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file]
+
+    # Get the length of names in the tile list
+    tilename_end = len(tiles[0]) - 1
+
+    filename_format = get_aster_ged_filename_format()
+
+    if antimeridian_crossing:
+        lon_range = range(int(src_info.bound.west), 180) + \
+                    range(int(src_info.bound.east), -181, -1)
+    else:
+        lon_range = xrange(int(src_info.bound.west),
+                           int(src_info.bound.east)+1)
+
+    for (lat, lon) in [(lat, lon)
+                       for lat in xrange(int(src_info.bound.south),
+                                         int(src_info.bound.north)+1)
+                       for lon in lon_range]:
+
+        # Build the base filename using the correct format
+        filename = filename_format.format(
+            ASTER_GED_LAT_FORMAT.format(lat).strip(),
+            ASTER_GED_LON_FORMAT.format(lon).strip())
+
+        # Skip the tile if it isn't in the ASTER GED tile list
+        # (ignore filename extension)
+        if filename[:tilename_end] not in tiles:
+            logger.info('Skipping tile {} not in ASTER GED'.format(filename))
+            continue
+
+        yield(filename)
+
 def locate_aster_ged_tile(url, filename):
     """Locate the specified tile, either on disk or download if needed
 
@@ -333,7 +359,7 @@ def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
 
     logger = logging.getLogger(__name__)
 
-    cmd = ['gdalwarp', '-wm', '2048', '-multi',
+    cmd = ['gdalwarp', '-wm', '2048', '-wo', 'NUM_THREADS=2',
            '-tr', str(target_info.toa.bt.pixel_size.x),
            str(target_info.toa.bt.pixel_size.y),
            '-s_srs', ''.join(["'", src_proj4, "'"]),
@@ -359,6 +385,88 @@ def warp_raster(target_info, src_proj4, no_data_value, src_name, dest_name):
     finally:
         if len(output) > 0:
             logger.info(output)
+
+
+def shift_longitude(tile_name, shifted_tile_name, offset):
+    """Shift the longitude of the tile data and put the results in the 
+       requested output file
+
+    Args:
+        tile_name <str>: Filename of tile to shift 
+        shifted_tile_name <str>: Filename of output tile to place results 
+        offset <int>: Number of degrees to add to the longitude 
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # Set up the base command
+    cmd = ['gdal_translate', '-a_ullr']
+
+    # Get the current locations
+    tile_src = gdal.Open(tile_name)
+    ulx, xres, xskew, uly, yskew, yres = tile_src.GetGeoTransform()
+
+    # Compute the adjusted longitude locations
+    lrx = ulx + (tile_src.RasterXSize * xres)
+    lry = uly + (tile_src.RasterYSize * yres)
+    new_ulx = ulx + offset
+    new_lrx = lrx + offset
+
+    # Close the dataset
+    tile_src = None
+
+    # Add updated coordinates to the command
+    cmd.extend([str(new_ulx), str(uly), str(new_lrx), str(lry)])
+
+    # Add source and destination files to the command
+    cmd.extend([tile_name, shifted_tile_name])
+
+    # Convert to a string for the execution
+    cmd = ' '.join(cmd)
+
+    output = ''
+    try:
+        logger.info('Executing [{0}]'.format(cmd))
+        output = util.System.execute_cmd(cmd)
+    finally:
+        if len(output) > 0:
+            logger.info(output)
+
+
+# Shift tile longitudes
+def shift_tiles(tiles):
+    """Shift the longitude of the tiles that need it to ensure they are in
+       the 0..360 range.  This is intended to be used in antimeridian crossing
+       cases.  Making the longitude range contiguous enables mosaicking using
+       GDAL tools.
+
+    Args:
+        tiles <list(<str>)>: List of tiles to shift 
+    """
+
+    logger = logging.getLogger(__name__)
+
+    for tile in tiles:
+        longitude = int(tile.split(".")[3])
+
+        # Only shift the longitude of the tiles with negative longitude
+        if longitude < 0:
+
+            # Name the shifted output file
+            shifted_tile = tile + '_shifted'
+
+            # Shift the longitude values
+            shift_longitude(tile, shifted_tile, 360)
+
+            # Move destination file back to source file
+            output = ''
+            try:
+                cmd = 'mv {0} {1}'.format(shifted_tile, tile)
+                logger.info('Executing [{0}]'.format(cmd))
+                output = util.System.execute_cmd(cmd)
+            finally:
+                if len(output) > 0:
+                    logger.info(output)
 
 
 def write_emissivity_product(samps, lines, transform, wkt, no_data_value,
@@ -399,7 +507,7 @@ def write_emissivity_product(samps, lines, transform, wkt, no_data_value,
     util.Geo.update_envi_header(hdr_filename, no_data_value)
 
     # Remove the *.aux.xml file generated by GDAL
-    aux_filename = filename.replace('.img', '.aux.xml')
+    aux_filename = filename.replace('.img', '.img.aux.xml')
     if os.path.exists(aux_filename):
         os.unlink(aux_filename)
 
@@ -559,28 +667,6 @@ def retrieve_command_line_arguments():
     __aster_ged_filename_format = args.aster_ged_filename_format
 
     return args
-
-
-def get_satellite_sensor_code(xml_filename):
-    """Derives the satellite-sensor code from the XML filename
-
-    Args:
-        xml_filename <str>: Filename for the ESPA Metadata XML
-
-    Returns:
-        <str>: Satellite sensor code
-    """
-
-    collection_prefixes = ['LT04', 'LT05', 'LE07', 'LT08', 'LC08', 'LO08']
-
-    base_name = os.path.basename(xml_filename)
-
-    satellite_sensor_code = base_name[0:4]
-    if satellite_sensor_code in collection_prefixes:
-        return satellite_sensor_code
-
-    raise Exception('Satellite-Sensor code ({0}) not understood'
-                    .format(satellite_sensor_code))
 
 
 def get_env_var(variable, default):

@@ -164,6 +164,10 @@ def process_point_dir((point_path, modtran_data_path)):
     current_directory = os.getcwd()
 
     # Get the real paths to simplify the logic a bit
+    if not os.path.isdir(point_path):
+        message = 'Point directory {0} does not exist'.format(point_path)
+        raise Exception(message)
+
     r_paths = [os.path.realpath(path)
                for path in glob.glob(os.path.join(point_path, '*', '*', '*'))]
 
@@ -186,7 +190,7 @@ def process_point_dir((point_path, modtran_data_path)):
 
             finally:
                 if len(output) > 0:
-                    logger.info(output)
+                    logger.debug(output)
 
             if not os.path.isfile(TAPE6):
                 raise ModtranProcessingError('Missing MODTRAN output file'
@@ -237,8 +241,8 @@ def main():
     # Cut down to just the ones we need to run MODTRAN on
     point_parms = [('{0:03}_{1:03}_{2:03}_{3:03}'.format(point.row,
                                                          point.col,
-                                                         point.narr_row,
-                                                         point.narr_col),
+                                                         point.reanalysis_row,
+                                                         point.reanalysis_col),
                     args.modtran_data_path)
                    for point in grid_points if point.run_modtran]
 

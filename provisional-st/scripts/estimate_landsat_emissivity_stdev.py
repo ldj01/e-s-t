@@ -27,6 +27,7 @@
 
 import os
 import sys
+import math
 import logging
 
 
@@ -35,13 +36,14 @@ from osgeo import gdal, osr
 
 
 from espa import Metadata
-from st_exceptions import NoTilesError, InaccessibleTileError
+from st_exceptions import NoTilesError, InaccessibleTileError, MissingBandError
 
 
 # Import local modules
 import st_utilities as util
 import emissivity_utilities as emis_util
 
+ASTER_EMISSIVITY_STDEV_SCALE_FACTOR = 0.0001
 
 def extract_aster_data(url, filename, intermediate):
     """Extracts the internal band(s) data for later processing
@@ -95,10 +97,10 @@ def extract_aster_data(url, filename, intermediate):
     logger.debug(lat_ds_name)
     logger.debug(lon_ds_name)
 
-    aster_b13_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 4)
-    aster_b14_sdev_data = emis_util.extract_raster_data(emis_sdev_ds_name, 5)
-    aster_lat_data = emis_util.extract_raster_data(lat_ds_name, 1)
-    aster_lon_data = emis_util.extract_raster_data(lon_ds_name, 1)
+    aster_b13_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 4)
+    aster_b14_sdev_data = util.Dataset.extract_raster_data(emis_sdev_ds_name, 5)
+    aster_lat_data = util.Dataset.extract_raster_data(lat_ds_name, 1)
+    aster_lon_data = util.Dataset.extract_raster_data(lon_ds_name, 1)
 
     # Determine the minimum and maximum latitude and longitude
     x_min = aster_lon_data.min()
@@ -155,14 +157,16 @@ def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
                                                  no_data_value)
 
     # Scale the data
-    aster_b13_stdev_data = aster_b13_stdev_data * 0.0001
+    aster_b13_stdev_data = aster_b13_stdev_data * \
+            ASTER_EMISSIVITY_STDEV_SCALE_FACTOR
 
     # Save the no data locations.
     aster_b14_stdev_no_data_locations = np.where(aster_b14_stdev_data ==
                                                  no_data_value)
 
     # Scale the data
-    aster_b14_stdev_data = aster_b14_stdev_data * 0.0001
+    aster_b14_stdev_data = aster_b14_stdev_data * \
+            ASTER_EMISSIVITY_STDEV_SCALE_FACTOR
 
     # Create the estimated Landsat EMIS stdev data.
     emis_stdev_data = np.sqrt((aster_b13_stdev_data**2
@@ -190,7 +194,7 @@ def generate_emis_stdev_tile(tile_name, aster_b13_stdev_data,
 
 
 def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
-                   intermediate):
+                   intermediate, antimeridian_crossing):
     """Generate tiles for emissivity standard deviation from ASTER data
 
     Args:
@@ -200,6 +204,7 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
         wkt <str>: Well-Known-Text describing the projection
         no_data_value <float>: Value to use for fill
         intermediate <bool>: Keep any intermediate products generated
+        antimeridian_crossing <boolean>: Flag for scene crossing 180 meridian
 
     Returns:
         list(<str>): Standard deviation emissivity tile names
@@ -216,35 +221,14 @@ def generate_tiles(src_info, st_data_dir, url, wkt, no_data_value,
 
     logger = logging.getLogger(__name__)
 
-    # Read the ASTER GED tile list, stripping off filename extension
-    ged_tile_file = 'aster_ged_tile_list.txt'
-    with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file:
-        tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file]
-
-    # Get the length of names in the tile list
-    tilename_end = len(tiles[0]) - 1
-
     ls_emis_stdev_filenames = list()
-    filename_format = emis_util.get_aster_ged_filename_format()
-    for (lat, lon) in [(lat, lon)
-                       for lat in xrange(int(src_info.bound.south),
-                                         int(src_info.bound.north)+1)
-                       for lon in xrange(int(src_info.bound.west),
-                                         int(src_info.bound.east)+1)]:
 
-        # Build the base filename using the correct format
-        filename = filename_format.format(
-            emis_util.ASTER_GED_LAT_FORMAT.format(lat).strip(),
-            emis_util.ASTER_GED_LON_FORMAT.format(lon).strip())
-
-        # Skip the tile if it isn't in the ASTER GED tile list
-        # (ignore filename extension)
-        if filename[:tilename_end] not in tiles:
-            logger.info('Skipping tile {} not in ASTER GED'.format(filename))
-            continue
+    for filename in emis_util.get_aster_ged_tiles_for_src(st_data_dir,
+            src_info, antimeridian_crossing):
 
         # Build the output tile names
-        ls_emis_stdev_tile_name = ''.join([filename, '_emis_stdev.tif'])
+        root_filename = '.'.join(filename.split('.')[0:5])
+        ls_emis_stdev_tile_name = ''.join([root_filename, '_emis_stdev.tif'])
 
         # Read the ASTER data
         (aster_b13_stdev_data, aster_b14_stdev_data, samps, lines, transform,
@@ -302,13 +286,23 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
     # Save the source proj4 string to use during warping
     src_proj4 = ds_srs.ExportToProj4()
 
+    # Check for antimeridian crossing
+    start_longitude = int(math.floor(src_info.bound.west))
+    end_longitude = int(math.floor(src_info.bound.east))
+
+    if start_longitude > 0 and end_longitude < 0:
+        antimeridian_crossing = True
+    else:
+        antimeridian_crossing = False
+
     (ls_emis_stdev_filenames) = (
         generate_tiles(src_info=src_info,
                        st_data_dir=st_data_dir,
                        url=url,
                        wkt=geographic_wkt,
                        no_data_value=no_data_value,
-                       intermediate=intermediate))
+                       intermediate=intermediate,
+                       antimeridian_crossing=antimeridian_crossing))
 
     # Check to see that we downloaded at least one ASTER tile for processing.
     if len(ls_emis_stdev_filenames) == 0:
@@ -316,6 +310,11 @@ def build_ls_emis_data(server_name, server_path, st_data_dir, src_info,
 
     # Define the temporary names
     ls_emis_stdev_mosaic_name = 'landsat_emis_stdev_mosaic.tif'
+
+    # If the image crosses the 180 meridian, shift the tile longitudes to use
+    # the 0..360 range so the mosaic is not confused
+    if antimeridian_crossing:
+        emis_util.shift_tiles(ls_emis_stdev_filenames)
 
     # Mosaic the estimated Landsat EMIS stdev tiles into the temp EMIS stdev
     logger.info('Building mosaic for estimated Landsat EMIS standard deviation')
@@ -355,7 +354,7 @@ def extract_warped_data(ls_emis_stdev_warped_name, no_data_value, intermediate):
     """
 
     # Load the warped estimated Landsat EMIS stdev into memory
-    ls_emis_stdev_data = emis_util.extract_raster_data(
+    ls_emis_stdev_data = util.Dataset.extract_raster_data(
         ls_emis_stdev_warped_name, 1)
     ls_emis_stdev_no_data_locations \
         = np.where(ls_emis_stdev_data == no_data_value)
@@ -388,11 +387,15 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     espa_metadata = Metadata(xml_filename)
     espa_metadata.parse()
 
+    product_id = espa_metadata.xml_object.global_metadata.product_id.text
+
     src_info = emis_util.retrieve_metadata_information(espa_metadata)
 
     # Determine output information
-    sensor_code = emis_util.get_satellite_sensor_code(xml_filename)
+    sensor_code = util.Landsat.get_satellite_sensor_code(xml_filename)
     dataset = gdal.Open(src_info.toa.red.name)
+    if dataset is None:
+        raise MissingBandError('Missing TOA Red Band')
     output_srs = osr.SpatialReference()
     output_srs.ImportFromWkt(dataset.GetProjection())
     output_transform = dataset.GetGeoTransform()
@@ -430,8 +433,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del ls_emis_stdev_no_data_locations
 
     # Write emissivity standard deviation data and metadata
-    ls_emis_stdev_img_filename = ''.join([xml_filename.split('.xml')[0],
-                                          '_emis_stdev', '.img'])
+    ls_emis_stdev_img_filename = ''.join([product_id, '_emis_stdev', '.img'])
 
     emis_util.write_emissivity_product(samps=samps,
                                        lines=lines,
@@ -449,11 +451,6 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
     # Memory cleanup
     del ls_emis_stdev_data
-
-
-# Specify the no data value we will be using, it also matches the
-# no_data_value for the ASTER data we extract and use
-NO_DATA_VALUE = -9999
 
 
 def main():
@@ -493,7 +490,7 @@ def main():
                                  server_name=args.aster_ged_server_name,
                                  server_path=args.aster_ged_server_path,
                                  st_data_dir=st_data_dir,
-                                 no_data_value=NO_DATA_VALUE,
+                                 no_data_value=util.INTERMEDIATE_NO_DATA_VALUE,
                                  intermediate=args.intermediate)
     except Exception:
         logger.exception('Processing failed')

@@ -1,0 +1,14 @@
+To run the st-tests.py unit tests, you will need the following environment
+variables set (shown here with an example path):
+
+setenv ESPA_UNIT_TEST_DATA_DIR /LOSRLPGD02/data2/rockvam/level2_test_data
+setenv ST_DATA_DIR /pcache/level1/dev/rockvam/level2/software/espa-surface-temperature/st/static_data
+setenv MERRA2_AUX_DIR /pcache/level1/dev/rockvam/level2/auxiliary/LST/sample_orig_NARR_MERRA
+setenv NARR_AUX_DIR /usr/local/usgs/bridge/auxiliaries/LST/NARR
+setenv ASTER_GED_SERVER localhost
+setenv ASTER_GED_PATH /pcache/level1/dev/rockvam/level2/auxiliary/LST/AG100.003/
+setenv MODTRAN_DATA /pcache/level1/dev/rockvam/level2/auxiliary/MODTRAN_DATA
+setenv NUM_THREADS 4 (optional)
+
+To run a single test: python -m unittest st-tests.TestGridPoints
+To get a list of the unit tests: grep -w class st-tests.py

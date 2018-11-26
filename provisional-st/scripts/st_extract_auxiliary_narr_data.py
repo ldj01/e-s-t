@@ -170,7 +170,8 @@ def extract_from_grib(aux_set):
             try:
                 output = util.System.execute_cmd(cmd)
             except Exception:
-                logger.error('Failed to unpack NARR Grib data')
+                logger.error('Failed to unpack NARR Grib data from {0}'.
+                    format(aux_set.grb))
                 raise
             finally:
                 if len(output) > 0:
@@ -187,7 +188,7 @@ def extract_narr_aux_data(espa_metadata, aux_path):
 
     logger = logging.getLogger(__name__)
 
-    (dummy, t0_date, t1_date) = util.NARR.dates(espa_metadata)
+    (dummy, t0_date, t1_date) = util.REANALYSIS.dates(espa_metadata)
 
     logger.info('Before Date = {}'.format(str(t0_date)))
     logger.info(' After Date = {}'.format(str(t1_date)))
@@ -201,7 +202,8 @@ def extract_narr_aux_data(espa_metadata, aux_path):
         # Verify that the files we need exist
         if (not os.path.exists(aux_set.hdr) or
                 not os.path.exists(aux_set.grb)):
-            raise Exception('Required ST AUX files are missing')
+            raise Exception('Required ST AUX files are missing: {0}, {1}'.
+                format(aux_set.hdr, aux_set.grb))
 
         extract_from_grib(aux_set)
 
