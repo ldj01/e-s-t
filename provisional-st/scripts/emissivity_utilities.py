@@ -254,13 +254,13 @@ def get_aster_ged_tiles_for_src(st_data_dir, src_info, antimeridian_crossing):
     Returns:
         Yields (filename): ASTER GED tile filename
     """
+
+    logger = logging.getLogger(__name__)
+
     # Read the ASTER GED tile list
     ged_tile_file = 'aster_ged_tile_list.txt'
     with open(os.path.join(st_data_dir, ged_tile_file)) as ged_file:
         tiles = [os.path.splitext(line.rstrip('\n'))[0] for line in ged_file]
-
-    # Get the length of names in the tile list
-    tilename_end = len(tiles[0]) - 1
 
     filename_format = get_aster_ged_filename_format()
 
@@ -283,8 +283,9 @@ def get_aster_ged_tiles_for_src(st_data_dir, src_info, antimeridian_crossing):
 
         # Skip the tile if it isn't in the ASTER GED tile list
         # (ignore filename extension)
-        if filename[:tilename_end] not in tiles:
-            logger.info('Skipping tile {} not in ASTER GED'.format(filename))
+        tilename = '.'.join(filename.split('.')[:5])
+        if tilename not in tiles:
+            logger.info('Skipping tile {} not in ASTER GED'.format(tilename))
             continue
 
         yield(filename)
