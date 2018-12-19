@@ -1,9 +1,4 @@
-## Surface Temperature Auxiliary Archive Generation 1.1.0 Release Notes
-Release Date: May 2018
-
-See git tag [st-rit-v1.1.0]
-
-The scripts in this directory facilitate building archives of NARR and MERRA-2 data utilized by the Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the NARR and MERRA-2 data, even for the reduced files this software produces and archives.
+The scripts in this directory facilitate building an archive of auxiliary data utilized by the Surface Temperature processing during product generation.  <b>Note:</b> Significant disk space is required to archive all of the auxiliary data, even for the reduced files this software produces and archives.
 
 ## Script Descriptions
 
@@ -17,12 +12,17 @@ This script is used to update the archive on a daily basis from http://ftp.cpc.n
 
 #### st_aux_merra_from_NASA_archive.py
 
-This script is used to retrieve data from the MERRA-2 archive located at https://goldsmr5.gesdisc.eosdis.nasa.gov/data/MERRA2/M2I3NPASM.5.12.4   This data is provided in 3-hour increments, with 1 file of data per day.  When a file is downloaded and processed, all 3-hour increments within the file will be processed and added to (or will update) the local archive.  See https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf for more details about the contents of the data.
+This script is used to update the archive on a daily basis from the MERRA-2 archive located at https://goldsmr5.gesdisc.eosdis.nasa.gov/data/MERRA2/M2I3NPASM.5.12.4/.  This data is provided in daily files which will be processed and added to the local archive.  See https://goldsmr5.gesdisc.eosdis.nasa.gov/data/MERRA2 for more details about the contents of the data.
+
+#### st_aux_aster_from_LPDAAC_archive.py
+
+This script is used to create an archive of ASTER data from the LP DAAC archive.  The script will extract the variables required in ST processing, and compress the file before storing it to a localized archive.  Since the ASTER dataset is static, this script should only be needed when establishing a new local archive.
 
 ## Installation
 
 ### Dependencies
-* Python 2.7+
+* Python 3.4+
+* ESPA Python library
 * wgrib [Found here](http://www.cpc.ncep.noaa.gov/products/wesley/wgrib.html)
   - The command line tool is used to extract required parameters from original NARR source files.
 * nccopy [Found here](https://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html)
@@ -31,12 +31,13 @@ This script is used to retrieve data from the MERRA-2 archive located at https:/
   - The source for archived NARR data.
 * Login credentials for NASA EarthData https://urs.earthdata.nasa.gov
   - A NASA EarthData login is required to access the archived MERRA-2 data.
+* Access to a DATASETS_IAS database schema with associated environment variable
 * Additional Python libraries
   - requests: ```pip install requests``` 
 
 ### Configuration Files
-* st_auxiliary.config is placed in the configuration file location ```$HOME/.usgs/espa```.  See [example](example-st_auxiliary.config) file.
-* st_merra_auxiliary.config is placed in the configuration file location ```$HOME/.usgs/espa```.  See [example](example-st_merra_auxiliary.config) file.
+* level2_auxiliary.conf provides URLS for retrieval of ST auxiliary files.  It 
+is installed in ```$IAS_SYS_DIR/etc``` by the ESPA Python library.
 
 ### Environment Variables
 * Required for installing this software
@@ -66,6 +67,11 @@ See `st_aux_merra_from_NASA_archive.py --help` for command line details.
 ### Environment Variables
 * PATH - May need to be updated to include the following
   - `$PREFIX/bin`
+* IAS_DB_COM - Needed to update the database tables associated with the local archive
+* NASA_EARTHDATA_USER - Needed to provide authentication to the MERRA-2 archive
+* NASA_EARTHDATA_PASS - Needed to provide authentication to the MERRA-2 archive
+* UCAR_EMAIL - Needed to provide authentication to the UCAR archive for NARR data
+* UCAR_PASSWORD - Needed to provide authentication to the UCAR archive for NARR data
 
 ## More Information
 This project is provided by the US Geological Survey (USGS) Earth Resources Observation and Science (EROS) Land Satellite Data Systems (LSDS) Science Research and Development (LSRD) Project. For questions regarding products produced by this source code, please contact the Landsat Contact Us page and specify USGS CDR/ECV in the "Regarding" section. https://landsat.usgs.gov/contactus.php
