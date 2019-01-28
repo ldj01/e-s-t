@@ -31,13 +31,8 @@ METHOD:  planck_eq
 
 PURPOSE: Using Planck's equation to calculate radiance at each wavelength for
          current temperature.
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/30/2014   Song Guo         Original Development
 *****************************************************************************/
-void planck_eq
+static void planck_eq
 (
     double *wavelength, /* I: Each wavelength */
     int num_elements,   /* I: Number of wavelengths to calculate */
@@ -49,23 +44,23 @@ void planck_eq
     double lambda;
 
     /* Planck Const hecht pg, 585 ## units: Js */
-    double PLANCK_CONST = (6.6260755 * pow (10, -34));
+    double PLANCK_CONST = 6.6260755e-34;
 
     /* Boltzmann Gas Const halliday et 2001 -- units: J/K */
-    double BOLTZMANN_GAS_CONST = (1.3806503 * pow (10, -23));
+    double BOLTZMANN_GAS_CONST = 1.3806503e-23;
 
     /* Speed of Light -- units: m/s */
-    double SPEED_OF_LIGHT = (299792458.0);
-    double SPEED_OF_LIGHT_SQRD = (SPEED_OF_LIGHT * SPEED_OF_LIGHT);
+    double SPEED_OF_LIGHT = 299792458.0;
+    double SPEED_OF_LIGHT_SQRD = SPEED_OF_LIGHT * SPEED_OF_LIGHT;
 
     for (i = 0; i < num_elements; i++)
     {
         /* Lambda intervals of spectral response locations microns units: m */
-        lambda = wavelength[i] * pow (10, -6);
+        lambda = wavelength[i] * 1e-6;
 
         /* Compute the Planck Blackbody Eq [W/m^2 sr um] */
         bb_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
-                         * (pow (10, -6) * pow (lambda, -5.0))
+                         * 1e-6 * pow(lambda, -5.0)
                          * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
                                          / (lambda
                                             * BOLTZMANN_GAS_CONST
@@ -73,8 +68,8 @@ void planck_eq
                                    - 1.0));
 
         /* Convert to W/cm^2 sr micron to match modtran units */
-        /* br / (100 * 100) == br * 10e-5 */
-        bb_radiance[i] *= 10e-5;
+        /* br / (100 * 100) == br * 1e-4 */
+        bb_radiance[i] *= 1e-4;
     }
 }
 
@@ -87,14 +82,8 @@ PURPOSE: spline constructs a cubic spline given a set of x and y values,
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Modified from Numerical Recipes in C
-                             (ISBN 0-521-43108-5)
 *****************************************************************************/
-int spline
+static int spline
 (
     double *x,
     double *y,
@@ -181,11 +170,6 @@ MODULE:  splint
 
 PURPOSE: splint uses the cubic spline generated with spline to interpolate
          values in the XY table
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Modified from online code
 *****************************************************************************/
 static int splint_klo = -1;
 static int splint_khi = -1;
@@ -256,11 +240,6 @@ PURPOSE: This function integrates a tabulated set of data { x(i) , f(i) },
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Original Development
 
 NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
 *****************************************************************************/
@@ -366,11 +345,6 @@ PURPOSE: Calculate blackbody radiance from temperature using spectral response
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Original Development
 *****************************************************************************/
 int calculate_lt
 (
@@ -509,11 +483,6 @@ PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Original Development
 *****************************************************************************/
 int calculate_lobs
 (
@@ -716,13 +685,8 @@ PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
 
 RETURN: SUCCESS
         FAILURE
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-9/29/2014   Song Guo         Original Development
 *****************************************************************************/
-int calculate_point_atmospheric_parameters
+static int calculate_point_atmospheric_parameters
 (
     Input_Data_t *input,       /* I: Input structure */
     GRID_POINTS *grid_points,  /* I: The coordinate points */
@@ -1193,7 +1157,7 @@ METHOD:  interpolate_to_height
 
 PURPOSE: Interpolate to height of current pixel
 ******************************************************************************/
-void interpolate_to_height
+static void interpolate_to_height
 (
     MODTRAN_POINT modtran_point, /* I: results from MODTRAN runs for a point */
     double interpolate_to,    /* I: current landsat pixel height */
@@ -1209,7 +1173,6 @@ void interpolate_to_height
     double above_parameters[AHP_NUM_PARAMETERS];
 
     double slope;
-    double intercept;
 
     double above_height;
     double inv_height_diff; /* To remove the multiple divisions */
@@ -1281,9 +1244,8 @@ void interpolate_to_height
             slope = (above_parameters[parameter] - below_parameters[parameter])
                     * inv_height_diff;
 
-            intercept = above_parameters[parameter] - slope * above_height;
-
-            at_height[parameter] = slope * interpolate_to + intercept;
+            at_height[parameter] = slope*(interpolate_to - above_height)
+                                 + above_parameters[parameter];
         }
     }
 }
@@ -1895,7 +1857,7 @@ Notes:
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int load_grid_points
+static int load_grid_points
 (
     GRID_POINTS *grid_points
 )
@@ -1961,7 +1923,7 @@ Notes:
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int load_elevations
+static int load_elevations
 (
     MODTRAN_POINTS *modtran_points
 )
@@ -1986,18 +1948,19 @@ int load_elevations
 
     /* Read the elevations into the 0 elevation positions in the MODTRAN 
        point structure.  The file and structure should have the same order. */
-    index = 0;
     for (index = 0; index < modtran_points->count; index++)
     {
+        MODTRAN_POINT *modtran_ptr = &modtran_points->points[index];
+
         /* Keep looking for a modtran point that was actually run. */
-        if (modtran_points->points[index].ran_modtran == 0)
+        if (modtran_ptr->ran_modtran == 0)
         {
             continue; 
         }
 
         status = fscanf(elevation_fd, "%lf %lf\n", 
-            &(modtran_points->points[index].elevations[0].elevation),
-            &(modtran_points->points[index].elevations[0].elevation_directory));
+            &(modtran_ptr->elevations->elevation),
+            &(modtran_ptr->elevations->elevation_directory));
         if (status <= 0)
         {
             RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
@@ -2056,7 +2019,7 @@ Description:  Allocate the memory need to hold the MODTRAN results and
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int initialize_modtran_points
+static int initialize_modtran_points
 (
     GRID_POINTS *grid_points,      /* I: The coordinate points */
     MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
@@ -2092,7 +2055,6 @@ int initialize_modtran_points
     }
 
     /* Read the elevations into the gndalt structure. */ 
-    index = 0;
     for (index = 0; index < num_elevations; index++)
     {
         status = fscanf(modtran_elevation_fd, "%lf\n", &gndalt[index]);
@@ -2116,23 +2078,24 @@ int initialize_modtran_points
 
     for (index = 0; index < modtran_points->count; index++)
     {
-        modtran_points->points[index].count = num_elevations;
-        modtran_points->points[index].ran_modtran =
-            grid_points->points[index].run_modtran;
-        modtran_points->points[index].row = grid_points->points[index].row;
-        modtran_points->points[index].col = grid_points->points[index].col;
-        modtran_points->points[index].narr_row =
-            grid_points->points[index].narr_row;
-        modtran_points->points[index].narr_col =
-            grid_points->points[index].narr_col;
-        modtran_points->points[index].lon = grid_points->points[index].lon;
-        modtran_points->points[index].lat = grid_points->points[index].lat;
-        modtran_points->points[index].map_x = grid_points->points[index].map_x;
-        modtran_points->points[index].map_y = grid_points->points[index].map_y;
+        /* convenience pointers */
+        MODTRAN_POINT *modtran_ptr = &modtran_points->points[index];
+        GRID_POINT *grid_ptr = &grid_points->points[index];
+        
+        modtran_ptr->count = num_elevations;
+        modtran_ptr->ran_modtran = grid_ptr->run_modtran;
+        modtran_ptr->row = grid_ptr->row;
+        modtran_ptr->col = grid_ptr->col;
+        modtran_ptr->narr_row = grid_ptr->narr_row;
+        modtran_ptr->narr_col = grid_ptr->narr_col;
+        modtran_ptr->lon = grid_ptr->lon;
+        modtran_ptr->lat = grid_ptr->lat;
+        modtran_ptr->map_x = grid_ptr->map_x;
+        modtran_ptr->map_y = grid_ptr->map_y;
 
-        modtran_points->points[index].elevations =
-            malloc(num_elevations * sizeof(MODTRAN_ELEVATION));
-        if (modtran_points->points[index].elevations == NULL)
+        modtran_ptr->elevations = malloc(num_elevations*
+                                         sizeof(MODTRAN_ELEVATION));
+        if (modtran_ptr->elevations == NULL)
         {
             RETURN_ERROR("Failed allocating memory for modtran point"
                          " elevations", FUNC_NAME, FAILURE);
@@ -2142,10 +2105,11 @@ int initialize_modtran_points
         for (elevation_index = 0; elevation_index < num_elevations; 
             elevation_index++)
         {
-            modtran_points->points[index].elevations[elevation_index]
-                .elevation = gndalt[elevation_index];
-            modtran_points->points[index].elevations[elevation_index]
-                .elevation_directory = gndalt[elevation_index];
+            MODTRAN_ELEVATION *mt_elev =
+                                    &modtran_ptr->elevations[elevation_index];
+
+            mt_elev->elevation = gndalt[elevation_index];
+            mt_elev->elevation_directory = gndalt[elevation_index];
         }
     }
 
@@ -2210,7 +2174,7 @@ Notes:
        should be character pointers set to NULL on input.  The caller is
        responsible for freeing the allocated memory upon successful return.
 *****************************************************************************/
-int get_args
+static int get_args
 (
     int argc,           /* I: number of cmd-line args */
     char *argv[],       /* I: string of cmd-line args */

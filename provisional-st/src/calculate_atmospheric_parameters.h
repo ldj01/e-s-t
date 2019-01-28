@@ -65,14 +65,6 @@ typedef enum
 
 /* Function prototypes */
 
-int calculate_point_atmospheric_parameters
-(
-    Input_Data_t *input,       /* I: Input structure */
-    GRID_POINTS *grid_points,  /* I: The coordinate points */
-    MODTRAN_POINTS *modtran_results /* I/O: Atmospheric parameters from
-                                   modtran */
-);
-
 int calculate_pixel_atmospheric_parameters
 (
     Input_Data_t *input,       /* I: input structure */
