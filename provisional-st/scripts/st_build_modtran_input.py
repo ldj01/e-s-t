@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     File: st_build_modtran_input.py
@@ -75,7 +75,7 @@ TEMPERATURES = ['273', '310', '000']
 # The albedo associated with each temperature (1:1 relationship)
 ALBEDOS = ['0.0', '0.0', '0.1']
 # Provide them as a list of pairs
-TEMP_ALBEDO_PAIRS = zip(TEMPERATURES, ALBEDOS)
+TEMP_ALBEDO_PAIRS = list(zip(TEMPERATURES, ALBEDOS))
 
 # The parameters we use provided by the reanalysis data
 # Time 0 and Time 1 Height labels and directory names
@@ -198,12 +198,12 @@ def load_pressure_file(parameter, layer, reanalysis):
     with open(filename, 'r') as data_fd:
         if reanalysis == "NARR":
             point_values = [[float(data_fd.readline())
-                             for dummy1 in xrange(NARR_COLS)]
-                            for dummy2 in xrange(NARR_ROWS)]
+                             for dummy1 in range(NARR_COLS)]
+                            for dummy2 in range(NARR_ROWS)]
         elif reanalysis == "MERRA2":
             point_values = [[float(data_fd.readline())
-                             for dummy1 in xrange(MERRA_COLS)]
-                            for dummy2 in xrange(MERRA_ROWS)]
+                             for dummy1 in range(MERRA_COLS)]
+                            for dummy2 in range(MERRA_ROWS)]
     return point_values
 
 

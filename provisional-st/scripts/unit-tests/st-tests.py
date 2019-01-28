@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
 import glob
 import unittest
 import subprocess
 import filecmp
+import fnmatch
 import shutil
 import sys
 import logging
@@ -21,14 +22,14 @@ class TestST(unittest.TestCase):
             os.environ['ESPA_UNIT_TEST_DATA_DIR'],
             'espa-surface-temperature')
 
-        if os.environ.has_key('NUM_THREADS'):
+        if 'NUM_THREADS' in os.environ:
             self.num_threads = os.environ['NUM_THREADS']
         else:
             self.num_threads = 4
 
     def setUp(self):
         # The XML file for the scene we're working with
-        self.xml_filename = 'LE07_L1TP_043028_20020419_20180206_01_T1.xml';
+        self.xml_filename = 'LE07_L1TP_043028_20020419_20180206_01_T1.xml'
 
         # List of files linked from ESPA_UNIT_TEST_DATA_DIR into the local
         # unit test directory, to use as inputs for a test
@@ -69,7 +70,7 @@ class TestST(unittest.TestCase):
             if (len(dc.diff_files) > 0 
                 or len(dc.funny_files) > 0 or len(dc.common_funny) > 0
                 or len(dc.left_only) > 0 or len(dc.right_only) > 0):
-                print dc.report()
+                print((dc.report()))
             self.assertEqual(len(dc.diff_files), 0)
             self.assertEqual(len(dc.funny_files), 0)
             self.assertEqual(len(dc.common_funny), 0)
@@ -77,16 +78,17 @@ class TestST(unittest.TestCase):
             self.assertEqual(len(dc.right_only), 0)
 
         for check_file in self.check_files:
-            print "Comparing", check_file
+            print(("Comparing", check_file))
             self.assertTrue(
                 filecmp.cmp(check_file, os.path.basename(check_file)))
+
 
     def compare_updated_xml(self, extension):
         # Compare the updated XML file with the expected one, which is
         # named with the given extension
         expected_xml_filename = os.path.join(self.unit_test_data_dir,
                 self.xml_filename + extension)
-        print "Comparing", self.xml_filename, "to", expected_xml_filename
+        print(("Comparing", self.xml_filename, "to", expected_xml_filename))
         # Ignore app_version and production_date
         diff_cmd = ["diff", "-b", "-I", "production_date", "-I", "app_version",
             self.xml_filename, expected_xml_filename]
@@ -254,7 +256,7 @@ class TestEmissivity(TestST):
         self.run_test_case(cmd)
         self.compare_updated_xml(".emis")
         # Clean up any leftover ASTER files, not already in the check_files list
-        check_files_base = map(lambda x:os.path.basename(x), self.check_files)
+        check_files_base = [os.path.basename(x) for x in self.check_files]
         for aster_file in glob.glob("AG100.v003*"):
             if check_files_base.count(aster_file) > 0:
                 continue
@@ -302,7 +304,7 @@ class TestEmissivityStdev(TestST):
         self.run_test_case(cmd)
         self.compare_updated_xml(".emis_stdev")
         # Clean up any leftover ASTER files, not already in the check_files list
-        check_files_base = map(lambda x:os.path.basename(x), self.check_files)
+        check_files_base = [os.path.basename(x) for x in self.check_files]
         for aster_file in glob.glob("AG100.v003*"):
             if check_files_base.count(aster_file) > 0:
                 continue
@@ -336,7 +338,7 @@ class TestModtran(TestST):
         for d in self.copy_dirs:
             shutil.copytree(d, os.path.basename(d))
 
-        self.modtran_data_path = os.environ['MODTRAN_DATA_DIR']
+        self.modtran_data_path = os.environ['MODTRAN_DATA']
         self.assertTrue(os.path.exists(self.modtran_data_path))
 
     def tearDown(self):
@@ -355,9 +357,9 @@ class TestModtran(TestST):
         for check_subdir_file in self.check_subdir_files:
             local_subdir_file = check_subdir_file.replace(
                 os.path.join(self.unit_test_data_dir, ""),"")
-            print "Comparing", local_subdir_file
+            print(("Comparing", local_subdir_file))
             self.assertTrue(
-                filecmp.cmp(check_subdir_file, local_subdir_file));
+                filecmp.cmp(check_subdir_file, local_subdir_file))
 
 class TestAtmosParam(TestST):
     """Test st_atmospheric_parameters (C code) """
@@ -400,7 +402,7 @@ class TestAtmosParam(TestST):
             'used_points.txt')])
 
     def test_run(self):
-        cmd = ["../../src/st_atmospheric_parameters", "--xml",
+        cmd = ["st_atmospheric_parameters", "--xml",
                 self.xml_filename]
         self.run_test_case(cmd)
         self.compare_updated_xml(".atmos")
@@ -532,7 +534,7 @@ class TestConvert(TestST):
             'LE07*_st_*transmittance*')))
         file_list.extend(glob.glob(os.path.join(self.unit_test_data_dir,
             'LE07*_emis*')))
-        self.link_files.extend(filter(lambda x:'converted' not in x, file_list))
+        self.link_files.extend([x for x in file_list if 'converted' not in x])
         self.setUpTestLinks()
 
         self.check_files = glob.glob(
@@ -553,7 +555,7 @@ class TestGenerateProducts(TestST):
         # Check required environment variables
         self.assertTrue(os.path.exists(os.environ['ST_DATA_DIR']))
         self.assertTrue(os.path.exists(os.environ['MERRA2_AUX_DIR']))
-        self.assertTrue(os.path.exists(os.environ['MODTRAN_DATA_DIR']))
+        self.assertTrue(os.path.exists(os.environ['MODTRAN_DATA']))
         self.assertIsNotNone(os.environ['ASTER_GED_SERVER'])
         self.assertIsNotNone(os.environ['ASTER_GED_PATH'])
 

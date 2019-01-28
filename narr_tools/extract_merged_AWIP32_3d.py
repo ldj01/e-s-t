@@ -1,10 +1,10 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 
 import os
 import sys
 import logging
-import commands
+import subprocess
 import glob
 import errno
 from argparse import ArgumentParser
@@ -96,7 +96,7 @@ def execute_cmd(cmd):
     output = ''
 
     logger.info('Executing [{0}]'.format(cmd))
-    (status, output) = commands.getstatusoutput(cmd)
+    (status, output) = subprocess.getstatusoutput(cmd)
 
     if status < 0:
         message = 'Application terminated by signal [{0}]'.format(cmd)
@@ -128,7 +128,7 @@ def create_directory(directory):
 
     # Create/Make sure the directory exists
     try:
-        os.makedirs(directory, mode=0755)
+        os.makedirs(directory, mode=0o755)
     except OSError as ose:
         if ose.errno == errno.EEXIST and os.path.isdir(directory):
             pass
@@ -191,7 +191,7 @@ def process_parameter(filename, output_path, parameter, hour):
 
 
 def process_file(filename):
-    print filename
+    print(filename)
 
     # Get the date information from the grib file
     parts = filename.split('.')

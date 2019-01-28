@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     File: st_run_modtran.py
@@ -152,13 +152,13 @@ class ModtranProcessingError(Exception):
 TAPE5 = 'tape5'
 
 
-def process_point_dir((point_path, modtran_data_path)):
+def process_point_dir(point_pair):
     """Run MODTRAN for a point and parse/format the results for later use
 
     Args:
-        path <str>: The path to a directory containing a tape5 file
+        point_pair <tuple>: path to point and path to modtran_data
     """
-
+    (point_path, modtran_data_path) = point_pair
     logger = logging.getLogger(__name__)
 
     current_directory = os.getcwd()
@@ -253,7 +253,7 @@ def main():
             pools = Pool(process_count)
             pools.map(process_point_dir, point_parms)
         else:
-            map(process_point_dir, point_parms)
+            list(map(process_point_dir, point_parms))
     except:
         logger.exception('Error processing points')
         raise

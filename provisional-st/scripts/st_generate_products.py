@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     File: st_generate_products.py
@@ -18,7 +18,7 @@ import logging
 import glob
 import shutil
 from argparse import ArgumentParser
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 import st_utilities as util
 

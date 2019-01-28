@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     FILE: emissivity_utilities.py
@@ -25,7 +25,7 @@
 '''
 
 import os
-import urlparse
+import urllib.parse
 import logging
 import math
 import datetime
@@ -265,14 +265,14 @@ def get_aster_ged_tiles_for_src(st_data_dir, src_info, antimeridian_crossing):
     filename_format = get_aster_ged_filename_format()
 
     if antimeridian_crossing:
-        lon_range = range(int(src_info.bound.west), 180) + \
-                    range(int(src_info.bound.east), -181, -1)
+        lon_range = list(range(int(src_info.bound.west), 180)) + \
+                    list(range(int(src_info.bound.east), -181, -1))
     else:
-        lon_range = xrange(int(src_info.bound.west),
-                           int(src_info.bound.east)+1)
+        lon_range = list(range(int(src_info.bound.west),
+                           int(src_info.bound.east)+1))
 
     for (lat, lon) in [(lat, lon)
-                       for lat in xrange(int(src_info.bound.south),
+                       for lat in range(int(src_info.bound.south),
                                          int(src_info.bound.north)+1)
                        for lon in lon_range]:
 
@@ -315,7 +315,7 @@ def locate_aster_ged_tile(url, filename):
             h5_file_path = local_h5_file_path
         else:
             # Try parsing the URL, if url includes file://hostname/path
-            url_parts = urlparse.urlparse(local_h5_file_path)
+            url_parts = urllib.parse.urlparse(local_h5_file_path)
             local_h5_file_path = os.path.abspath(os.path.join(url_parts.netloc,
                                                               url_parts.path))
             if os.path.exists(local_h5_file_path):

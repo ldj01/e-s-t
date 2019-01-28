@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     File: determine_missing_narr.py
@@ -54,7 +54,7 @@ TEMPERATURES = ['273', '310', '000']
 # The albedo associated with each temperature (1:1 relationship)
 ALBEDOS = ['0.0', '0.0', '0.1']
 # Provide them as a list of pairs
-TEMP_ALBEDO_PAIRS = zip(TEMPERATURES, ALBEDOS)
+TEMP_ALBEDO_PAIRS = list(zip(TEMPERATURES, ALBEDOS))
 
 # The parameters we use provided by the NARR data
 # Time 0 and Time 1 Height labels and directory names
@@ -132,8 +132,8 @@ def load_narr_pressure_file(parameter, layer):
     point_values = None
     with open(filename, 'r') as data_fd:
         point_values = [[float(data_fd.readline())
-                         for dummy1 in xrange(NARR_ROWS)]
-                        for dummy2 in xrange(NARR_COLS)]
+                         for dummy1 in range(NARR_ROWS)]
+                        for dummy2 in range(NARR_COLS)]
 
     return point_values
 
@@ -173,9 +173,9 @@ def check_hgt(data, point, layer, time):
     hgt = data[HGT_PARMS[time]][layer][point.narr_col][point.narr_row]
 
     if hgt == INVALID_NARR_DATA_VALUE:
-        print ('HGT  : {0} {1} {2} {3} {4} {5}'
+        print(('HGT  : {0} {1} {2} {3} {4} {5}'
                .format(time, layer, point.narr_col, point.narr_row,
-                       point.lon, point.lat))
+                       point.lon, point.lat)))
 
 
 def check_spfh(data, point, layer, time):
@@ -193,9 +193,9 @@ def check_spfh(data, point, layer, time):
     spfh = data[SPFH_PARMS[time]][layer][point.narr_col][point.narr_row]
 
     if spfh == INVALID_NARR_DATA_VALUE:
-        print ('SPFH : {0} {1} {2} {3} {4} {5}'
+        print(('SPFH : {0} {1} {2} {3} {4} {5}'
                .format(time, layer, point.narr_col, point.narr_row,
-                       point.lon, point.lat))
+                       point.lon, point.lat)))
 
 
 def check_temp(data, point, layer, time):
@@ -213,9 +213,9 @@ def check_temp(data, point, layer, time):
     temp = data[TMP_PARMS[time]][layer][point.narr_col][point.narr_row]
 
     if temp == INVALID_NARR_DATA_VALUE:
-        print ('TEMP : {0} {1} {2} {3} {4} {5}'
+        print(('TEMP : {0} {1} {2} {3} {4} {5}'
                .format(time, layer, point.narr_col, point.narr_row,
-                       point.lon, point.lat))
+                       point.lon, point.lat)))
 
 
 def check_point(data, point):

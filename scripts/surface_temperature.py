@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     PURPOSE: Determine which executable to run and then pass all arguments
@@ -24,8 +24,8 @@ import os
 import sys
 import logging
 import argparse
-import commands
-from ConfigParser import ConfigParser
+import subprocess
+from configparser import ConfigParser
 
 
 class ExecuteError(Exception):
@@ -49,7 +49,7 @@ def execute_cmd(cmd):
         ExecuteError(<str>)
     """
 
-    (status, output) = commands.getstatusoutput(cmd)
+    (status, output) = subprocess.getstatusoutput(cmd)
 
     if status < 0:
         message = ('Application terminated by signal [{0}]'

@@ -13,10 +13,10 @@
 import os
 import logging
 import errno
-import commands
+import subprocess
 import datetime
 from time import sleep
-from cStringIO import StringIO
+from io import StringIO
 import requests
 from osgeo import gdal, osr
 
@@ -91,7 +91,7 @@ class System(object):
         output = ''
 
         logger.info('Executing [%s]', cmd)
-        (status, output) = commands.getstatusoutput(cmd)
+        (status, output) = subprocess.getstatusoutput(cmd)
 
         if status < 0:
             message = 'Application terminated by signal [{0}]'.format(cmd)
@@ -123,7 +123,7 @@ class System(object):
 
         # Create/Make sure the directory exists
         try:
-            os.makedirs(directory, mode=0755)
+            os.makedirs(directory, mode=0o755)
         except OSError as ose:
             if ose.errno == errno.EEXIST and os.path.isdir(directory):
                 pass
@@ -319,7 +319,7 @@ class Geo(object):
         """Translate map coordinates into image coordinates"""
 
         # Convert the transform from image->map to map->image
-        (_, inv_transform) = gdal.InvGeoTransform(transform)
+        inv_transform = gdal.InvGeoTransform(transform)
 
         image_x = (inv_transform[0] +
                    map_x * inv_transform[1] +

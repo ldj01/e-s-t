@@ -16,6 +16,7 @@ import logging
 import array
 import struct
 from collections import namedtuple
+import numpy as np
 
 
 # Grid Point Information
@@ -53,8 +54,8 @@ def write_grid_points(grid_points, grid_rows, grid_cols):
         point_struct = struct.Struct(GRID_POINT_FMT)
 
         # Allocate enough buffer space for all the points we will write
-        buffer_size = '\0' * point_struct.size * len(grid_points)
-        point_buffer = array.array('c', buffer_size)
+        buffer_size =  point_struct.size * len(grid_points)
+        point_buffer = np.zeros(buffer_size, np.int8)
 
         index = 0
         for point in grid_points:
@@ -97,7 +98,7 @@ def read_grid_points():
     with open(GRID_POINT_BINARY_NAME, 'rb') as binary_fd:
         point_struct = struct.Struct(GRID_POINT_FMT)
 
-        for position in xrange(count):
+        for position in range(count):
             logger.debug('Reading point {}'.format(position))
             point_buffer = bytearray(binary_fd.read(point_struct.size))
             (index, run_modtran, row, col, reanalysis_row, reanalysis_col,

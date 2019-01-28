@@ -14,7 +14,7 @@ See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads
 
 ### Dependencies
 * ESPA raw binary libraries, tools, and its dependencies. [Found here](https://github.com/USGS-EROS/espa-product-formatter)
-* Python 2.7+ and Numpy/GDAL
+* Python 3.4+ and Numpy/GDAL
 * [GDAL](http://www.gdal.org/) 1.11.1
   - The GDAL command line tools are utilized for some of the processing steps.
 

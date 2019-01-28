@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 '''
     File: st_determine_grid_points.py
@@ -353,8 +353,8 @@ def haversine_distance(lon_1, lat_1, lon_2, lat_2):
     """
 
     # Convert to radians
-    (rlon_1, rlat_1, rlon_2, rlat_2) = map(math.radians, [lon_1, lat_1,
-                                                          lon_2, lat_2])
+    (rlon_1, rlat_1, rlon_2, rlat_2) = list(map(math.radians, [lon_1, lat_1,
+                                                          lon_2, lat_2]))
 
     # Figure out some sines
     sin_lon_sqrd = math.sin((rlon_2 - rlon_1) / 2.0)**2
@@ -449,7 +449,7 @@ def find_first_last_valid(mask, lines):
         Yields (line, sample): For the left and right sides of the valid data
     """
 
-    for line in xrange(lines):
+    for line in range(lines):
         l2r = mask[line]
         r2l = l2r[::-1]
         try:
@@ -547,7 +547,7 @@ def determine_min_max_row_col(data_bounds, data_path, reanalysis,
     remaining = [point for point in rows_cols if point is not None]
 
     # Determine min and max rows and cols for those within the boundary
-    (rows, cols) = zip(*remaining)
+    (rows, cols) = list(zip(*remaining))
     min_row = min(rows)
     max_row = max(rows)
     min_col = min(cols)
@@ -718,12 +718,12 @@ def generate_point_grid(debug, gdal_objs, data_bounds, data_path, reanalysis):
 
     # Add any first row length of pixels
     ew_edges.extend([(first_line[0][0], samp)
-                     for samp in xrange(first_line[0][1] + 1,
+                     for samp in range(first_line[0][1] + 1,
                                         first_line[1][1])])
 
     # Add any last row length of pixels
     ew_edges.extend([(last_line[0][0], samp)
-                     for samp in xrange(last_line[0][1] + 1,
+                     for samp in range(last_line[0][1] + 1,
                                         last_line[1][1])])
 
     # Remove duplicates and re-sort

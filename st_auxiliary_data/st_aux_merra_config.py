@@ -3,7 +3,7 @@
 
 
 import os
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 from collections import namedtuple
 
 from st_aux_exception import AuxiliaryError
