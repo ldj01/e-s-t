@@ -183,7 +183,6 @@ static void splint
 {
     int k;
     double h;
-    double b;
     double a;
     static int splint_klo = -1;
     static int splint_khi = -1;
@@ -222,12 +221,17 @@ static void splint
     {
         a = (xa[splint_khi] - x) / h;
 
-        b = (x - xa[splint_klo]) / h;
+        /*  The equation used below is the following, simplified:
 
-        *y = a * ya[splint_klo]
-             + b * ya[splint_khi]
-             + ((a * a * a - a) * y2a[splint_klo]
-                + (b * b * b - b) * y2a[splint_khi]) * (h * h) * one_sixth;
+            b = 1 - a;
+            *y = a * ya[splint_klo]
+               + b * ya[splint_khi]
+               + ((a * a * a - a) * y2a[splint_klo]
+               + (b * b * b - b) * y2a[splint_khi]) * (h * h) * one_sixth; */
+
+        *y = ya[splint_khi] + a*(ya[splint_klo] - ya[splint_khi])
+            + one_sixth*h*h*a*(a - 1)*((a + 1)*y2a[splint_klo] +
+                                       (2 - a)*y2a[splint_khi]);
     }
 }
 
@@ -1445,7 +1449,6 @@ static int calculate_pixel_atmospheric_parameters
     GRID_ITEM *grid_points = NULL;
 
     int vertex;
-    int current_index;
     int center_point;
     int cell_vertices[NUM_CELL_POINTS];
 
@@ -1467,7 +1470,6 @@ static int calculate_pixel_atmospheric_parameters
     int num_cols = points->cols;
     int num_points = points->count;
     int pixel_count = input->lines * input->samples;
-    int pixel_line_loc;
     int pixel_loc;
 
     /* Open the intermedate data files */
@@ -1484,7 +1486,7 @@ static int calculate_pixel_atmospheric_parameters
     }
 
     /* Allocate memory for elevation */
-    elevation_data = calloc(pixel_count, sizeof(int16_t));
+    elevation_data = malloc(pixel_count*sizeof(int16_t));
     if (elevation_data == NULL)
     {
         RETURN_ERROR("Allocating elevation_data memory", FUNC_NAME, FAILURE);
@@ -1536,7 +1538,7 @@ static int calculate_pixel_atmospheric_parameters
     LOG_MESSAGE(msg, FUNC_NAME);
 
     /* Loop through each line in the image */
-    for (line = 0; line < input->lines; line++)
+    for (line = 0, pixel_loc = 0; line < input->lines; line++)
     {
         /* Print status on every 1000 lines */
         if (!(line % 1000))
@@ -1545,14 +1547,12 @@ static int calculate_pixel_atmospheric_parameters
             fflush (stdout);
         }
 
-        pixel_line_loc = line * input->samples;
+        northing = input->meta.ul_map_corner.y - line*input->y_pixel_size;
 
         /* Set first_sample to be true */
         first_sample = true;
-        for (sample = 0; sample < input->samples; sample++)
+        for (sample = 0; sample < input->samples; sample++, pixel_loc++)
         {
-            pixel_loc = pixel_line_loc + sample;
-
             if (inter.band_thermal[pixel_loc] != ST_NO_DATA_VALUE)
             {
                 /* Determine latitude and longitude for current line/sample */
@@ -1569,9 +1569,6 @@ static int calculate_pixel_atmospheric_parameters
 
                 easting = input->meta.ul_map_corner.x
                     + (sample * input->x_pixel_size);
-                northing = input->meta.ul_map_corner.y
-                    - (line * input->y_pixel_size);
-
                 if (first_sample)
                 {
                     /* Determine the first center point from all of the
@@ -1672,7 +1669,7 @@ static int calculate_pixel_atmospheric_parameters
                    four closest points */
                 for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
                 {
-                    current_index = cell_vertices[vertex];
+                    int current_index = cell_vertices[vertex];
 
                     /* Interpolate three atmospheric parameters to current
                        height */
