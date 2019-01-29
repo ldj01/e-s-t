@@ -171,10 +171,7 @@ MODULE:  splint
 PURPOSE: splint uses the cubic spline generated with spline to interpolate
          values in the XY table
 *****************************************************************************/
-static int splint_klo = -1;
-static int splint_khi = -1;
-static double one_sixth = (1.0 / 6.0); /* To remove a division */
-void splint
+static void splint
 (
     double *xa,
     double *ya,
@@ -188,6 +185,9 @@ void splint
     double h;
     double b;
     double a;
+    static int splint_klo = -1;
+    static int splint_khi = -1;
+    static double one_sixth = (1.0 / 6.0); /* To remove a division */
 
     if (splint_klo < 0)
     {
@@ -243,7 +243,7 @@ RETURN: SUCCESS
 
 NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
 *****************************************************************************/
-int int_tabulated
+static int int_tabulated
 (
     double *x,         /*I: Tabulated X-value data */
     double *f,         /*I: Tabulated F-value data */
@@ -346,7 +346,7 @@ PURPOSE: Calculate blackbody radiance from temperature using spectral response
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int calculate_lt
+static int calculate_lt
 (
     double temperature,         /*I: temperature */
     double **spectral_response, /*I: spectral response function */
@@ -415,7 +415,7 @@ MODULE:  linear_interpolate_over_modtran
 
 PURPOSE: Simulate IDL (interpol) function for ST.
 *****************************************************************************/
-void linear_interpolate_over_modtran
+static void linear_interpolate_over_modtran
 (
     double **modtran, /* I: The MODTRAN data - provides both the a and b */
     int index,        /* I: The MODTRAN temperatur to use for a */
@@ -484,7 +484,7 @@ PURPOSE: Calculate observed radiance from MODTRAN results and the spectral
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int calculate_lobs
+static int calculate_lobs
 (
     double **modtran,           /*I: MODTRAN results with wavelengths */
     double **spectral_response, /*I: spectral response function */
@@ -554,7 +554,7 @@ METHOD:  matrix_transpose_2x2
 
 PURPOSE: Transposes a 2x2 matrix, producing a 2x2 result.
 *****************************************************************************/
-void matrix_transpose_2x2(double *A, double *out)
+static void matrix_transpose_2x2(double *A, double *out)
 {
     /*
         Formula is:
@@ -584,7 +584,7 @@ METHOD:  matrix_inverse_2x2
 
 PURPOSE: Inverts a 2x2 matrix, producing a 2x2 result.
 *****************************************************************************/
-void matrix_inverse_2x2(double *A, double *out)
+static void matrix_inverse_2x2(double *A, double *out)
 {
     /*
         Formula is:
@@ -618,7 +618,7 @@ METHOD:  matrix_multiply_2x2_2x2
 
 PURPOSE: Multiply a 2x2 matrix with a 2x2 matrix, producing a 2x2 result.
 *****************************************************************************/
-void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
+static void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
 {
     /*
         Formula is:
@@ -653,7 +653,7 @@ METHOD:  matrix_multiply_2x2_2x1
 
 PURPOSE: Multiply a 2x2 matrix with a 2x1 matrix, producing a 2x1 result.
 *****************************************************************************/
-void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
+static void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
 {
     /*
         Formula is:
@@ -1087,7 +1087,7 @@ PURPOSE: A qsort routine that can be used with the GRID_ITEM items to sort by
 
 RETURN: int: -1 (a<b), 1 (b<a), 0 (a==b) 
 ******************************************************************************/
-int qsort_grid_compare_function
+static int qsort_grid_compare_function
 (
     const void *grid_item_a,
     const void *grid_item_b
@@ -1117,7 +1117,7 @@ RETURN: double - The great-circle distance in meters between the points.
 NOTE: This is based on the haversine_distance function in the ST Python
       scripts.
 ******************************************************************************/
-double haversine_distance
+static double haversine_distance
 (
     double lon_1,  /* I: the longitude for the first point */
     double lat_1,  /* I: the latitude for the first point */
@@ -1126,9 +1126,7 @@ double haversine_distance
 )
 {
 
-    double lon_1_radians; /* Longitude for first point in radians */
     double lat_1_radians; /* Latitude for first point in radians */
-    double lon_2_radians; /* Longitude for second point in radians */
     double lat_2_radians; /* Latitude for second point in radians */
     double sin_lon;       /* Intermediate value */
     double sin_lat;       /* Intermediate value */
@@ -1136,14 +1134,12 @@ double haversine_distance
     double sin_lat_sqrd;  /* Intermediate value */
 
     /* Convert to radians */
-    lon_1_radians = lon_1 * RADIANS_PER_DEGREE;
     lat_1_radians = lat_1 * RADIANS_PER_DEGREE;
-    lon_2_radians = lon_2 * RADIANS_PER_DEGREE;
     lat_2_radians = lat_2 * RADIANS_PER_DEGREE;
 
     /* Figure out some sines */
-    sin_lon = sin((lon_2_radians - lon_1_radians) / 2.0);
-    sin_lat = sin((lat_2_radians - lat_1_radians) / 2.0);
+    sin_lon = sin((lon_2 - lon_1)*0.5*RADIANS_PER_DEGREE);
+    sin_lat = sin((lat_2_radians - lat_1_radians)*0.5);
     sin_lon_sqrd = sin_lon * sin_lon;
     sin_lat_sqrd = sin_lat * sin_lat;
 
@@ -1256,7 +1252,7 @@ METHOD:  interpolate_to_location
 
 PURPOSE: Interpolate to location of current pixel
 ******************************************************************************/
-void interpolate_to_location
+static void interpolate_to_location
 (
     GRID_POINTS *points,         /* I: The coordinate points */
     int *vertices,               /* I: The vertices for the points to use */
@@ -1315,7 +1311,7 @@ PURPOSE: Determines the distances for the current set of grid points.
 
 NOTE: The indexes of the grid points are assumed to be populated.
 *****************************************************************************/
-void determine_grid_point_distances
+static void determine_grid_point_distances
 (
     GRID_POINTS *points,       /* I: All the available points */
     double longitude,          /* I: Longitude of the current line/sample */
@@ -1351,7 +1347,7 @@ RETURN: type = int
     -----  -------------------------------------------------------------------
     index  The index of the center point
 *****************************************************************************/
-int determine_center_grid_point
+static int determine_center_grid_point
 (
     GRID_POINTS *points,       /* I: All the available points */
     double longitude,          /* I: Longitude of the current line/sample */
@@ -1385,7 +1381,7 @@ RETURN: type = int
     -----  -------------------------------------------------------------------
     index  The index of the center point
 *****************************************************************************/
-int determine_first_center_grid_point
+static int determine_first_center_grid_point
 (
     GRID_POINTS *points,       /* I: All the available points */
     double longitude,          /* I: Longitude of the current line/sample */
@@ -1417,7 +1413,7 @@ PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
 RETURN: SUCCESS
         FAILURE
 *****************************************************************************/
-int calculate_pixel_atmospheric_parameters
+static int calculate_pixel_atmospheric_parameters
 (
     Input_Data_t *input,       /* I: input structure */
     GRID_POINTS *points,       /* I: The coordinate points */
