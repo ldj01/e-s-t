@@ -65,15 +65,6 @@ typedef enum
 
 /* Function prototypes */
 
-int calculate_pixel_atmospheric_parameters
-(
-    Input_Data_t *input,       /* I: input structure */
-    GRID_POINTS *points,       /* I: The coordinate points */
-    char *xml_filename,        /* I: XML filename */
-    Espa_internal_meta_t xml_metadata, /* I: XML metadata */
-    MODTRAN_POINTS *modtran_results /* I: results from MODTRAN runs */
-);
-
 void free_grid_points
 (
     GRID_POINTS *grid_points   /* I: Grid points to free */

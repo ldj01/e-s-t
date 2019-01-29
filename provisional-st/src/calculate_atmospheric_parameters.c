@@ -1269,6 +1269,7 @@ static void interpolate_to_location
     double inv_h[NUM_CELL_POINTS];
     double w[NUM_CELL_POINTS];
     double total = 0.0;
+    double inv_total;
 
     /* Shepard's method */
     for (point = 0; point < NUM_CELL_POINTS; point++)
@@ -1287,9 +1288,10 @@ static void interpolate_to_location
     }
 
     /* Determine the weights for each vertex */
+    inv_total = 1/total;
     for (point = 0; point < NUM_CELL_POINTS; point++)
     {
-        w[point] = inv_h[point] / total;
+        w[point] = inv_h[point]*inv_total;
     }
 
     /* For each parameter apply each vertex's weighted value */
@@ -1322,14 +1324,14 @@ static void determine_grid_point_distances
 )
 {
     int point;
+    GRID_ITEM *pt = grid_points;  /* array pointer */
 
     /* Populate the distances to the grid points */
-    for (point = 0; point < num_grid_points; point++)
+    for (point = 0; point < num_grid_points; point++, pt++)
     {
-        grid_points[point].distance = haversine_distance (
-            points->points[grid_points[point].index].lon,
-            points->points[grid_points[point].index].lat,
-            longitude, latitude);
+        pt->distance = haversine_distance(points->points[pt->index].lon,
+                                          points->points[pt->index].lat,
+                                          longitude, latitude);
     }
 }
 
