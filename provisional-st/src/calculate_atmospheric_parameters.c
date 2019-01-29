@@ -325,13 +325,14 @@ static int int_tabulated
     result = 0.0;
     for (i = 0; i < ii_count; i++)
     {
-        result += (h * (14.0 * (z[ii[i] - 4] + z[ii[i]]) +
-                        64.0 * (z[ii[i] - 3] + z[ii[i] - 1]) +
-                        24.0 * z[ii[i] - 2]) / 45.0);
+        double *z_ptr = &z[ii[i] - 4];
+
+        result += 14*(z_ptr[0] + z_ptr[4]) + 64*(z_ptr[1] + z_ptr[3])
+                + 24*z_ptr[2];
     }
 
     /* Assign the results to the output */
-    *result_out = result;
+    *result_out = result*h/45;
 
     free (temp);
     free (z);
