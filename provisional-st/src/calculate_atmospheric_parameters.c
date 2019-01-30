@@ -1445,26 +1445,25 @@ static int calculate_pixel_atmospheric_parameters
 
                 /* Determine the average distances for each quadrant around
                    the center point. We only need to use the three outer grid 
-                   points */
-                avg_distance_ll = (grid_points[DC_GRID_POINT].distance
-                                   + grid_points[LL_GRID_POINT].distance
-                                   + grid_points[LC_GRID_POINT].distance)
-                                  / 3.0;
+                   points.
+                   The true average values are the values computed
+                   below divided by 3.  But since we're only using these these
+                   values comparatively, we can forego the division. */
+                avg_distance_ll = grid_points[DC_GRID_POINT].distance
+                                + grid_points[LL_GRID_POINT].distance
+                                + grid_points[LC_GRID_POINT].distance;
 
-                avg_distance_ul = (grid_points[LC_GRID_POINT].distance
-                                   + grid_points[UL_GRID_POINT].distance
-                                   + grid_points[UC_GRID_POINT].distance)
-                                  / 3.0;
+                avg_distance_ul = grid_points[LC_GRID_POINT].distance
+                                + grid_points[UL_GRID_POINT].distance
+                                + grid_points[UC_GRID_POINT].distance;
 
-                avg_distance_ur = (grid_points[UC_GRID_POINT].distance
-                                   + grid_points[UR_GRID_POINT].distance
-                                   + grid_points[RC_GRID_POINT].distance)
-                                  / 3.0;
+                avg_distance_ur = grid_points[UC_GRID_POINT].distance
+                                + grid_points[UR_GRID_POINT].distance
+                                + grid_points[RC_GRID_POINT].distance;
 
-                avg_distance_lr = (grid_points[RC_GRID_POINT].distance
-                                   + grid_points[LR_GRID_POINT].distance
-                                   + grid_points[DC_GRID_POINT].distance)
-                                  / 3.0;
+                avg_distance_lr = grid_points[RC_GRID_POINT].distance
+                                + grid_points[LR_GRID_POINT].distance
+                                + grid_points[DC_GRID_POINT].distance;
 
                 /* Determine which quadrant is closer and setup the cell
                    vertices to interpolate over based on that */
