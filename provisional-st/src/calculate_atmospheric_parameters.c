@@ -9,7 +9,6 @@
 
 
 #include "const.h"
-#include "2d_array.h"
 #include "utilities.h"
 #include "input.h"
 #include "st_types.h"
@@ -422,7 +421,7 @@ PURPOSE: Simulate IDL (interpol) function for ST.
 *****************************************************************************/
 static void linear_interpolate_over_modtran
 (
-    double **modtran, /* I: The MODTRAN data - provides both the a and b */
+    double (*modtran)[4], /* I: The MODTRAN data - provides both the a and b */
     int index,        /* I: The MODTRAN temperatur to use for a */
     double *c,        /* I: The Landsat wavelength grid points */
     int num_in,       /* I: Number of input data and grid points*/
@@ -491,7 +490,7 @@ RETURN: SUCCESS
 *****************************************************************************/
 static int calculate_lobs
 (
-    double **modtran,           /*I: MODTRAN results with wavelengths */
+    double (*modtran)[4],       /*I: MODTRAN results with wavelengths */
     double **spectral_response, /*I: spectral response function */
     int num_entries,            /*I: number of MODTRAN points */
     int num_srs,                /*I: number of spectral response points */
@@ -580,7 +579,7 @@ static int calculate_point_atmospheric_parameters
     int j;
     int entry;
 
-    double **spectral_response = NULL;
+    double *spectral_response[2];
     double temp_radiance_0;
     double obs_radiance_0;
     double temp_radiance_273;
@@ -601,7 +600,8 @@ static int calculate_point_atmospheric_parameters
     double modtran_wavelength;
     double modtran_radiance;
     double zero_temp;
-    double **current_data;
+    double (*current_data)[4] = NULL;
+    int max_radiance_record_count = 0; /* max number of radiance records read */
     double y_0;
     double y_1;
     double tau; /* Transmission */
@@ -621,9 +621,9 @@ static int calculate_point_atmospheric_parameters
     }
 
     /* Allocate memory for maximum spectral response count */
-    spectral_response =
-        (double **) allocate_2d_array (2, MAX_SRS_COUNT, sizeof (double));
-    if (spectral_response == NULL)
+    spectral_response[0] = malloc(MAX_SRS_COUNT*sizeof(double));
+    spectral_response[1] = malloc(MAX_SRS_COUNT*sizeof(double));
+    if (spectral_response[0] == NULL || spectral_response[1] == NULL)
     {
         RETURN_ERROR ("Allocating spectral_response memory",
                       FUNC_NAME, FAILURE);
@@ -700,6 +700,8 @@ static int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Calling calculate_lt for 310K", FUNC_NAME, FAILURE);
     }
 
+    /* Compute the multiplier for the transmittance and upwelled radiance
+       calculations in the following loop. */
     delta_radiance_inv = 1/(temp_radiance_310 - temp_radiance_273);
 
     /* Output information about the used points, primarily useful for
@@ -715,16 +717,19 @@ static int calculate_point_atmospheric_parameters
     counter = 0;
     for (i = 0; i < grid_points->count; i++)
     {
+        GRID_POINT *grid_point = &grid_points->points[i];
+        MODTRAN_POINT *modtran_point = & modtran_results->points[i];
+
         /* Don't process the points that didn't have a MODTRAN run. */
-        if (!modtran_results->points[i].ran_modtran)
+        if (!modtran_point->ran_modtran)
         {
             continue;
         }
 
         fprintf (used_points_fd, "\"%d\"|\"%f\"|\"%f\"\n",
-                 i, grid_points->points[i].map_x, grid_points->points[i].map_y);
+                 i, grid_point->map_x, grid_point->map_y);
 
-        for (j = 0; j < modtran_results->points[i].count; j++)
+        for (j = 0; j < modtran_point->count; j++)
         {
             /* Read the st_modtran.info file for the 000 execution
                (when MODTRAN is run at 0K)
@@ -732,10 +737,9 @@ static int calculate_point_atmospheric_parameters
                The record count is the same for all three associated runs */
             snprintf(current_file, sizeof(current_file), 
                 "%03d_%03d_%03d_%03d/%1.3f/000/0.1/st_modtran.hdr",
-                grid_points->points[i].row, grid_points->points[i].col,
-                grid_points->points[i].narr_row,
-                grid_points->points[i].narr_col,
-                modtran_results->points[i].elevations[j].elevation_directory);
+                grid_point->row, grid_point->col, grid_point->narr_row,
+                grid_point->narr_col,
+                modtran_point->elevations[j].elevation_directory);
 
             fd = fopen (current_file, "r");
             if (fd == NULL)
@@ -764,12 +768,16 @@ static int calculate_point_atmospheric_parameters
             /* For each height, read in radiance information for three
                MODTRAN runs.  Columns of array are organized as follows:
                wavelength | 273,0.0 | 310,0.0 | 000,0.1 */
-            current_data =
-                (double **)allocate_2d_array(num_entries, 4, sizeof(double));
-            if (current_data == NULL)
+            if (num_entries > max_radiance_record_count)
             {
-                RETURN_ERROR ("Allocating current_data memory",
-                              FUNC_NAME, FAILURE);
+                max_radiance_record_count = num_entries;
+                current_data = realloc(current_data,
+                                       num_entries*sizeof(double[4]));
+                if (current_data == NULL)
+                {
+                    RETURN_ERROR ("Allocating current_data memory",
+                                  FUNC_NAME, FAILURE);
+                }
             }
 
             /* Iterate through the three pairs of parameters */
@@ -778,11 +786,9 @@ static int calculate_point_atmospheric_parameters
                 /* Define MODTRAN data file */
                 snprintf(current_file, sizeof(current_file), 
                     "%03d_%03d_%03d_%03d/%1.3f/%03d/%1.1f/st_modtran.data",
-                    grid_points->points[i].row, grid_points->points[i].col,
-                    grid_points->points[i].narr_row,
-                    grid_points->points[i].narr_col,
-                    modtran_results->points[i]
-                        .elevations[j].elevation_directory,
+                    grid_point->row, grid_point->col, grid_point->narr_row,
+                    grid_point->narr_col,
+                    modtran_point->elevations[j].elevation_directory,
                     temperature[index - 1],
                     albedo[index - 1]);
 
@@ -868,28 +874,20 @@ static int calculate_point_atmospheric_parameters
                   - (temp_radiance_0 * WATER_EMISSIVITY)) * INV_WATER_ALBEDO;
 
             /* Place results into MODTRAN results array */
-            modtran_results->points[i].elevations[j].transmission = tau;
-            modtran_results->points[i].elevations[j].upwelled_radiance = lu;
-            modtran_results->points[i].elevations[j].downwelled_radiance = ld;
-
-            /* Free the allocated memory in the loop */
-            if (free_2d_array ((void **) current_data) != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: current_data\n",
-                              FUNC_NAME, FAILURE);
-            }
-            current_data = NULL;
-        } /* END - modtran_results->points[i].count loop */
+            modtran_point->elevations[j].transmission = tau;
+            modtran_point->elevations[j].upwelled_radiance = lu;
+            modtran_point->elevations[j].downwelled_radiance = ld;
+        } /* END - modtran_point->count loop */
     } /* END - count loop */
     fclose (used_points_fd);
 
     /* Free allocated memory */
-    if (free_2d_array ((void **) spectral_response) != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: spectral_response\n", FUNC_NAME,
-                      FAILURE);
-    }
-    spectral_response = NULL;
+    free(current_data);
+    current_data = NULL;
+    free(spectral_response[0]);
+    spectral_response[0] = NULL;
+    free(spectral_response[1]);
+    spectral_response[1] = NULL;
 
     /* Write atmospheric transmission, upwelled radiance, and downwelled 
        radiance for each elevation for each point to a file */
@@ -906,21 +904,23 @@ static int calculate_point_atmospheric_parameters
     }
     for (i = 0; i < grid_points->count; i++)
     {
+        MODTRAN_POINT *modtran_point = & modtran_results->points[i];
+
         /* Only write parameters for grid points where MODTRAN was run */
-        if (!modtran_results->points[i].ran_modtran)
+        if (!modtran_point->ran_modtran)
         {
             continue;
         }
 
-        for (j = 0; j < modtran_results->points[i].count; j++)
+        for (j = 0; j < modtran_point->count; j++)
         {
             fprintf (fd, "%f,%f,%12.9f,%12.9f,%12.9f,%12.9f\n",
-                 modtran_results->points[i].lat,
-                 modtran_results->points[i].lon,
-                 modtran_results->points[i].elevations[j].elevation,
-                 modtran_results->points[i].elevations[j].transmission,
-                 modtran_results->points[i].elevations[j].upwelled_radiance,
-                 modtran_results->points[i].elevations[j].downwelled_radiance);
+                 modtran_point->lat,
+                 modtran_point->lon,
+                 modtran_point->elevations[j].elevation,
+                 modtran_point->elevations[j].transmission,
+                 modtran_point->elevations[j].upwelled_radiance,
+                 modtran_point->elevations[j].downwelled_radiance);
         }
     }
     fclose (fd);
@@ -1106,7 +1106,8 @@ static void interpolate_to_location
 (
     GRID_POINTS *points,         /* I: The coordinate points */
     int *vertices,               /* I: The vertices for the points to use */
-    double **at_height,          /* I: current height atmospheric results */
+    double at_height[][AHP_NUM_PARAMETERS], /* I: current height atmospheric
+                                                  results */
     double interpolate_easting,  /* I: interpolate to easting */
     double interpolate_northing, /* I: interpolate to northing */
     double *parameters           /* O: interpolated pixel atmospheric 
@@ -1278,7 +1279,6 @@ static int calculate_pixel_atmospheric_parameters
 
     int line;
     int sample;
-    int status;
 
     bool first_sample;
 
@@ -1298,7 +1298,7 @@ static int calculate_pixel_atmospheric_parameters
     int center_point;
     int cell_vertices[NUM_CELL_POINTS];
 
-    double **at_height = NULL;
+    double at_height[NUM_CELL_POINTS][AHP_NUM_PARAMETERS];
     double parameters[AHP_NUM_PARAMETERS];
     double avg_distance_ll;
     double avg_distance_ul;
@@ -1336,15 +1336,6 @@ static int calculate_pixel_atmospheric_parameters
     if (elevation_data == NULL)
     {
         RETURN_ERROR("Allocating elevation_data memory", FUNC_NAME, FAILURE);
-    }
-
-    /* Allocate memory for at_height */
-    at_height = (double **) allocate_2d_array (NUM_CELL_POINTS,
-                                               AHP_NUM_PARAMETERS,
-                                               sizeof (double));
-    if (at_height == NULL)
-    {
-        RETURN_ERROR ("Allocating at_height memory", FUNC_NAME, FAILURE);
     }
 
     /* Allocate memory to hold the grid_points to the first sample of data for
@@ -1561,13 +1552,6 @@ static int calculate_pixel_atmospheric_parameters
     /* Free allocated memory */
     free(grid_points);
     free(elevation_data);
-
-    status = free_2d_array((void **)at_height);
-    if (status != SUCCESS)
-    {
-        ERROR_MESSAGE("Freeing memory: at_height\n", FUNC_NAME);
-    }
-
     free_intermediate(&inter);
 
     /* Close the intermediate binary files */
