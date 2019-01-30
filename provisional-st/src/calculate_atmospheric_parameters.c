@@ -475,7 +475,7 @@ static void linear_interpolate_over_modtran
         }
 
         /* Apply the formula for linear interpolation */
-        x[o] = d1 + ((g - g1) / (g2 - g1)) * (d2 - d1);
+        x[o] = d1 + (g - g1) / (g2 - g1) * (d2 - d1);
     }
 }
 
@@ -555,134 +555,6 @@ static int calculate_lobs
 
 
 /*****************************************************************************
-METHOD:  matrix_transpose_2x2
-
-PURPOSE: Transposes a 2x2 matrix, producing a 2x2 result.
-*****************************************************************************/
-static void matrix_transpose_2x2(double *A, double *out)
-{
-    /*
-        Formula is:
-
-            out[0] = a
-            out[1] = c
-            out[2] = b
-            out[3] = d
-
-        Where:
-
-            a = A[0]
-            b = A[1]
-            c = A[2]
-            d = A[3]
-    */
-
-    out[0] = A[0];
-    out[1] = A[2];
-    out[2] = A[1];
-    out[3] = A[3];
-}
-
-
-/*****************************************************************************
-METHOD:  matrix_inverse_2x2
-
-PURPOSE: Inverts a 2x2 matrix, producing a 2x2 result.
-*****************************************************************************/
-static void matrix_inverse_2x2(double *A, double *out)
-{
-    /*
-        Formula is:
-
-            out[0] = d * determinant;
-            out[1] = (-b) * determinant;
-            out[2] = (-c) * determinant;
-            out[3] = a * determinant;
-
-        Where:
-
-            a = A[0]
-            b = A[1]
-            c = A[2]
-            d = A[3]
-
-            determinant = 1.0 / (a * d - b * c)
-    */
-
-    double determinant = (1.0 / (A[0] * A[3] - A[1] * A[2]));
-
-    out[0] = A[3] * determinant;
-    out[1] = (-A[1]) * determinant;
-    out[2] = (-A[2]) * determinant;
-    out[3] = A[0] * determinant;
-}
-
-
-/*****************************************************************************
-METHOD:  matrix_multiply_2x2_2x2
-
-PURPOSE: Multiply a 2x2 matrix with a 2x2 matrix, producing a 2x2 result.
-*****************************************************************************/
-static void matrix_multiply_2x2_2x2(double *A, double *B, double *out)
-{
-    /*
-        Formula is:
-
-            out[0] = a * e + b * g
-            out[1] = a * f + b * h
-            out[2] = c * e + d * g
-            out[3] = c * f + d * h
-
-        Where:
-
-            a = A[0]
-            b = A[1]
-            c = A[2]
-            d = A[3]
-
-            e = B[0]
-            f = B[1]
-            g = B[2]
-            h = B[3]
-    */
-
-    out[0] = A[0] * B[0] + A[1] * B[2];
-    out[1] = A[0] * B[1] + A[1] * B[3];
-    out[2] = A[2] * B[0] + A[3] * B[2];
-    out[3] = A[2] * B[1] + A[3] * B[3];
-}
-
-
-/*****************************************************************************
-METHOD:  matrix_multiply_2x2_2x1
-
-PURPOSE: Multiply a 2x2 matrix with a 2x1 matrix, producing a 2x1 result.
-*****************************************************************************/
-static void matrix_multiply_2x2_2x1(double *A, double *B, double *out)
-{
-    /*
-        Formula is:
-
-            out[0] = a * e + b * f
-            out[1] = c * e + d * f
-
-        Where:
-
-            a = A[0]
-            b = A[1]
-            c = A[2]
-            d = A[3]
-
-            e = B[0]
-            f = B[1]
-    */
-
-    out[0] = A[0] * B[0] + A[1] * B[1];
-    out[1] = A[2] * B[0] + A[3] * B[1];
-}
-
-
-/*****************************************************************************
 METHOD:  calculate_point_atmospheric_parameters
 
 PURPOSE: Generate transmission, upwelled radiance, and downwelled radiance at
@@ -713,6 +585,8 @@ static int calculate_point_atmospheric_parameters
     double obs_radiance_0;
     double temp_radiance_273;
     double temp_radiance_310;
+    double delta_radiance_inv; /* inverse of radiance differences; used to
+                                  compute transmittance and upwelled radiance */
     int counter;
     int index;
     int num_entries;   /* Number of MODTRAN output results to read and use */
@@ -733,16 +607,6 @@ static int calculate_point_atmospheric_parameters
     double tau; /* Transmission */
     double lu;  /* Upwelled Radiance */
     double ld;  /* Downwelled Radiance */
-
-    /* Variables to hold matrices and the results for the operations perfomed
-       on them */
-    double X_2x2[4];
-    double Xt_2x2[4];
-    double Xt_X_2x2[4];
-    double Inv_Xt_X_2x2[4];
-    double Y_2x1[2];
-    double Xt_Y_2x1[4];
-    double A_2x1[2];
 
     /* Temperature and albedo */
     int temperature[3] = { 273, 310, 000 };
@@ -836,18 +700,7 @@ static int calculate_point_atmospheric_parameters
         RETURN_ERROR ("Calling calculate_lt for 310K", FUNC_NAME, FAILURE);
     }
 
-    /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y
-       from the IDL code base.
-       Partially implemented here, the variable part is implemented in the
-       looping code. */
-    X_2x2[0] = 1;
-    X_2x2[1] = temp_radiance_273;
-    X_2x2[2] = 1;
-    X_2x2[3] = temp_radiance_310;
-
-    matrix_transpose_2x2(X_2x2, Xt_2x2);
-    matrix_multiply_2x2_2x2(Xt_2x2, X_2x2, Xt_X_2x2);
-    matrix_inverse_2x2(Xt_X_2x2, Inv_Xt_X_2x2);
+    delta_radiance_inv = 1/(temp_radiance_310 - temp_radiance_273);
 
     /* Output information about the used points, primarily useful for
        plotting them against the scene */
@@ -983,17 +836,9 @@ static int calculate_point_atmospheric_parameters
                               FUNC_NAME, FAILURE);
             }
 
-            /* Implement a = INVERT(TRANSPOSE(x)##x)##TRANSPOSE(x)##y  from
-               the IDL code base.  Partially implemented above and used here. */
-               
-            Y_2x1[0] = y_0;
-            Y_2x1[1] = y_1;
-
-            matrix_multiply_2x2_2x1(Xt_2x2, Y_2x1, Xt_Y_2x1);
-            matrix_multiply_2x2_2x1(Inv_Xt_X_2x2, Xt_Y_2x1, A_2x1);
-
-            tau = A_2x1[1]; /* Transmittance */
-            lu = A_2x1[0];  /* Upwelled Radiance */
+            tau = (y_1 - y_0)*delta_radiance_inv; /* Transmittance */
+            lu = (temp_radiance_310*y_0 - temp_radiance_273*y_1)
+               * delta_radiance_inv;  /* Upwelled Radiance */
 
             /* Determine Lobs and Lt when MODTRAN was run at 0K - calculate 
                downwelled */
