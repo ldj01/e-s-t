@@ -11,8 +11,8 @@ typedef struct {
     uint8_t col;
     uint16_t narr_row;
     uint16_t narr_col;
-    float lon;
-    float lat;
+    float lon;          /* longitude (degrees) */
+    float lat;          /* latitude (degrees) */
     float map_x;
     float map_y;
 } GRID_POINT;
@@ -42,8 +42,8 @@ typedef struct {
     uint8_t col;
     uint16_t narr_row;
     uint16_t narr_col;
-    double lon;
-    double lat;
+    double lon;                    /* longitude (degrees) */
+    double lat;                    /* latitude (degrees) */
     double map_x;
     double map_y;
     MODTRAN_ELEVATION *elevations;

@@ -23,8 +23,6 @@ pixel in the Landsat scene.  Also, create bands with these values.  A thermal
 radiance band is also created based on a Landsat thermal band and parameters.
 *****************************************************************************/
 
-/* calculate_point_atmospheric_parameters functions */
-
 /*****************************************************************************
 METHOD:  planck_eq
 
@@ -969,33 +967,27 @@ NOTE: This is based on the haversine_distance function in the ST Python
 ******************************************************************************/
 static double haversine_distance
 (
-    double lon_1,  /* I: the longitude for the first point */
-    double lat_1,  /* I: the latitude for the first point */
-    double lon_2,  /* I: the longitude for the second point */
-    double lat_2   /* I: the latitude for the second point */
+    double lon_1,  /* I: longitude (radians) for the first point */
+    double lat_1,  /* I: latitude (radians) for the first point */
+    double lon_2,  /* I: longitude (radians) for the second point */
+    double lat_2   /* I: latitude (radians) for the second point */
 )
 {
 
-    double lat_1_radians; /* Latitude for first point in radians */
-    double lat_2_radians; /* Latitude for second point in radians */
     double sin_lon;       /* Intermediate value */
     double sin_lat;       /* Intermediate value */
     double sin_lon_sqrd;  /* Intermediate value */
     double sin_lat_sqrd;  /* Intermediate value */
 
-    /* Convert to radians */
-    lat_1_radians = lat_1 * RADIANS_PER_DEGREE;
-    lat_2_radians = lat_2 * RADIANS_PER_DEGREE;
-
     /* Figure out some sines */
-    sin_lon = sin((lon_2 - lon_1)*0.5*RADIANS_PER_DEGREE);
-    sin_lat = sin((lat_2_radians - lat_1_radians)*0.5);
+    sin_lon = sin((lon_2 - lon_1)*0.5);
+    sin_lat = sin((lat_2 - lat_1)*0.5);
     sin_lon_sqrd = sin_lon * sin_lon;
     sin_lat_sqrd = sin_lat * sin_lat;
 
     /* Compute and return the distance */
     return EQUATORIAL_RADIUS * 2 + asin(sqrt(sin_lat_sqrd 
-        + cos(lat_1_radians) * cos(lat_2_radians) * sin_lon_sqrd));
+        + cos(lat_1) * cos(lat_2) * sin_lon_sqrd));
 }
 
 /******************************************************************************
@@ -1166,9 +1158,12 @@ NOTE: The indexes of the grid points are assumed to be populated.
 *****************************************************************************/
 static void determine_grid_point_distances
 (
-    GRID_POINTS *points,       /* I: All the available points */
-    double longitude,          /* I: Longitude of the current line/sample */
-    double latitude,           /* I: Latitude of the current line/sample */
+    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
+    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
+    double longitude,          /* I: Longitude of the current line/sample
+                                     (radians) */
+    double latitude,           /* I: Latitude of the current line/sample
+                                     (radians) */
     int num_grid_points,       /* I: The number of grid points to operate on */
     GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
                                        point */
@@ -1180,8 +1175,8 @@ static void determine_grid_point_distances
     /* Populate the distances to the grid points */
     for (point = 0; point < num_grid_points; point++, pt++)
     {
-        pt->distance = haversine_distance(points->points[pt->index].lon,
-                                          points->points[pt->index].lat,
+        pt->distance = haversine_distance(grid_pt_lon[pt->index],
+                                          grid_pt_lat[pt->index],
                                           longitude, latitude);
     }
 }
@@ -1202,16 +1197,19 @@ RETURN: type = int
 *****************************************************************************/
 static int determine_center_grid_point
 (
-    GRID_POINTS *points,       /* I: All the available points */
-    double longitude,          /* I: Longitude of the current line/sample */
-    double latitude,           /* I: Latitude of the current line/sample */
-    int num_grid_points,       /* I: The number of grid points to operate on */
+    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
+    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
+    double longitude,          /* I: Longitude of the current line/sample
+                                     (radians) */
+    double latitude,           /* I: Latitude of the current line/sample
+                                     (radians) */
+    int num_grid_points,       /* I: Number of grid points to operate on */
     GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
                                        point */
 )
 {
-    determine_grid_point_distances (points, longitude, latitude,
-                                    num_grid_points, grid_points);
+    determine_grid_point_distances(grid_pt_lon, grid_pt_lat, longitude,
+                                   latitude, num_grid_points, grid_points);
 
     /* Sort them to find the closest one */
     qsort (grid_points, num_grid_points, sizeof (GRID_ITEM),
@@ -1236,9 +1234,13 @@ RETURN: type = int
 *****************************************************************************/
 static int determine_first_center_grid_point
 (
-    GRID_POINTS *points,       /* I: All the available points */
-    double longitude,          /* I: Longitude of the current line/sample */
-    double latitude,           /* I: Latitude of the current line/sample */
+    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
+    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
+    double longitude,          /* I: Longitude of the current line/sample
+                                     (radians) */
+    double latitude,           /* I: Latitude of the current line/sample
+                                     (radians) */
+    int num_grid_points,       /* I: Number of grid points to operate on */
     GRID_ITEM *grid_points     /* I/O: Memory passed in, populated and
                                        sorted to determine the center grid
                                        point */
@@ -1247,13 +1249,13 @@ static int determine_first_center_grid_point
     int point;
 
     /* Assign the point indexes for all grid points */
-    for (point = 0; point < points->count; point++)
+    for (point = 0; point < num_grid_points; point++)
     {
         grid_points[point].index = point;
     }
 
-    return determine_center_grid_point (points, longitude, latitude,
-                                        points->count, grid_points);
+    return determine_center_grid_point(grid_pt_lon, grid_pt_lat, longitude,
+                                       latitude, num_grid_points, grid_points);
 }
 
 
@@ -1269,7 +1271,7 @@ RETURN: SUCCESS
 static int calculate_pixel_atmospheric_parameters
 (
     Input_Data_t *input,       /* I: input structure */
-    GRID_POINTS *points,       /* I: The coordinate points */
+    GRID_POINTS *points,       /* I: coordinate points */
     char *xml_filename,        /* I: XML filename */
     Espa_internal_meta_t xml_metadata, /* I: XML metadata */
     MODTRAN_POINTS *modtran_results /* I: results from MODTRAN runs */
@@ -1279,6 +1281,7 @@ static int calculate_pixel_atmospheric_parameters
 
     int line;
     int sample;
+    int ipt;                   /* grid point index */
 
     bool first_sample;
 
@@ -1289,8 +1292,9 @@ static int calculate_pixel_atmospheric_parameters
     Space_def_t space_def;     /* Space definition (projection values) */
     Img_coord_float_t img;     /* Floating point image coordinates */
     Geo_coord_t geo;           /* Geodetic coordinates */
-    float longitude;           /* Longitude */
-    float latitude;            /* Latitude */
+    double *grid_pt_lon;       /* grid point longitudes (radians) */
+    double *grid_pt_lat;       /* grid point latitudes (radians) */
+
 
     GRID_ITEM *grid_points = NULL;
 
@@ -1344,6 +1348,19 @@ static int calculate_pixel_atmospheric_parameters
     if (grid_points == NULL)
     {
         RETURN_ERROR ("Allocating grid_points memory", FUNC_NAME, FAILURE);
+    }
+
+    /* Convert the grid point latitudes and longitudes to radians for use
+       in calcuations. */
+    grid_pt_lon = malloc(num_points * sizeof(double));
+    grid_pt_lat = malloc(num_points * sizeof(double));
+    if (grid_pt_lon == NULL || grid_pt_lat == NULL)
+        RETURN_ERROR ("Allocating grid point lat/long memory", FUNC_NAME,
+                      FAILURE);
+    for (ipt = 0; ipt < num_points; ipt++)
+    {
+        grid_pt_lon[ipt] = points->points[ipt].lon*RADIANS_PER_DEGREE;
+        grid_pt_lat[ipt] = points->points[ipt].lat*RADIANS_PER_DEGREE;
     }
 
     /* Read thermal and elevation data into memory */
@@ -1401,9 +1418,6 @@ static int calculate_pixel_atmospheric_parameters
                     RETURN_ERROR ("Mapping from line/sample to longitude/"
                         "latitude", FUNC_NAME, FAILURE);
                 }
-                longitude = geo.lon * DEGREES_PER_RADIAN;
-                latitude = geo.lat * DEGREES_PER_RADIAN;
-
                 easting = input->meta.ul_map_corner.x
                     + (sample * input->x_pixel_size);
                 if (first_sample)
@@ -1411,8 +1425,8 @@ static int calculate_pixel_atmospheric_parameters
                     /* Determine the first center point from all of the
                        available points */
                     center_point = determine_first_center_grid_point(
-                                       points, longitude, latitude,
-                                       grid_points);
+                                       grid_pt_lon, grid_pt_lat, geo.lon,
+                                       geo.lat, num_points, grid_points);
 
                     /* Set first_sample to be false */
                     first_sample = false;
@@ -1422,8 +1436,8 @@ static int calculate_pixel_atmospheric_parameters
                     /* Determine the center point from the current 9 grid
                        points for the current line/sample */
                     center_point = determine_center_grid_point(
-                                       points, longitude, latitude,
-                                       NUM_GRID_POINTS, grid_points);
+                                       grid_pt_lon, grid_pt_lat, geo.lon,
+                                       geo.lat, NUM_GRID_POINTS, grid_points);
                 }
 
                 /* Fix the index values, since the points are from a new line
@@ -1440,8 +1454,9 @@ static int calculate_pixel_atmospheric_parameters
 
                 /* Fix the distances, since the points are from a new line or
                    were messed up during determining the center point */
-                determine_grid_point_distances (points, longitude, latitude,
-                                                NUM_GRID_POINTS, grid_points);
+                determine_grid_point_distances(grid_pt_lon, grid_pt_lat,
+                                               geo.lon, geo.lat,
+                                               NUM_GRID_POINTS, grid_points);
 
                 /* Determine the average distances for each quadrant around
                    the center point. We only need to use the three outer grid 
@@ -1550,6 +1565,8 @@ static int calculate_pixel_atmospheric_parameters
 
     /* Free allocated memory */
     free(grid_points);
+    free(grid_pt_lat);
+    free(grid_pt_lon);
     free(elevation_data);
     free_intermediate(&inter);
 
@@ -1691,6 +1708,7 @@ static int load_grid_points
     FILE *grid_fd = NULL;
 
     int status;
+    int i;         /* loop counter */
 
     char binary_filename[] = "grid_points.bin";
     char errmsg[PATH_MAX];
