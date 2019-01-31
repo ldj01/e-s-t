@@ -973,21 +973,12 @@ static double haversine_distance
     double lat_2   /* I: latitude (radians) for the second point */
 )
 {
-
-    double sin_lon;       /* Intermediate value */
-    double sin_lat;       /* Intermediate value */
-    double sin_lon_sqrd;  /* Intermediate value */
-    double sin_lat_sqrd;  /* Intermediate value */
-
-    /* Figure out some sines */
-    sin_lon = sin((lon_2 - lon_1)*0.5);
-    sin_lat = sin((lat_2 - lat_1)*0.5);
-    sin_lon_sqrd = sin_lon * sin_lon;
-    sin_lat_sqrd = sin_lat * sin_lat;
+    double sin_lon = sin((lon_2 - lon_1)*0.5);
+    double sin_lat = sin((lat_2 - lat_1)*0.5);
 
     /* Compute and return the distance */
-    return EQUATORIAL_RADIUS * 2 + asin(sqrt(sin_lat_sqrd 
-        + cos(lat_1) * cos(lat_2) * sin_lon_sqrd));
+    return EQUATORIAL_RADIUS * 2
+        + asin(sqrt(sin_lat*sin_lat + cos(lat_1)*cos(lat_2)*sin_lon*sin_lon));
 }
 
 /******************************************************************************
@@ -1097,7 +1088,6 @@ static void interpolate_to_location
     int point;
     int parameter;
 
-    double inv_h[NUM_CELL_POINTS];
     double w[NUM_CELL_POINTS];
     double total = 0.0;
     double inv_total;
@@ -1105,24 +1095,21 @@ static void interpolate_to_location
     /* Shepard's method */
     for (point = 0; point < NUM_CELL_POINTS; point++)
     {
-        inv_h[point] = 1.0 / sqrt (((points->points[vertices[point]].map_x
-                                     - interpolate_easting)
-                                    * (points->points[vertices[point]].map_x
-                                       - interpolate_easting))
-                                   +
-                                   ((points->points[vertices[point]].map_y
-                                     - interpolate_northing)
-                                    * (points->points[vertices[point]].map_y
-                                       - interpolate_northing)));
+        double delta_x = points->points[vertices[point]].map_x
+                       - interpolate_easting;
+        double delta_y = points->points[vertices[point]].map_y
+                       - interpolate_northing;
 
-        total += inv_h[point];
+        w[point] = 1.0 / sqrt(delta_x*delta_x + delta_y*delta_y);
+
+        total += w[point];
     }
 
-    /* Determine the weights for each vertex */
+    /* Normalize the weights for each vertex. */
     inv_total = 1/total;
     for (point = 0; point < NUM_CELL_POINTS; point++)
     {
-        w[point] = inv_h[point]*inv_total;
+        w[point] *= inv_total;
     }
 
     /* For each parameter apply each vertex's weighted value */
