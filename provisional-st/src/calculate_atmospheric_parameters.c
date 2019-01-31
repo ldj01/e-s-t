@@ -1004,47 +1004,36 @@ static void interpolate_to_height
 {
     int parameter;
     int elevation;
-    int below = 0;
-    int above = 0;
+    int below;
+    int above;
 
     double below_parameters[AHP_NUM_PARAMETERS];
     double above_parameters[AHP_NUM_PARAMETERS];
 
-    double slope;
+    double interp_ratio; /* interpolation ratio */
 
-    double above_height;
-    double inv_height_diff; /* To remove the multiple divisions */
-
-    /* Find the height to use that is below the interpolate_to height */
+    /* Find the heights between which the pixel height sits.
+       The heights are in increasing order. */
     for (elevation = 0; elevation < modtran_point.count; elevation++)
     {
-        if (modtran_point.elevations[elevation].elevation < interpolate_to)
-        {
-            below = elevation; /* Last match will always be the one we want */
-        }
+        if (modtran_point.elevations[elevation].elevation >= interpolate_to)
+            break;
     }
-
-    /* Find the height to use that is equal to or above the interpolate_to
-       height.  It will always be the same or the next height */ 
-    above = below; /* Start with the same */
-    if (above != (modtran_point.count - 1))
+    if (elevation < modtran_point.count)
     {
-        /* Not the last height */
-
-        /* Check to make sure that we are not less that the below height,
-           indicating that our interpolate_to height is below the first
-           height */
-        if (! (interpolate_to < modtran_point.elevations[above].elevation))
-        {
-            /* Use the next height, since it will be equal to or above our
-               interpolate_to height */
-            above++;
-        }
-        /* Else - We are at the first height, so use that for both above and
-                  below */
+        above = elevation;
+        if (above != 0)
+            below = above - 1;
+        else
+            /* All heights are above the pixel height, use the first value. */
+            below = 0;
     }
-    /* Else - We are at the last height, so use that for both above and
-              below */
+    else
+    {
+        /* All heights are below the pixel height, so use the final value. */
+        above = modtran_point.count - 1;
+        below = above;
+    }
 
     below_parameters[AHP_TRANSMISSION] =
         modtran_point.elevations[below].transmission;
@@ -1066,9 +1055,10 @@ static void interpolate_to_height
     else
     {
         /* Interpolate between the heights for each parameter */
-        above_height = modtran_point.elevations[above].elevation;
-        inv_height_diff = 1.0 / (above_height
-                                 - modtran_point.elevations[below].elevation);
+        interp_ratio = (interpolate_to -
+                        modtran_point.elevations[above].elevation)
+                     / (modtran_point.elevations[above].elevation -
+                        modtran_point.elevations[below].elevation);
 
         above_parameters[AHP_TRANSMISSION] =
             modtran_point.elevations[above].transmission;
@@ -1079,11 +1069,9 @@ static void interpolate_to_height
 
         for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
         {
-            slope = (above_parameters[parameter] - below_parameters[parameter])
-                    * inv_height_diff;
-
-            at_height[parameter] = slope*(interpolate_to - above_height)
-                                 + above_parameters[parameter];
+            at_height[parameter] = interp_ratio
+                * (above_parameters[parameter] - below_parameters[parameter])
+                + above_parameters[parameter];
         }
     }
 }
@@ -1708,7 +1696,6 @@ static int load_grid_points
     FILE *grid_fd = NULL;
 
     int status;
-    int i;         /* loop counter */
 
     char binary_filename[] = "grid_points.bin";
     char errmsg[PATH_MAX];
