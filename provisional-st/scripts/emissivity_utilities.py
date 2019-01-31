@@ -310,7 +310,7 @@ def locate_aster_ged_tile(url, filename):
         downloaded = True
     else: # See if the file is accessible locally, but in another directory
         # If URL is just a path
-        local_h5_file_path = ''.join([url, filename])
+        local_h5_file_path = os.path.join(url, filename)
         if os.path.exists(local_h5_file_path):
             h5_file_path = local_h5_file_path
         else:
