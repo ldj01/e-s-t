@@ -336,7 +336,7 @@ class TestModtran(TestST):
         self.copy_dirs = glob.glob(
             os.path.join(self.unit_test_data_dir, '00?_00?_???_???'))
         for d in self.copy_dirs:
-            shutil.copytree(d, os.path.basename(d))
+            shutil.copytree(d, os.path.basename(d), symlinks=True)
 
         self.modtran_data_path = os.environ['MODTRAN_DATA']
         self.assertTrue(os.path.exists(self.modtran_data_path))

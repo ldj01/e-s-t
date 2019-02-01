@@ -14,4 +14,8 @@ add_test(NAME TestGenerateProducts COMMAND python3 -m unittest st-tests.TestGene
 set_property(TEST TestAtmosParam
     PROPERTY ENVIRONMENT
     PATH=${CMAKE_CURRENT_BINARY_DIR}/../../src:$ENV{PATH})
+set_tests_properties(TestGridPoints TestAuxMerra TestAuxNarr TestModtranInput
+    TestEmissivity TestEmissivityStdev TestModtran TestAtmosParam
+    TestBuildSTData TestDistToCloud TestQA TestConvert TestGenerateProducts
+    PROPERTIES RESOURCE_LOCK working_directory)
 
