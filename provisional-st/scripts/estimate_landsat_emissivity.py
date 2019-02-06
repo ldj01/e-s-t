@@ -340,7 +340,7 @@ def generate_estimated_emis_tile(coefficients, tile_name,
     del aster_b14_no_data_locations
 
     # Create the estimated Landsat EMIS raster output tile
-    logger.info('Creating an estimated Landsat EMIS tile {}'.format(tile_name))
+    logger.debug('Creating an estimated Landsat EMIS tile {}'.format(tile_name))
     util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                   tile_name,
                                   emis_data,
@@ -386,7 +386,7 @@ def generate_aster_ndvi_tile(tile_name, ndvi_data,
     data[ndvi_no_data_locations] = no_data_value
 
     # Create the ASTER NDVI raster output tile
-    logger.info('Creating an ASTER NDVI tile {}'.format(tile_name))
+    logger.debug('Creating an ASTER NDVI tile {}'.format(tile_name))
     util.Geo.generate_raster_file(gdal.GetDriverByName('GTiff'),
                                   tile_name,
                                   data,

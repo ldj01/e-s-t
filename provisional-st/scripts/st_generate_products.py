@@ -309,6 +309,10 @@ def run_modtran(modtran_data_path, process_count, debug):
         debug <bool>: Debug logging and processing
     """
 
+    logger = logging.getLogger(__name__)
+    logger.info('*** Run MODTRAN ***')
+
+
     output = ''
     try:
         cmd = ['st_run_modtran.py',
@@ -321,8 +325,9 @@ def run_modtran(modtran_data_path, process_count, debug):
         output = util.System.execute_cmd(' '.join(cmd))
     finally:
         if output: # Check if output is empty
-            logger = logging.getLogger(__name__)
             logger.info(output)
+
+    logger.info('*** MODTRAN Complete ***')
 
 
 def generate_distance_to_cloud(xml_filename, debug):

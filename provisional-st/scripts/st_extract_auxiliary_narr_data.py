@@ -163,7 +163,7 @@ def extract_from_grib(aux_set):
                    '-d', record,
                    '-text', '-nh', '-o', path]
             cmd = ' '.join(cmd)
-            logger.info('wgrib command = [{}]'.format(cmd))
+            logger.debug('wgrib command = [{}]'.format(cmd))
 
             # Extract the pressure data and raise any errors
             output = ''
@@ -175,7 +175,7 @@ def extract_from_grib(aux_set):
                 raise
             finally:
                 if len(output) > 0:
-                    logger.info(output)
+                    logger.debug(output)
 
 
 def extract_narr_aux_data(espa_metadata, aux_path):
@@ -196,7 +196,6 @@ def extract_narr_aux_data(espa_metadata, aux_path):
     for aux_set in aux_filenames(aux_path, PARMS_TO_EXTRACT,
                                  t0_date, t1_date):
 
-        logger.info('Using {0}'.format(aux_set.hdr))
         logger.info('Using {0}'.format(aux_set.grb))
 
         # Verify that the files we need exist

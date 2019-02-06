@@ -173,7 +173,7 @@ def process_point_dir(point_pair):
 
     try:
         for tape5_path in r_paths:
-            logger.info('Processing Directory [{}]'.format(tape5_path))
+            logger.debug('Processing Directory [{}]'.format(tape5_path))
             os.chdir(tape5_path)
             # MODTRAN requires the directory to always be named 'DATA'
             util.System.create_link(modtran_data_path, 'DATA')

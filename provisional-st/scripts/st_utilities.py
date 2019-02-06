@@ -90,7 +90,7 @@ class System(object):
 
         output = ''
 
-        logger.info('Executing [%s]', cmd)
+        logger.debug('Executing [%s]', cmd)
         (status, output) = subprocess.getstatusoutput(cmd)
 
         if status < 0:
@@ -437,7 +437,7 @@ class Geo(object):
 
         logger = logging.getLogger(__name__)
 
-        cmd = ['gdalwarp', '-wm', '2048', '-wo', 'NUM_THREADS=2',
+        cmd = ['gdalwarp', '-q', '-wm', '2048', '-wo', 'NUM_THREADS=2',
                '-srcnodata', str(no_data_value),
                '-dstnodata', str(no_data_value)]
         cmd.extend(src_names)
