@@ -106,7 +106,7 @@ def extract_variables(cfg, source_filename, date):
     # Figure out the filenames to create
     dload_dir = cfg.get('merra2_temp_directory')
     dest_filename = (cfg.get('merra2_filename_format')
-                     .format(date.year, date.month, date.day, 'nc4'))
+                     .format(date.year, date.month, date.day))
     dest_filename = os.path.join(dload_dir, dest_filename)
     logger.debug('Destination Filename [%s]', dest_filename)
 
@@ -119,7 +119,8 @@ def extract_variables(cfg, source_filename, date):
 
     # Archive the file
     arc_path = cfg.get('merra2_base_archive')
-    arc_path = cfg.get('merra2_archive_format').format(arc_path, date.year)
+    arc_path = cfg.get('merra2_archive_format').format(arc_path, date.year,
+                                                       date.month)
     arc_file = os.path.join(arc_path, os.path.basename(dest_filename))
     logger.info('Archiving into [%s]', arc_path)
     shutil.move(dest_filename, arc_file)
@@ -162,7 +163,7 @@ def archive_aux_data(args, cfg, archive, con, dbh):
         # not exist
         arc_path = cfg.get('merra2_base_archive')
         arc_path = cfg.get('merra2_archive_format').format(arc_path, 
-                s_date.year)
+                s_date.year, s_date.month)
         System.create_directory(arc_path)
 
         # Determine archive filename for this date and if it needs processing
