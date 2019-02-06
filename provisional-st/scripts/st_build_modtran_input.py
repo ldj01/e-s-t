@@ -738,7 +738,7 @@ def write_tape5_file(filename, head_data, body_data, tail_data):
 
     logger = logging.getLogger(__name__)
 
-    logger.info('Creating [{}]'.format(filename))
+    logger.debug('Creating [{}]'.format(filename))
 
     with open(filename, 'w') as tape5_fd:
         tape5_fd.write(head_data)
