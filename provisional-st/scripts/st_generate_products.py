@@ -6,8 +6,7 @@
     Purpose: Runs all of the sub-applications required to generate ST
              products.
 
-    Project: Land Satellites Data Systems Science Research and Development
-             (LSRD) at the USGS EROS
+    Project: IAS/LPGS L1/L2 DPAS at the USGS EROS
 
     License: NASA Open Source Agreement 1.3
 '''
@@ -19,16 +18,16 @@ import glob
 import shutil
 from argparse import ArgumentParser
 from configparser import ConfigParser
-
+import datetime
+from espa import Metadata
 import st_utilities as util
-
 from st_grid_points import (GRID_POINT_HEADER_NAME,
                              GRID_POINT_BINARY_NAME)
-
 from st_build_modtran_input import NARR_PARAMETERS, MERRA_PARAMETERS
-
 import build_st_data
 
+# GEOS5 data is available from 2000-01-01
+GEOS5_AVAILABLE_DATE = "2000-01-01"
 
 def retrieve_command_line_arguments():
     """Read arguments from the command line
@@ -61,8 +60,8 @@ def retrieve_command_line_arguments():
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
                         required=False, default='MERRA2',
-                        choices=['NARR','MERRA2'],
-                        help='Reanalysis source - NARR or MERRA2')
+                        choices=['NARR','MERRA2','GEOS5'],
+                        help='Reanalysis source - NARR, MERRA2 or GEOS5')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -169,7 +168,7 @@ def determine_grid_points(xml_filename, data_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
         debug <bool>: Debug logging and processing
     """
 
@@ -196,7 +195,7 @@ def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         aux_path <str>: Directory for the auxiliary data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
         debug <bool>: Debug logging and processing
     """
 
@@ -205,11 +204,18 @@ def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
         if reanalysis == "NARR":
             cmd = ['st_extract_auxiliary_narr_data.py',
                '--xml', xml_filename,
-               '--aux_path', aux_path]
+               '--aux_path', aux_path,
+               '--reanalysis', reanalysis]
         elif reanalysis == "MERRA2":
             cmd = ['st_extract_auxiliary_merra_data.py',
                    '--xml', xml_filename,
-                   '--aux_path', aux_path]
+                   '--aux_path', aux_path,
+                   '--reanalysis', reanalysis]
+        elif reanalysis == "GEOS5":
+            cmd = ['st_extract_auxiliary_geos5_data.py',
+                   '--xml', xml_filename,
+                   '--aux_path', aux_path,
+                   '--reanalysis', reanalysis]
         else:
             raise Exception('Unknown reanalysis type [{}]'.format(reanalysis))
 
@@ -229,7 +235,7 @@ def build_modtran_input(xml_filename, data_path, reanalysis, debug):
     Args:
         xml_filename <str>: XML metadata filename
         data_path <str>: Directory for ST data files
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 GEOS5
         debug <bool>: Debug logging and processing
     """
 
@@ -392,7 +398,7 @@ def cleanup_temporary_data(reanalysis):
     """Cleanup/remove all the ST temporary files and directories 
 
     Args:
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
     """
 
     GRID_POINT_ELEVATION_NAME = 'grid_elevations.txt'
@@ -425,7 +431,7 @@ def cleanup_temporary_data(reanalysis):
 
     if reanalysis == "NARR":
         parameters = NARR_PARAMETERS
-    elif reanalysis == "MERRA2":
+    elif reanalysis == "MERRA2" or reanalysis == "GEOS5":
         parameters = MERRA_PARAMETERS
     else:
         raise Exception('Unknown reanalysis type [{}]'.format(reanalysis))
@@ -490,6 +496,26 @@ def main():
 
     logger.info('*** Begin ST Generate Products ***')
 
+    # Obtain reanalysis from arguments
+    reanalysis = args.reanalysis
+
+    logger.info('*** Use auxiliary %s data ***', reanalysis)
+
+    # Parse XML Metadata to find Landsat scene acquisition date
+    espa_metadata = Metadata()
+    espa_metadata.parse(xml_filename=args.xml_filename)
+
+    acquisition_date = espa_metadata.xml_object.global_metadata.acquisition_date
+    acquisition_date = str(acquisition_date)
+    acquisition_date = datetime.datetime.strptime(acquisition_date, "%Y-%m-%d")
+    GEOS5_STARTING_DATE = datetime.datetime.strptime(GEOS5_AVAILABLE_DATE,
+                                                     "%Y-%m-%d")
+    # Use MERRA2 data if acquisition date is later than GEOS5_AVAILABLE_DATE
+    if (reanalysis == 'GEOS5') and (acquisition_date < GEOS5_STARTING_DATE):
+        reanalysis = 'MERRA2'
+        logger.info('*** GEOS5 aux data is not available: defaulting to %s ***',
+            reanalysis)
+
     if args.espa:
         # Retrieve the processing configuration
         proc_cfg = retrieve_cfg(PROC_CFG_FILENAME)
@@ -503,8 +529,10 @@ def main():
         # Determine ST data locations
         data_path = proc_cfg.get('processing', 'st_data_path')
 
-        # Determine auxiliary (NARR or MERRA2) data locations
-        if args.reanalysis == 'MERRA2':
+        # Determine auxiliary (NARR, MERRA2 or GEOS5) data locations
+        if reanalysis == 'GEOS5':
+            aux_path = proc_cfg.get('processing', 'st_geos5_aux_path')
+        elif reanalysis == 'MERRA2':
             aux_path = proc_cfg.get('processing', 'st_merra_aux_path')
         elif reanalysis == "NARR":
             aux_path = proc_cfg.get('processing', 'st_aux_path')
@@ -526,8 +554,8 @@ def main():
             raise Exception('[ST_DATA_DIR] not found in environment')
         data_path = os.environ.get('ST_DATA_DIR')
 
-        # Determine auxiliary (NARR or MERRA2) data locations
-        aux_path_variable = '{0}_AUX_DIR'.format(args.reanalysis)
+        # Determine auxiliary (NARR, MERRA2 or GEOS5) data locations
+        aux_path_variable = '{0}_AUX_DIR'.format(reanalysis)
         if aux_path_variable not in os.environ:
             raise Exception('[{0}] not found in environment'
                             .format(aux_path_variable))
@@ -549,17 +577,17 @@ def main():
     # -------------- Generate the products --------------
     determine_grid_points(xml_filename=args.xml_filename,
                           data_path=data_path,
-                          reanalysis=args.reanalysis,
+                          reanalysis=reanalysis,
                           debug=args.debug)
 
     extract_auxiliary_data(xml_filename=args.xml_filename,
-                                aux_path=aux_path,
-                           reanalysis=args.reanalysis,
-                                debug=args.debug)
+                           aux_path=aux_path,
+                           reanalysis=reanalysis,
+                           debug=args.debug)
 
     build_modtran_input(xml_filename=args.xml_filename,
                         data_path=data_path,
-                        reanalysis=args.reanalysis,
+                        reanalysis=reanalysis,
                         debug=args.debug)
 
     generate_emissivity_products(xml_filename=args.xml_filename,
@@ -610,7 +638,7 @@ def main():
     # Clean up files and directories according to user selections, or
     # for intermediate bands convert them if they are to be kept.
     if not args.temporary:
-        cleanup_temporary_data(reanalysis=args.reanalysis)
+        cleanup_temporary_data(reanalysis=reanalysis)
 
     if args.intermediate:
         convert_intermediate_bands(xml_filename=args.xml_filename,

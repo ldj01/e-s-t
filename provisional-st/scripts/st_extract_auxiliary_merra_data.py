@@ -3,11 +3,10 @@
 '''
     FILE: st_extract_auxiliary_merra_data.py
 
-    PURPOSE: Performs setup and extracts MERRA data from the NetCDF 
+    PURPOSE: Performs setup and extracts MERRA or GEOS5 data from the NetCDF
              auxiliary files.
 
-    PROJECT: Land Satellites Data Systems Science Research and Development
-             (LSRD) at the USGS EROS
+    PROJECT: IAS/LPGS L1/L2 DPAS at the USGS EROS
 
     LICENSE: NASA Open Source Agreement 1.3
 '''
@@ -27,13 +26,18 @@ import st_utilities as util
 # QV - Specific humidity
 # T - Air temperature
 PARMS_TO_EXTRACT = ['H', 'QV', 'T']
-AUX_PATH_TEMPLATE = '{0:0>4}/{1:0>2}'
-AUX_NAME_TEMPLATE = 'merra2_{0:04}{1:02}{2:02}.{3}'
 
 PRESSURE_LAYERS = [1000, 975, 950, 925, 900, 875, 850, 825, 800,
                    775, 750, 725, 700, 650, 600, 550, 500, 450,
                    400, 350, 300, 250, 200, 150, 100, 70, 50, 40,
                    30, 20, 10, 7, 5, 4, 3, 2, 1, 0.7, 0.5, 0.4, 0.3, 0.1]
+
+# Global template variables
+AUX_PATH_TEMPLATE_GEOS5 = '{0:0>4}/{1:0>2}/{2:0>2}'
+AUX_NAME_TEMPLATE_GEOS5 = 'fpit_{0:04}{1:02}{2:02}.{3:04}.{4}'
+
+AUX_PATH_TEMPLATE_MERRA2 = '{0:0>4}/{1:0>2}'
+AUX_NAME_TEMPLATE_MERRA2 = 'merra2_{0:04}{1:02}{2:02}.{3}'
 
 def retrieve_command_line_arguments():
     """Read arguments from the command line
@@ -42,7 +46,7 @@ def retrieve_command_line_arguments():
         args <arguments>: The arguments read from the command line
     """
 
-    parser = ArgumentParser(description='Retrieves and generates auxillary'
+    parser = ArgumentParser(description='Retrieves and generates auxiliary'
                                         ' ST inputs, then processes and'
                                         ' calls other executables for ST'
                                         ' generation')
@@ -60,6 +64,12 @@ def retrieve_command_line_arguments():
                         action='store', dest='aux_path',
                         required=False, default=None,
                         help='Base auxiliary data directory to use')
+
+    parser.add_argument('--reanalysis',
+                        action='store', dest='reanalysis',
+                        required=False, default='MERRA2',
+                        choices=['NARR','MERRA2','GEOS5'],
+                        help='Reanalysis source - NARR, MERRA2 or GEOS5')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -94,12 +104,12 @@ AuxFilenameSet = namedtuple('AuxFilenameSet',
                             ('parameter', 'nc4', 'hour', 'output_dir'))
 
 
-def build_aux_filename(aux_path, parm, date, date_type):
+def build_aux_filename(reanalysis, aux_path, parm, date, date_type):
     """Builds a filename set based on date and time
 
     Args:
-        aux_path <str>: Path to base auxiliary (MERRA) data
-        parm <str>: MERRA parameter to extract
+        aux_path <str>: Path to base auxiliary (MERRA or GEOS5) data
+        parm <str>: MERRA or GEOS5 parameter to extract
         date <datetime>: Date and time of parameter to extract 
         date_type <str>: Type of date - time 0/1 (before/after scene center)
 
@@ -107,27 +117,33 @@ def build_aux_filename(aux_path, parm, date, date_type):
         <AuxFilenameSet>: The set of filenames
     """
 
-    filename = AUX_NAME_TEMPLATE.format(date.year,
-                                        date.month,
-                                        date.day,
-                                        'nc4')
+    if reanalysis == "GEOS5":
+        filename = AUX_NAME_TEMPLATE_GEOS5.format(date.year,
+                                                  date.month,
+                                                  date.day,
+                                                  date.hour * 100,
+                                                  'nc4')
+        path = AUX_PATH_TEMPLATE_GEOS5.format(date.year, date.month, date.day)
 
-    path = AUX_PATH_TEMPLATE.format(date.year, date.month)
+    elif reanalysis == "MERRA2":
+        filename = AUX_NAME_TEMPLATE_MERRA2.format(date.year,
+                                                   date.month,
+                                                   date.day,
+                                                   'nc4')
+        path = AUX_PATH_TEMPLATE_MERRA2.format(date.year, date.month)
 
     nc4_path = os.path.join(aux_path, path, filename)
-
     return AuxFilenameSet(parameter=parm,
                           nc4=nc4_path,
                           hour=date.hour,
                           output_dir='{0}_{1}'.format(parm, date_type))
 
-
-def aux_filenames(aux_path, parms, date, date_type):
+def aux_filenames(reanalysis, aux_path, parms, date, date_type):
     """Builds filename sets for each parameter
 
     Args:
-        aux_path <str>: Path to base auxiliary (MERRA) data
-        parm <list[str]>: List of MERRA parameters to extract
+        aux_path <str>: Path to base auxiliary (MERRA or GEOS5) data
+        parm <list[str]>: List of MERRA or GEOS5 parameters to extract
         t0_date <datetime>: Time 0 before scene center
         t1_date <datetime>: Time 1 after scene center
         date_type <str>: Type of date - time 0/1 (before/after scene center)
@@ -137,7 +153,7 @@ def aux_filenames(aux_path, parms, date, date_type):
     """
 
     for parm in parms:
-        yield build_aux_filename(aux_path=aux_path, parm=parm,
+        yield build_aux_filename(reanalysis, aux_path=aux_path, parm=parm,
                                   date=date, date_type=date_type)
 
 
@@ -183,12 +199,12 @@ def extract_from_netcdf(aux_set):
             np.savetxt(output_filename, latlon.filled(9.999e+20),
                 fmt='%s', delimiter='\n')
 
-def extract_merra_aux_data(espa_metadata, aux_path):
-    """Extracts the required MERRA data from the auxiliary archive
+def extract_merra_aux_data(espa_metadata, aux_path, reanalysis):
+    """Extracts the required MERRA or GEOS5 data from the auxiliary archive
 
     Args:
         espa_metadata <espa.Metadata>: The metadata structure for the scene
-        aux_path <str>: Path to base auxiliary (MERRA) data
+        aux_path <str>: Path to base auxiliary (MERRA or GEOS5) data
     """
 
     logger = logging.getLogger(__name__)
@@ -199,7 +215,7 @@ def extract_merra_aux_data(espa_metadata, aux_path):
     logger.info(' After Date = {}'.format(str(t1_date)))
 
     for (date, date_type) in zip([t0_date, t1_date], ['t0', 't1']):
-        for aux_set in aux_filenames(aux_path, PARMS_TO_EXTRACT,
+        for aux_set in aux_filenames(reanalysis, aux_path, PARMS_TO_EXTRACT,
                                      date, date_type):
 
             logger.info('Using {0}'.format(aux_set.nc4))
@@ -233,21 +249,24 @@ def main():
                         stream=sys.stdout)
     logger = logging.getLogger(__name__)
 
-    logger.info('*** Begin Extract Auxiliary MERRA Data ***')
+    logger.info('*** Begin Extract Auxiliary {0} Data ***'
+               .format(args.reanalysis))
 
     # XML Metadata
     espa_metadata = Metadata()
     espa_metadata.parse(xml_filename=args.xml_filename)
 
     try:
-        logger.info('Extracting ST AUX data')
-        extract_merra_aux_data(espa_metadata, args.aux_path)
+        logger.info('Extracting ST AUX %s: data', args.reanalysis)
+        extract_merra_aux_data(espa_metadata, args.aux_path, args.reanalysis)
 
     except Exception:
-        logger.exception('Failed processing auxiliary MERRA data')
+        logger.exception('Failed processing auxiliary {0} data'
+                        .format(args.reanalysis))
         raise
 
-    logger.info('*** Extract Auxiliary MERRA Data - Complete ***')
+    logger.info('*** Extract Auxiliary {0} Data - Complete ***'
+               .format(args.reanalysis))
 
 
 if __name__ == '__main__':

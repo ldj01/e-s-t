@@ -144,6 +144,32 @@ class TestAuxMerra(TestST):
                self.xml_filename, "--aux_path", self.aux_path]
         self.run_test_case(cmd)
 
+class TestAuxGeos5(TestST):
+    """ Test st_extract_auxiliary_geos5_data.py """
+
+    def setUp(self):
+        super(TestAuxGeos5, self).setUp()
+
+        self.aux_path = os.environ['GEOS5_AUX_DIR']
+        self.assertTrue(os.path.exists(self.aux_path))
+
+        self.setUpTestLinks()
+
+        self.check_dirs = [
+            os.path.join(self.unit_test_data_dir, 'geos5', 'H_t0'),
+            os.path.join(self.unit_test_data_dir, 'geos5', 'H_t1'),
+            os.path.join(self.unit_test_data_dir, 'geos5', 'QV_t0'),
+            os.path.join(self.unit_test_data_dir, 'geos5', 'QV_t1'),
+            os.path.join(self.unit_test_data_dir, 'geos5', 'T_t0'),
+            os.path.join(self.unit_test_data_dir, 'geos5', 'T_t1')
+            ]
+
+    def test_run(self):
+        cmd = ["../st_extract_auxiliary_geos5_data.py", "--xml",
+              self.xml_filename, "--aux_path", self.aux_path,
+              "--reanalysis", "GEOS5"]
+        self.run_test_case(cmd)
+
 class TestAuxNarr(TestST):
     """Test st_extract_auxiliary_narr_data.py
 

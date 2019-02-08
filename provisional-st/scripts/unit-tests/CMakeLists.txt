@@ -1,5 +1,6 @@
 add_test(NAME TestGridPoints COMMAND python3 -m unittest st-tests.TestGridPoints WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME TestAuxMerra COMMAND python3 -m unittest st-tests.TestAuxMerra WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME TestAuxGeos5 COMMAND python3 -m unittest st-tests.TestAuxGeos5 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME TestAuxNarr COMMAND python3 -m unittest st-tests.TestAuxNarr WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME TestModtranInput COMMAND python3 -m unittest st-tests.TestModtranInput WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME TestEmissivity COMMAND python3 -m unittest st-tests.TestEmissivity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -14,8 +15,8 @@ add_test(NAME TestGenerateProducts COMMAND python3 -m unittest st-tests.TestGene
 set_property(TEST TestAtmosParam
     PROPERTY ENVIRONMENT
     PATH=${CMAKE_CURRENT_BINARY_DIR}/../../src:$ENV{PATH})
-set_tests_properties(TestGridPoints TestAuxMerra TestAuxNarr TestModtranInput
-    TestEmissivity TestEmissivityStdev TestModtran TestAtmosParam
-    TestBuildSTData TestDistToCloud TestQA TestConvert TestGenerateProducts
+set_tests_properties(TestGridPoints TestAuxMerra TestAuxGeos5 TestAuxNarr 
+    TestModtranInput TestEmissivity TestEmissivityStdev TestModtran 
+    TestAtmosParam TestBuildSTData TestDistToCloud TestQA TestConvert 
+    TestGenerateProducts
     PROPERTIES RESOURCE_LOCK working_directory)
-

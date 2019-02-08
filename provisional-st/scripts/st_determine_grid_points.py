@@ -85,8 +85,8 @@ def retrieve_command_line_arguments():
     parser.add_argument('--reanalysis',
                         action='store', dest='reanalysis',
                         required=False, default='MERRA2',
-                        choices=['NARR','MERRA2'],
-                        help='Reanalysis source - NARR or MERRA2')
+                        choices=['NARR','MERRA2','GEOS5'],
+                        help='Reanalysis source - NARR, MERRA2 or GEOS5')
 
     parser.add_argument('--debug',
                         action='store_true', dest='debug',
@@ -182,7 +182,7 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
     Args:
         espa_metadata <espa.Metadata>: The metadata for the data
         gdal_objs <GdalInfo>: Contains GDAL objects and static information
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
 
     Returns:
         <DataBoundInfo>: Contains adjusted data boundary information
@@ -190,7 +190,7 @@ def determine_adjusted_data_bounds(espa_metadata, gdal_objs, reanalysis):
 
     if reanalysis == "NARR":
         adjustment = 32000 * 1.5
-    elif reanalysis == "MERRA2":
+    elif reanalysis == "MERRA2" or reanalysis == 'GEOS5':
         adjustment = 69500 * 2.0 
     else:
         raise Exception('Unknown reanalysis source {0}'.format(reanalysis))
@@ -497,7 +497,7 @@ def extract_row_col(data_bounds, line, reanalysis):
     Args:
         data_bounds <DataBoundInfo>: Contains adjusted data boundary information
         line <str>: The line of information read from the coordinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
 
     Returns:
         row <int>: The row for the point
@@ -528,7 +528,7 @@ def determine_min_max_row_col(data_bounds, data_path, reanalysis,
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The full path to the reanalysis coordinates file
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
         cross_antimeridian <str>: Flag for scene crossing 180 meridian 
 
     Returns:
@@ -581,7 +581,7 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The directory for the coodinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
 
     Returns:
         grid_points <dict>: Dictionary of the gridded points
@@ -592,10 +592,11 @@ def determine_gridded_points(debug, gdal_objs, data_bounds,
     logger = logging.getLogger(__name__)
 
     # Determine full path to the file
+    # GEOS5 uses same coordinates as used by MERRA2
 
     if reanalysis == "NARR":
         data_path = os.path.join(data_path, NARR_COORDINATES_FILENAME)
-    elif reanalysis == "MERRA2":
+    elif reanalysis == "MERRA2" or reanalysis == "GEOS5":
         data_path = os.path.join(data_path, MERRA2_COORDINATES_FILENAME)
     else:
         data_path = None
@@ -680,7 +681,7 @@ def generate_point_grid(debug, gdal_objs, data_bounds, data_path, reanalysis):
         data_bounds <DataBoundInfo>: Contains adjusted data boundary
                                      information
         data_path <str>: The directory for the coodinate file
-        reanalysis <str>: Reanalysis source: NARR or MERRA2
+        reanalysis <str>: Reanalysis source: NARR, MERRA2 or GEOS5
 
     Notes: The file format contains lines of the following information.
                'Grid_Column Grid_Row Grid_Latitude Grid_Longitude'
