@@ -339,8 +339,8 @@ class BuildSTData(object):
         st_band.set('name', 'surface_temperature')
         st_band.set('category', 'image')
         st_band.set('data_type', 'UINT16')
-        st_band.set('scale_factor', "%.6f" % self.scale)
-        st_band.set('add_offset', "%.6f" % self.offset)
+        st_band.set('scale_factor', "%g" % self.scale)
+        st_band.set('add_offset', "%g" % self.offset)
         st_band.set('nlines', str(int(base_band.get("nlines"))))
         st_band.set('nsamps', str(int(base_band.get("nsamps"))))
         st_band.set('fill_value', str(self.no_data_value))
@@ -361,8 +361,10 @@ class BuildSTData(object):
 
         # Create a valid range element and add attributes to it
         st_band.valid_range = em.element()
-        st_band.valid_range.set('min', '1500')
-        st_band.valid_range.set('max', '3730')
+        scaled_min = (150.0 - self.offset) / self.scale
+        scaled_max = (373.0 - self.offset) / self.scale
+        st_band.valid_range.set('min', "%g" % scaled_min)
+        st_band.valid_range.set('max', "%g" % scaled_max)
 
         st_band.app_version = em.element(str(util.Version.app_version()))
 
