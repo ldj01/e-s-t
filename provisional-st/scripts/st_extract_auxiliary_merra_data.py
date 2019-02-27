@@ -142,10 +142,10 @@ def aux_filenames(reanalysis, aux_path, parms, date, date_type):
     """Builds filename sets for each parameter
 
     Args:
+        reanalysis <str>: Type of auxiliary data
         aux_path <str>: Path to base auxiliary (MERRA or GEOS5) data
-        parm <list[str]>: List of MERRA or GEOS5 parameters to extract
-        t0_date <datetime>: Time 0 before scene center
-        t1_date <datetime>: Time 1 after scene center
+        parms <list[str]>: List of MERRA or GEOS5 parameters to extract
+        date <datetime>: Time to extract
         date_type <str>: Type of date - time 0/1 (before/after scene center)
 
     Returns:
@@ -169,7 +169,7 @@ def extract_from_netcdf(aux_set):
 
     util.System.create_directory(aux_set.output_dir)
 
-    # Open the NetCDF file.
+    # Read the NetCDF file.
     f = nc4.Dataset(aux_set.nc4, 'r')
 
     # Find the index for the hour. 
@@ -187,17 +187,15 @@ def extract_from_netcdf(aux_set):
                         format(pressure_layers[pressure_index]))
 
         # Build the output file.
-        output_filename = os.path.join(aux_set.output_dir, str(pressure_layer)
-            + ".txt")
+        output_filename = os.path.join(aux_set.output_dir, str(pressure_layer))
 
         # Write the data for the pressure layer, time, and parameter. 
         latlon = f.variables[aux_set.parameter][hour_index, pressure_index]
 
         if type(latlon) is np.ndarray: # no missing values, not masked array
-            np.savetxt(output_filename, latlon, fmt='%s', delimiter='\n')
+            np.save(output_filename, latlon)
         else: # masked array
-            np.savetxt(output_filename, latlon.filled(9.999e+20),
-                fmt='%s', delimiter='\n')
+            np.save(output_filename, latlon.filled(9.999e+20))
 
 def extract_merra_aux_data(espa_metadata, aux_path, reanalysis):
     """Extracts the required MERRA or GEOS5 data from the auxiliary archive
@@ -214,11 +212,15 @@ def extract_merra_aux_data(espa_metadata, aux_path, reanalysis):
     logger.info('Before Date = {}'.format(str(t0_date)))
     logger.info(' After Date = {}'.format(str(t1_date)))
 
+    last_filename = ""
     for (date, date_type) in zip([t0_date, t1_date], ['t0', 't1']):
         for aux_set in aux_filenames(reanalysis, aux_path, PARMS_TO_EXTRACT,
                                      date, date_type):
 
-            logger.info('Using {0}'.format(aux_set.nc4))
+            # Avoid logging the same filename repeatedly.
+            if last_filename != aux_set.nc4:
+                logger.info('Using {0}'.format(aux_set.nc4))
+                last_filename = aux_set.nc4
 
             # Verify that the files we need exist
             if (not os.path.exists(aux_set.nc4)):

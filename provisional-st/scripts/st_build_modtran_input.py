@@ -191,19 +191,22 @@ def load_pressure_file(parameter, layer, reanalysis):
 
     logger = logging.getLogger(__name__)
 
-    filename = os.path.join(parameter, '.'.join([str(layer), 'txt']))
+    if reanalysis == "NARR":
+        file_ext = 'txt'
+    else:
+        file_ext = 'npy'
+    filename = os.path.join(parameter, '.'.join([str(layer), file_ext]))
     logger.debug('Reading Pressure File [{}]'.format(filename))
 
-    point_values = None
-    with open(filename, 'r') as data_fd:
-        if reanalysis == "NARR":
+    if reanalysis == "NARR":
+        point_values = None
+        with open(filename, 'r') as data_fd:
             point_values = [[float(data_fd.readline())
                              for dummy1 in range(NARR_COLS)]
                             for dummy2 in range(NARR_ROWS)]
-        elif reanalysis == "MERRA2" or reanalysis == "GEOS5":
-            point_values = [[float(data_fd.readline())
-                             for dummy1 in range(MERRA_COLS)]
-                            for dummy2 in range(MERRA_ROWS)]
+    else:
+        point_values = np.load(filename)
+
     return point_values
 
 
@@ -316,13 +319,13 @@ def determine_geometric_hgt(data, point, layer, time, reanalysis):
         hgt = data[NARR_HGT_PARMS[time]][layer]\
                 [point.reanalysis_row-1][point.reanalysis_col-1]
         # For NARR, invalid data is an error case.
-        if hgt == INVALID_DATA_VALUE:
+        if abs(hgt - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             raise InvalidDataPointError('Invalid data point value [HGT]')
     elif reanalysis == "MERRA2" or reanalysis == "GEOS5":
         hgt = data[MERRA_HGT_PARMS[time]][layer]\
                 [point.reanalysis_row-1][point.reanalysis_col-1]
         # For MERRA2 and GEOS5, invalid data is filled.
-        if hgt == INVALID_DATA_VALUE:
+        if abs(hgt - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             return INVALID_DATA_VALUE
     else:
         raise InvalidDataPointError('Unable to locate height value for {0}'.
@@ -381,9 +384,9 @@ def determine_rh_temp(data, point, layer, time, reanalysis):
                 [point.reanalysis_row-1][point.reanalysis_col-1]
 
         # For NARR, invalid data is an error case.
-        if spfh == INVALID_DATA_VALUE:
+        if abs(spfh - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             raise InvalidDataPointError('Invalid data point value [SPFH]')
-        if temp == INVALID_DATA_VALUE:
+        if abs(temp - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             raise InvalidDataPointError('Invalid data point value [TMP]')
 
     elif reanalysis == "MERRA2" or reanalysis == "GEOS5":
@@ -396,9 +399,9 @@ def determine_rh_temp(data, point, layer, time, reanalysis):
                 [point.reanalysis_row-1][point.reanalysis_col-1]
 
         # For MERRA2 and GEOS5, invalid data is filled.
-        if spfh == INVALID_DATA_VALUE:
+        if abs(spfh - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             return (INVALID_DATA_VALUE, INVALID_DATA_VALUE)
-        if temp == INVALID_DATA_VALUE:
+        if abs(temp - INVALID_DATA_VALUE) < 1e-6*INVALID_DATA_VALUE:
             return (INVALID_DATA_VALUE, INVALID_DATA_VALUE)
 
     else:
