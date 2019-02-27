@@ -204,8 +204,7 @@ def extract_auxiliary_data(xml_filename, aux_path, reanalysis, debug):
         if reanalysis == "NARR":
             cmd = ['st_extract_auxiliary_narr_data.py',
                '--xml', xml_filename,
-               '--aux_path', aux_path,
-               '--reanalysis', reanalysis]
+               '--aux_path', aux_path]
         elif reanalysis == "MERRA2":
             cmd = ['st_extract_auxiliary_merra_data.py',
                    '--xml', xml_filename,
