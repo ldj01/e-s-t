@@ -158,10 +158,8 @@ def extract_from_grib(aux_set):
                          .format(record, pressure))
 
             path = os.path.join(aux_set.output_dir,
-                                '.'.join([pressure, 'txt']))
-            cmd = ['wgrib', aux_set.grb,
-                   '-d', record,
-                   '-text', '-nh', '-o', path]
+                                '.'.join([pressure, 'bin']))
+            cmd = ['wgrib', aux_set.grb, '-d', record, '-nh', '-o', path]
             cmd = ' '.join(cmd)
             logger.debug('wgrib command = [{}]'.format(cmd))
 

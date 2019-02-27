@@ -44,9 +44,6 @@ INVALID_DATA_VALUE = 9.999e+20
 # The number of rows and columns present in the NARR data
 NARR_ROWS = 277
 NARR_COLS = 349
-# The number of rows and columns present in the MERRA2 and GEOS5 data
-MERRA_ROWS = 361 
-MERRA_COLS = 576
 
 # The pressure levels contained in the NARR data
 NARR_PRESSURE_LAYERS = [1000, 975, 950, 925, 900,
@@ -192,18 +189,15 @@ def load_pressure_file(parameter, layer, reanalysis):
     logger = logging.getLogger(__name__)
 
     if reanalysis == "NARR":
-        file_ext = 'txt'
+        file_ext = 'bin'
     else:
         file_ext = 'npy'
     filename = os.path.join(parameter, '.'.join([str(layer), file_ext]))
     logger.debug('Reading Pressure File [{}]'.format(filename))
 
     if reanalysis == "NARR":
-        point_values = None
-        with open(filename, 'r') as data_fd:
-            point_values = [[float(data_fd.readline())
-                             for dummy1 in range(NARR_COLS)]
-                            for dummy2 in range(NARR_ROWS)]
+        values = np.fromfile(filename, dtype=np.float32)
+        point_values = values.reshape(NARR_ROWS, NARR_COLS)
     else:
         point_values = np.load(filename)
 
