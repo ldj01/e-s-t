@@ -367,6 +367,24 @@ def extract_warped_data(ls_emis_stdev_warped_name, no_data_value, intermediate):
     return (ls_emis_stdev_data, ls_emis_stdev_no_data_locations)
 
 
+def update_water_locations(ls_emis_stdev_data, water_update_filename):
+    """Update emissivity band nodata locations that were updated to water 
+       emissivity to 0 standard deviations
+
+    Args:
+        ls_emis_stdev_data <raster>: 2D raster array data
+        water_update_filename <str>: Name of the mask file for water updates
+    """
+    water_update_mask = util.Dataset.extract_raster_data(water_update_filename, 1)
+
+    # Find the locations that were updated from nodata to water emissivity in 
+    # the emissivity band, and set them to 0 standard deviations
+    water_update_locations = np.where(water_update_mask == 1)
+    ls_emis_stdev_data[water_update_locations] = 0
+
+    return ls_emis_stdev_data
+
+
 def generate_emissivity_data(xml_filename, server_name, server_path,
                              st_data_dir, no_data_value, intermediate):
     """Provides the main processing algorithm for generating the estimated
@@ -431,6 +449,13 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
 
     # Memory cleanup
     del ls_emis_stdev_no_data_locations
+
+    # Find the locations that were updated from nodata to water emissivity in 
+    # the emissivity band, and set them to 0 standard deviations
+    water_update_filename = ''.join([xml_filename.split('.xml')[0],
+                                    '_water_update', '.img'])
+    ls_emis_stdev_data = update_water_locations(ls_emis_stdev_data,
+                                           water_update_filename)
 
     # Write emissivity standard deviation data and metadata
     ls_emis_stdev_img_filename = ''.join([product_id, '_emis_stdev', '.img'])

@@ -254,6 +254,8 @@ class TestEmissivity(TestST):
         self.link_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir,
                 '*toa_band[2345]*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 'LE07*bqa_pixel*')))
         self.setUpTestLinks()
 
         self.aster_ged_server = os.environ['ASTER_GED_SERVER']
@@ -262,6 +264,9 @@ class TestEmissivity(TestST):
 
         self.check_files = glob.glob(
             os.path.join(self.unit_test_data_dir, 'LE07*_emis.*'))
+        self.check_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 
+                'LE07*_water_update.*')))
         # Check the tif files from one ASTER granule
         self.check_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, 'AG*emis.tif')))
@@ -305,6 +310,9 @@ class TestEmissivityStdev(TestST):
             glob.glob(os.path.join(self.unit_test_data_dir, '*bt_band6*')))
         self.link_files.extend(
             glob.glob(os.path.join(self.unit_test_data_dir, '*toa_band3*')))
+        self.link_files.extend(
+            glob.glob(os.path.join(self.unit_test_data_dir, 
+                'LE07*_water_update.*')))
         self.setUpTestLinks()
 
         self.aster_ged_server = os.environ['ASTER_GED_SERVER']

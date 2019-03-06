@@ -87,10 +87,9 @@ ExtentInfo = namedtuple('ExtentInfo',
 BoundInfo = namedtuple('BoundInfo',
                        ('north', 'south', 'east', 'west'))
 SourceInfo = namedtuple('SourceInfo',
-                        ('bound', 'extent', 'proj4', 'toa'))
+                        ('bound', 'extent', 'proj4', 'pixel_qa', 'toa'))
 TileInfo = namedtuple('TileInfo',
                       ('h5_file_path', 'downloaded'))
-
 
 def get_band_info(band):
     """Returns a populated BandInfo
@@ -184,23 +183,23 @@ def retrieve_metadata_information(espa_metadata):
 
     # Find the TOA bands to extract information from
     for band in espa_metadata.xml_object.bands.band:
-        if (band.get('product') == 'toa_refl' and
-                band.get('name') == 'toa_band2'):
-            bi_green = get_band_info(band)
-
-        if (band.get('product') == 'toa_refl' and
-                band.get('name') == 'toa_band3'):
-            bi_red = get_band_info(band)
-
-        if (band.get('product') == 'toa_refl' and
-                band.get('name') == 'toa_band4'):
-            bi_nir = get_band_info(band)
-
-        if (band.get('product') == 'toa_refl' and
-                band.get('name') == 'toa_band5'):
-            bi_swir1 = get_band_info(band)
-
         if satellite == 'LANDSAT_8':
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band3'):
+                bi_green = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band4'):
+                bi_red = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band5'):
+                bi_nir = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band6'):
+                bi_swir1 = get_band_info(band)
+
             if (band.get('product') == 'toa_bt' and
                     band.get('name') == 'bt_band11'):
                 bi_bt = get_band_info(band)
@@ -208,12 +207,34 @@ def retrieve_metadata_information(espa_metadata):
                 # Get the output proj4 string
                 proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
         else:
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band2'):
+                bi_green = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band3'):
+                bi_red = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band4'):
+                bi_nir = get_band_info(band)
+
+            if (band.get('product') == 'toa_refl' and
+                    band.get('name') == 'toa_band5'):
+                bi_swir1 = get_band_info(band)
+
             if (band.get('product') == 'toa_bt' and
                     band.get('name') == 'bt_band6'):
                 bi_bt = get_band_info(band)
 
                 # Get the output proj4 string
                 proj4 = util.Geo.get_proj4_projection_string(bi_bt.name)
+
+        # Get metadata information for level 1 BQA pixel band
+        if (band.get('product') == 'L1TP' and
+                band.get('name') == 'bqa_pixel'):
+            pixel_qa_name = str(band.file_name)
+
 
     # Error if we didn't find the required TOA bands in the data
     if bi_green is None:
@@ -229,13 +250,17 @@ def retrieve_metadata_information(espa_metadata):
         raise MissingBandError('Failed to find the TOA SWIR1 band'
                                ' in the input data')
     if bi_bt is None:
-        raise MissingBandError('Failed to find the TOA BT band'
+        raise MissingBandError('Failed to find the BT band'
+                               ' in the input data')
+    if pixel_qa_name is None:
+        raise MissingBandError('Failed to find the PIXEL QA band'
                                ' in the input data')
 
 
     return SourceInfo(bound=bound_info(espa_metadata),
                       extent=extent_info(espa_metadata, bi_bt),
                       proj4=proj4,
+                      pixel_qa=pixel_qa_name,
                       toa=ToaInfo(green=bi_green,
                                   red=bi_red,
                                   nir=bi_nir,

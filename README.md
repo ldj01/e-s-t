@@ -4,11 +4,18 @@
 This project contains application source code for producing Surface Temperature products.
 
 ## Product Descriptions
-See the [provisional_st_README_V10.pdf](https://edclpdsftp.cr.usgs.gov/downloads/provisional/land_surface_temperature/provisional_st_README_v10.pdf) product guide (which is an unofficial and provisional version) for information about the Surface Temperature products.
+See the [Landsat Surface Temperature (ST) Product Guide](https://landsat.usgs.gov/sites/default/files/documents/LSDS-1330-lst-product-guide.pdf) for information about the Surface Temperature products.
 
 ## Release Notes
 * Support global processing (within constraints of available inputs) by using
   MERRA-2 reanalysis input 
+* Update Landsat input bands used by emissivity procedure when processing 
+  Landsat 8 scenes
+* Fix problem where the procedure crashes if a scene is completely cloud-free,
+  or a pixel is > 200km from any cloud pixels 
+* Fix problem where the procedure produces invalid temperature results in a region for some scenes because some of the atmospheric input data is not processed for that region. 
+* If emissivity is below 0, make it fill.
+* Update the Product Guide reference.
 
 ## Installation
 

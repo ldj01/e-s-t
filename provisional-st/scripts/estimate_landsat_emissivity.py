@@ -46,6 +46,8 @@ import emissivity_utilities as emis_util
 
 ASTER_EMISSIVITY_MEAN_SCALE_FACTOR = 0.001
 NDVI_SCALE_FACTOR = 0.01
+PQA_WATER = 7                     # Bit 7 in the Level 1 BQA Pixel Band
+PQA_SINGLE_BIT = 0x01             # 00000001
 
 CoefficientInfo = namedtuple('CoefficientInfo',
                              ('estimated_1', 'estimated_2', 'estimated_3',
@@ -626,6 +628,53 @@ def extract_warped_data(ls_emis_warped_name, aster_ndvi_warped_name,
             aster_ndvi_no_data_locations)
 
 
+def update_water_locations(src_info, ls_emis_final, water_update_filename,
+                           samps, lines, transform, wkt, no_data_value,
+                           aster_ged_water):
+    """Update locations identified as water to use the water emissivity
+       value if they would otherwise be nodata
+
+    Args:
+        src_info <SourceInfo>: Information about the source data
+        ls_emis_final <raster>: 2D raster array data
+        water_update_filename <str>: Name of the mask file for water updates
+        samps <int>: Samples in the data
+        lines <int>: Lines in the data
+        transform <2x3:float>: GDAL Affine transformation matrix
+                               [0] - Map X of upper left corner
+                               [1] - Pixel size in X direction
+                               [2] - Y rotation
+                               [3] - Map Y of upper left corner
+                               [4] - X rotation
+                               [5] - Pixel size in Y direction
+        wkt <str>: Well-Known-Text describing the projection
+        no_data_value <int>: No data (fill) value to use
+        aster_ged_water <float>: Constant value for water emissivity
+    """
+    qa_data = util.Dataset.extract_raster_data(src_info.pixel_qa, 1)
+    qa_water_shifted_mask = np.right_shift(qa_data, PQA_WATER)
+    qa_water_mask = np.bitwise_and(qa_water_shifted_mask, PQA_SINGLE_BIT)
+
+    # Set any water locations to water emissivity value if they are nodata
+    water_update_locations = np.where((ls_emis_final == no_data_value) \
+        & (qa_water_mask == 1))
+    ls_emis_final[water_update_locations] = aster_ged_water 
+
+    # Write a band with the locations that were changed.  This will be used
+    # to update the emissivity standard deviation band accordingly
+    water_update_mask = np.empty_like(ls_emis_final)
+    water_update_mask[water_update_locations] = 1
+    emis_util.write_emissivity_product(samps=samps,
+                                       lines=lines,
+                                       transform=transform,
+                                       wkt=wkt,
+                                       no_data_value=no_data_value,
+                                       filename=water_update_filename,
+                                       file_data=water_update_mask)
+
+    return ls_emis_final
+
+
 def generate_emissivity_data(xml_filename, server_name, server_path,
                              st_data_dir, no_data_value, intermediate):
     """Provides the main processing algorithm for generating the estimated
@@ -815,8 +864,10 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     # Memory cleanup
     del ls_emis_data
 
-    # Add the fill and scan gaps and ASTER gaps back into the results,
-    # since they may have been lost
+    # Add the fill and scan gaps identified from the various original Landsat 
+    # and ASTER bands as they were initially read back into the results, since 
+    # they may have been lost during later band math steps.  Also set any 
+    # negative emissivity values to fill
     logger.info('Adding fill and data gaps back into the estimated'
                 ' Landsat emissivity results')
     ls_emis_final[ls_emis_no_data_locations] = no_data_value
@@ -825,6 +876,7 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     ls_emis_final[aster_ndvi_gap_locations] = no_data_value
     ls_emis_final[ndvi_no_data_locations] = no_data_value
     ls_emis_final[ndsi_no_data_locations] = no_data_value
+    ls_emis_final[ls_emis_final < 0.0] = no_data_value
 
     # Memory cleanup
     del ls_emis_no_data_locations
@@ -833,6 +885,15 @@ def generate_emissivity_data(xml_filename, server_name, server_path,
     del aster_ndvi_gap_locations
     del ndvi_no_data_locations
     del ndsi_no_data_locations
+
+    # Update known water locations to water emissivity value if they are nodata
+    water_update_filename = ''.join([xml_filename.split('.xml')[0],
+                                    '_water_update', '.img'])
+    ls_emis_final = update_water_locations(src_info, ls_emis_final,
+                                           water_update_filename, samps, lines,
+                                           output_transform, 
+                                           output_srs.ExportToWkt(),
+                                           no_data_value, ASTER_GED_WATER)
 
     # Write emissivity data and metadata
     ls_emis_img_filename = ''.join([product_id, '_emis', '.img'])

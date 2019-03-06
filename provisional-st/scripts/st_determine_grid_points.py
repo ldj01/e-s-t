@@ -709,31 +709,24 @@ def generate_point_grid(debug, gdal_objs, data_bounds, data_path, reanalysis):
     del raster_data
 
     # Process through the mask and generate pairs for the left/right edges
-    ew_edges = sorted([pair
-                       for pair
-                       in find_first_last_valid(mask, gdal_objs.nlines)])
+    edges = sorted([pair
+                    for pair
+                    in find_first_last_valid(mask, gdal_objs.nlines)])
 
-    # Add all the data points between the first and last line edges
-    first_line = ew_edges[:2]
-    last_line = ew_edges[-2:]
-
-    # Add any first row length of pixels
-    ew_edges.extend([(first_line[0][0], samp)
-                     for samp in range(first_line[0][1] + 1,
-                                        first_line[1][1])])
-
-    # Add any last row length of pixels
-    ew_edges.extend([(last_line[0][0], samp)
-                     for samp in range(last_line[0][1] + 1,
-                                        last_line[1][1])])
+    # Process through the mask and generate pairs for the top/bottom edges.
+    # Use the same algorithm, but give it the transpose of the mask, and
+    # reverse the returned tuples.  Add these to the left/right edges
+    edges.extend(sorted([pair[::-1]
+                         for pair
+                         in find_first_last_valid(mask.T, gdal_objs.nsamps)]))
 
     # Remove duplicates and re-sort
-    ew_edges = sorted(list(set(ew_edges)))
+    edges = sorted(list(set(edges)))
 
     # For each pair of samp/line find the grid points that will be needed for
     # MODTRAN and mark them as "run_modran" = True so that later when MODTRAN
     # is ran only the required points are ran through it
-    for pair in ew_edges:
+    for pair in edges:
         cc_point = center_grid_point(gdal_objs, grid_points, pair[1], pair[0])
 
         '''

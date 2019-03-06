@@ -407,6 +407,7 @@ def cleanup_temporary_data(reanalysis):
     USED_POINTS_NAME = 'used_points.txt'
     EMISSIVITY_HEADER_NAME = '*_emis.img.aux.xml'
     EMISSIVITY_STDEV_HEADER_NAME = '*_emis_stdev.img.aux.xml'
+    WATER_UPDATE_PATTERN = '*_water_update.*'
 
     # File cleanup
     cleanup_list = [GRID_POINT_HEADER_NAME, GRID_POINT_BINARY_NAME, 
@@ -419,7 +420,8 @@ def cleanup_temporary_data(reanalysis):
 
     # Cleanup file patterns.
     cleanup_pattern_list = [EMISSIVITY_HEADER_NAME, 
-                            EMISSIVITY_STDEV_HEADER_NAME]
+                            EMISSIVITY_STDEV_HEADER_NAME,
+                            WATER_UPDATE_PATTERN]
     for pattern in cleanup_pattern_list:
         for filename in glob.glob(pattern):
             os.unlink(filename)
