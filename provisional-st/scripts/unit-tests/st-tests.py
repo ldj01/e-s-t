@@ -10,7 +10,6 @@ import sys
 import logging
 
 # Import the ST modules that are not standalone scripts
-sys.path.insert(0, '..')
 import build_st_data
 
 # Base class to be used for all ST test cases
@@ -28,6 +27,13 @@ class TestST(unittest.TestCase):
             self.num_threads = 4
 
     def setUp(self):
+        # Run the test in a unique directory so that multiple tests can
+        # be run simultaneously.
+        subdir = self.id()
+        if not os.path.exists(subdir):
+            os.mkdir(subdir)
+        os.chdir(subdir)
+
         # The XML file for the scene we're working with
         self.xml_filename = 'LE07_L1TP_043028_20020419_20180206_01_T1.xml'
 
@@ -115,7 +121,7 @@ class TestGridPoints(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_determine_grid_points.py", "--xml", self.xml_filename,
+        cmd = ["st_determine_grid_points.py", "--xml", self.xml_filename,
              "--data_path", self.data_path]
         self.run_test_case(cmd)
 
@@ -140,7 +146,7 @@ class TestAuxMerra(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_extract_auxiliary_merra_data.py", "--xml",
+        cmd = ["st_extract_auxiliary_merra_data.py", "--xml",
                self.xml_filename, "--aux_path", self.aux_path]
         self.run_test_case(cmd)
 
@@ -165,7 +171,7 @@ class TestAuxGeos5(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_extract_auxiliary_geos5_data.py", "--xml",
+        cmd = ["st_extract_auxiliary_geos5_data.py", "--xml",
               self.xml_filename, "--aux_path", self.aux_path,
               "--reanalysis", "GEOS5"]
         self.run_test_case(cmd)
@@ -196,7 +202,7 @@ class TestAuxNarr(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_extract_auxiliary_narr_data.py", "--xml",
+        cmd = ["st_extract_auxiliary_narr_data.py", "--xml",
                self.xml_filename, "--aux_path", self.aux_path]
         self.run_test_case(cmd)
 
@@ -232,7 +238,7 @@ class TestModtranInput(TestST):
             ]
 
     def test_run(self):
-        cmd = ["../st_build_modtran_input.py", "--xml", self.xml_filename,
+        cmd = ["st_build_modtran_input.py", "--xml", self.xml_filename,
              "--data_path", self.data_path]
         self.run_test_case(cmd)
 
@@ -280,7 +286,7 @@ class TestEmissivity(TestST):
                 'landsat_emis_[mw]*.tif')))
 
     def test_run(self):
-        cmd = ["../estimate_landsat_emissivity.py", "--xml", self.xml_filename,
+        cmd = ["estimate_landsat_emissivity.py", "--xml", self.xml_filename,
                "--intermediate",
                "--aster-ged-server-name", self.aster_ged_server,
                "--aster-ged-server-path", self.aster_ged_path]
@@ -331,7 +337,7 @@ class TestEmissivityStdev(TestST):
                 'landsat_emis_stdev*.tif')))
 
     def test_run(self):
-        cmd = ["../estimate_landsat_emissivity_stdev.py", "--xml",
+        cmd = ["estimate_landsat_emissivity_stdev.py", "--xml",
                 self.xml_filename, "--intermediate",
                "--aster-ged-server-name", self.aster_ged_server,
                "--aster-ged-server-path", self.aster_ged_path]
@@ -382,7 +388,7 @@ class TestModtran(TestST):
             shutil.rmtree(os.path.basename(d))
 
     def test_run(self):
-        cmd = ["../st_run_modtran.py",
+        cmd = ["st_run_modtran.py",
                "--process_count", str(self.num_threads),
                "--modtran_data_path", self.modtran_data_path]
         self.run_test_case(cmd)
@@ -504,7 +510,7 @@ class TestDistToCloud(TestST):
             os.path.join(self.unit_test_data_dir, 'LE07*_st_cloud_distance.*'))
 
     def test_run(self):
-        cmd = ["../st_generate_distance_to_cloud.py", "--xml",
+        cmd = ["st_generate_distance_to_cloud.py", "--xml",
                 self.xml_filename]
         self.run_test_case(cmd)
         self.compare_updated_xml(".dist")
@@ -540,7 +546,7 @@ class TestQA(TestST):
             os.path.join(self.unit_test_data_dir, 'LE07*_st_uncertainty*'))
 
     def test_run(self):
-        cmd = ["../st_generate_qa.py", "--xml",
+        cmd = ["st_generate_qa.py", "--xml",
                 self.xml_filename]
         self.run_test_case(cmd)
         self.compare_updated_xml(".qa")
@@ -575,7 +581,7 @@ class TestConvert(TestST):
             os.path.join(self.unit_test_data_dir, 'LE07*_converted*'))
 
     def test_run(self):
-        cmd = ["../st_convert_bands.py", "--xml",
+        cmd = ["st_convert_bands.py", "--xml",
                 self.xml_filename]
         self.run_test_case(cmd)
         self.compare_updated_xml(".convert")
@@ -618,7 +624,7 @@ class TestGenerateProducts(TestST):
         # runs successfully
 
     def test_run(self):
-        cmd = ["../st_generate_products.py",
+        cmd = ["st_generate_products.py",
                 "--xml", self.xml_filename,
                 "--keep-intermediate-data",
                 "--reanalysis" ,"MERRA2",

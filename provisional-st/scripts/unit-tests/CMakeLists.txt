@@ -1,22 +1,25 @@
-add_test(NAME TestGridPoints COMMAND python3 -m unittest st-tests.TestGridPoints WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestAuxMerra COMMAND python3 -m unittest st-tests.TestAuxMerra WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestAuxGeos5 COMMAND python3 -m unittest st-tests.TestAuxGeos5 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestAuxNarr COMMAND python3 -m unittest st-tests.TestAuxNarr WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestModtranInput COMMAND python3 -m unittest st-tests.TestModtranInput WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestEmissivity COMMAND python3 -m unittest st-tests.TestEmissivity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestEmissivityStdev COMMAND python3 -m unittest st-tests.TestEmissivityStdev WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestModtran COMMAND python3 -m unittest st-tests.TestModtran WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestAtmosParam COMMAND python3 -m unittest st-tests.TestAtmosParam WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestBuildSTData COMMAND python3 -m unittest st-tests.TestBuildSTData WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestDistToCloud COMMAND python3 -m unittest st-tests.TestDistToCloud WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestQA COMMAND python3 -m unittest st-tests.TestQA WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestConvert COMMAND python3 -m unittest st-tests.TestConvert WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_test(NAME TestGenerateProducts COMMAND python3 -m unittest st-tests.TestGenerateProducts WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-set_property(TEST TestAtmosParam
-    PROPERTY ENVIRONMENT
-    PATH=${CMAKE_CURRENT_BINARY_DIR}/../../src:$ENV{PATH})
-set_tests_properties(TestGridPoints TestAuxMerra TestAuxGeos5 TestAuxNarr 
-    TestModtranInput TestEmissivity TestEmissivityStdev TestModtran 
-    TestAtmosParam TestBuildSTData TestDistToCloud TestQA TestConvert 
-    TestGenerateProducts
-    PROPERTIES RESOURCE_LOCK working_directory)
+# Add this one first since it takes the longest
+add_test(NAME GenerateProducts
+         COMMAND python3 -m unittest st-tests.TestGenerateProducts)
+add_test(NAME GridPoints COMMAND python3 -m unittest st-tests.TestGridPoints)
+add_test(NAME AuxMerra COMMAND python3 -m unittest st-tests.TestAuxMerra)
+add_test(NAME AuxGeos5 COMMAND python3 -m unittest st-tests.TestAuxGeos5)
+add_test(NAME AuxNarr COMMAND python3 -m unittest st-tests.TestAuxNarr)
+add_test(NAME ModtranInput
+         COMMAND python3 -m unittest st-tests.TestModtranInput)
+add_test(NAME Emissivity COMMAND python3 -m unittest st-tests.TestEmissivity)
+add_test(NAME EmissivityStdev
+         COMMAND python3 -m unittest st-tests.TestEmissivityStdev)
+add_test(NAME Modtran COMMAND python3 -m unittest st-tests.TestModtran)
+add_test(NAME AtmosParam COMMAND python3 -m unittest st-tests.TestAtmosParam)
+add_test(NAME BuildSTData COMMAND python3 -m unittest st-tests.TestBuildSTData)
+add_test(NAME DistToCloud COMMAND python3 -m unittest st-tests.TestDistToCloud)
+add_test(NAME QA COMMAND python3 -m unittest st-tests.TestQA)
+add_test(NAME Convert COMMAND python3 -m unittest st-tests.TestConvert)
+
+set_property(TEST GridPoints AuxMerra AuxGeos5 AuxNarr ModtranInput 
+             Emissivity EmissivityStdev Modtran AtmosParam BuildSTData 
+             DistToCloud QA Convert GenerateProducts
+             PROPERTY ENVIRONMENT
+             PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/..:${CMAKE_CURRENT_SOURCE_DIR}:$ENV{PYTHONPATH}
+             PATH=${CMAKE_BINARY_DIR}/provisional-st/src:${CMAKE_CURRENT_SOURCE_DIR}/..:$ENV{PATH})
