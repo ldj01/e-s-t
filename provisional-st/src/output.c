@@ -12,6 +12,7 @@
 #include "write_metadata.h"
 #include "envi_header.h"
 #include "raw_binary_io.h"
+#include "output.h"
 
 
 #include "const.h"
@@ -43,8 +44,8 @@ int add_st_band_product
     char *short_name,
     char *long_name,
     char *data_units,
-    int min_range,
-    int max_range
+    float min_range,
+    float max_range
 )
 {
     char FUNC_NAME[] = "add_st_band_product";
