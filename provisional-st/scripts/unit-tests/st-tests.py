@@ -26,12 +26,24 @@ class TestST(unittest.TestCase):
         else:
             self.num_threads = 4
 
+        # Print a statement informing the tester that an environment variable
+        # can be used to retain the test results if the test fails.
+        print('\nSet TEST_KEEP_ON_FAILURE environment variable to retain\n'
+              'test results upon failure.  The variable is currently ',
+              end='')
+        if 'TEST_KEEP_ON_FAILURE' in os.environ:
+            print('set.\n')
+        else:
+            print('not set.\n')
+
     def setUp(self):
         # Run the test in a unique directory so that multiple tests can
-        # be run simultaneously.
+        # be run simultaneously.  Remove the directory before proceeding,
+        # if it exists.
         subdir = self.id()
-        if not os.path.exists(subdir):
-            os.mkdir(subdir)
+        if os.path.exists(subdir):
+            shutil.rmtree(subdir)
+        os.mkdir(subdir)
         os.chdir(subdir)
 
         # The XML file for the scene we're working with
@@ -53,6 +65,16 @@ class TestST(unittest.TestCase):
                 os.symlink(lf, os.path.basename(lf))
 
     def tearDown(self):
+        # Don't clean up the results if the test failed and the environment
+        # tells us to retain the results.
+        if ('TEST_KEEP_ON_FAILURE' in os.environ and
+            hasattr(self, '_outcome')):
+            result = self.defaultTestResult()
+            self._feedErrorsToResult(result, self._outcome.errors)
+            if not result.wasSuccessful():
+                return
+
+        # Remove test files and directories.
         for lf in self.link_files:
             os.unlink(os.path.basename(lf))
         for d in self.check_dirs:
