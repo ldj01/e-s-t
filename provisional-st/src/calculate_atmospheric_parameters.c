@@ -38,7 +38,6 @@ static void planck_eq
 )
 {
     int i;
-    double lambda;
 
     /* Planck Const hecht pg, 585 ## units: Js */
     double PLANCK_CONST = 6.6260755e-34;
@@ -46,27 +45,20 @@ static void planck_eq
     /* Boltzmann Gas Const halliday et 2001 -- units: J/K */
     double BOLTZMANN_GAS_CONST = 1.3806503e-23;
 
-    /* Speed of Light -- units: m/s */
-    double SPEED_OF_LIGHT = 299792458.0;
+    /* Speed of Light -- units: um/s */
+    double SPEED_OF_LIGHT = 299792458e6;
     double SPEED_OF_LIGHT_SQRD = SPEED_OF_LIGHT * SPEED_OF_LIGHT;
 
     for (i = 0; i < num_elements; i++)
     {
-        /* Lambda intervals of spectral response locations microns units: m */
-        lambda = wavelength[i] * 1e-6;
-
-        /* Compute the Planck Blackbody Eq [W/m^2 sr um] */
-        bb_radiance[i] = 2.0 * PLANCK_CONST * SPEED_OF_LIGHT_SQRD
-                         * 1e-6 * pow(lambda, -5.0)
-                         * (1.0 / (exp ((PLANCK_CONST * SPEED_OF_LIGHT)
-                                         / (lambda
-                                            * BOLTZMANN_GAS_CONST
-                                            * temperature))
-                                   - 1.0));
-
-        /* Convert to W/cm^2 sr micron to match modtran units */
-        /* br / (100 * 100) == br * 1e-4 */
-        bb_radiance[i] *= 1e-4;
+        /* Compute the Planck Blackbody Eq [W/m^2 sr um].
+           Convert to W/cm^2 sr micron to match modtran units
+           (additional 1e-4 multiplier). */
+        bb_radiance[i] = 2e8*PLANCK_CONST*SPEED_OF_LIGHT_SQRD
+                       * pow(wavelength[i], -5.0)
+                       / (exp(PLANCK_CONST*SPEED_OF_LIGHT
+                              /(wavelength[i]*BOLTZMANN_GAS_CONST*temperature))
+                          - 1.0);
     }
 }
 
