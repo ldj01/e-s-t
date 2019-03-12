@@ -11,9 +11,12 @@
 #include "const.h"
 #include "utilities.h"
 #include "input.h"
-#include "st_types.h"
 #include "output.h"
 #include "intermediate_data.h"
+#include "grid_points.h"
+#include "integrate.h"
+#include "interpolate.h"
+#include "modtran_utils.h"
 #include "calculate_atmospheric_parameters.h"
 
 /*****************************************************************************
@@ -22,6 +25,7 @@ atmospheric transmission, upwelled radiance, and downwelled radiance for each
 pixel in the Landsat scene.  Also, create bands with these values.  A thermal
 radiance band is also created based on a Landsat thermal band and parameters.
 *****************************************************************************/
+
 
 /*****************************************************************************
 METHOD:  planck_eq
@@ -63,271 +67,23 @@ static void planck_eq
 }
 
 
-/*****************************************************************************
-MODULE:  spline
-
-PURPOSE: spline constructs a cubic spline given a set of x and y values,
-         through these values.
-
-RETURN: SUCCESS
-        FAILURE
-*****************************************************************************/
-static int spline
-(
-    double *x,
-    double *y,
-    int n,
-    double yp1,
-    double ypn,
-    double *y2
-)
+/* Set up structure for managing the blackbody radiation work arrays.*/
+struct rad_work_array
 {
-    char FUNC_NAME[] = "spline";
-    int i;
-    double p;
-    double qn;
-    double sig;
-    double un;
-    double *u = NULL;
+    int size;
+    double *rad;
+    double *prod;
+};
 
-    u = malloc ((unsigned) (n - 1) * sizeof (double));
-    if (u == NULL)
-    {
-        RETURN_ERROR ("Can't allocate memory", FUNC_NAME, FAILURE);
-    }
-
-    /* Set the lower boundary */
-    if (yp1 > 0.99e30)
-    {
-        /* To be "natural" */
-        y2[0] = 0.0;
-        u[0] = 0.0;
-    }
-    else
-    {
-        /* To have a specified first derivative */
-        y2[0] = -0.5;
-        u[0] = (3.0 / (x[1] - x[0]))
-               * ((y[1] - y[0]) / (x[1] - x[0]) - yp1);
-    }
-
-    /* Set the upper boundary */
-    if (ypn > 0.99e30)
-    {
-        /* To be "natural" */
-        qn = 0.0;
-        un = 0.0;
-    }
-    else
-    {
-        /* To have a specified first derivative */
-        qn = 0.5;
-        un = (3.0 / (x[n - 1] - x[n - 2]))
-             * (ypn - (y[n - 1] - y[n - 2]) / (x[n - 1] - x[n - 2]));
-    }
-
-    /* Perform decomposition of the tridiagonal algorithm */
-    for (i = 1; i <= n - 2; i++)
-    {
-        sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
-
-        p = sig * y2[i - 1] + 2.0;
-
-        y2[i] = (sig - 1.0) / p;
-
-        u[i] = (y[i + 1] - y[i]) / (x[i + 1] - x[i])
-               - (y[i] - y[i - 1]) / (x[i] - x[i - 1]);
-
-        u[i] = (6.0 * u[i] / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
-    }
-    y2[n - 1] = (un - qn * u[n - 2]) / (qn * y2[n - 2] + 1.0);
-
-    /* Perform the backsubstitution of the tridiagonal algorithm */
-    for (i = n - 2; i >= 0; i--)
-    {
-        y2[i] = y2[i] * y2[i + 1] + u[i];
-    }
-
-    free (u);
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-MODULE:  splint
-
-PURPOSE: splint uses the cubic spline generated with spline to interpolate
-         values in the XY table
-*****************************************************************************/
-static void splint
-(
-    double *xa,
-    double *ya,
-    double *y2a,
-    int n,
-    double x,
-    double *y
-)
+static struct rad_work_array rad_work = {0, NULL, NULL};
+    
+static void free_rad_workspace()
 {
-    int k;
-    double h;
-    double a;
-    static int splint_klo = -1;
-    static int splint_khi = -1;
-    static double one_sixth = (1.0 / 6.0); /* To remove a division */
-
-    if (splint_klo < 0)
-    {
-        splint_klo = 0;
-        splint_khi = n - 1;
-    }
-    else
-    {
-        if (x < xa[splint_klo])
-            splint_klo = 0;
-        if (x > xa[splint_khi])
-            splint_khi = n - 1;
-    }
-
-    while (splint_khi - splint_klo > 1)
-    {
-        k = (splint_khi + splint_klo) >> 1;
-
-        if (xa[k] > x)
-            splint_khi = k;
-        else
-            splint_klo = k;
-    }
-
-    h = xa[splint_khi] - xa[splint_klo];
-
-    if (h == 0.0)
-    {
-        *y = 0.0;
-    }
-    else
-    {
-        a = (xa[splint_khi] - x) / h;
-
-        /*  The equation used below is the following, simplified:
-
-            b = 1 - a;
-            *y = a * ya[splint_klo]
-               + b * ya[splint_khi]
-               + ((a * a * a - a) * y2a[splint_klo]
-               + (b * b * b - b) * y2a[splint_khi]) * (h * h) * one_sixth; */
-
-        *y = ya[splint_khi] + a*(ya[splint_klo] - ya[splint_khi])
-            + one_sixth*h*h*a*(a - 1)*((a + 1)*y2a[splint_klo] +
-                                       (2 - a)*y2a[splint_khi]);
-    }
-}
-
-
-/*****************************************************************************
-MODULE:  int_tabulated
-
-PURPOSE: This function integrates a tabulated set of data { x(i) , f(i) },
-         on the closed interval [min(X) , max(X)].
-
-RETURN: SUCCESS
-        FAILURE
-
-NOTE: x and f are assumed to be in sorted order (min(x) -> max(x))
-*****************************************************************************/
-static int int_tabulated
-(
-    double *x,         /*I: Tabulated X-value data */
-    double *f,         /*I: Tabulated F-value data */
-    int nums,          /*I: Number of points */
-    double *result_out /*O: Integrated result */
-)
-{
-    char FUNC_NAME[] = "int_tabulated";
-    double *temp = NULL;
-    double *z = NULL;
-    double xmin;
-    double xmax;
-    int i;
-    int *ii = NULL;
-    int ii_count;
-    double h;
-    double result;
-    int segments;
-
-    /* Figure out the number of segments needed */
-    segments = nums - 1;
-    while (segments % 4 != 0)
-        segments++;
-
-    /* Determine how many iterations are needed  */
-    ii_count = (int) ((segments) / 4);
-
-    /* Determine the min and max */
-    xmin = x[0];
-    xmax = x[nums - 1];
-
-    /* Determine the step size */
-    h = (xmax - xmin) / segments;
-
-    /* Allocate memory */
-    temp = malloc (nums * sizeof (double));
-    if (temp == NULL)
-    {
-        RETURN_ERROR ("Allocating temp memory", FUNC_NAME, FAILURE);
-    }
-
-    z = malloc ((segments+1) * sizeof (double));
-    if (z == NULL)
-    {
-        RETURN_ERROR ("Allocating z memory", FUNC_NAME, FAILURE);
-    }
-
-    ii = malloc (ii_count * sizeof (int));
-    if (ii == NULL)
-    {
-        RETURN_ERROR ("Allocating ii memory", FUNC_NAME, FAILURE);
-    }
-
-    /* Interpolate spectral response over wavelength */
-    /* Using 1e30 forces generation of a natural spline and produces nearly
-       the same results as IDL */
-    if (spline (x, f, nums, 1e30, 1e30, temp) != SUCCESS)
-    {
-        RETURN_ERROR ("Failed during spline", FUNC_NAME, FAILURE);
-    }
-
-    /* Call splint for interpolations. one-based arrays are considered */
-    for (i = 0; i < segments+1; i++)
-    {
-        splint (x, f, temp, nums, h*i+xmin, &z[i]);
-    }
-
-    /* Get the 5-points needed for Newton-Cotes formula */
-    for (i = 0; i < ii_count; i++)
-    {
-        ii[i] = (i + 1) * 4;
-    }
-
-    /* Compute the integral using the 5-point Newton-Cotes formula */
-    result = 0.0;
-    for (i = 0; i < ii_count; i++)
-    {
-        double *z_ptr = &z[ii[i] - 4];
-
-        result += 14*(z_ptr[0] + z_ptr[4]) + 64*(z_ptr[1] + z_ptr[3])
-                + 24*z_ptr[2];
-    }
-
-    /* Assign the results to the output */
-    *result_out = result*h/45;
-
-    free (temp);
-    free (z);
-    free (ii);
-
-    return SUCCESS;
+    free(rad_work.rad);
+    free(rad_work.prod);
+    rad_work.rad = NULL;
+    rad_work.prod = NULL;
+    rad_work.size = 0;
 }
 
 
@@ -355,19 +111,21 @@ static int calculate_lt
     double *product;
     double *blackbody_radiance;
 
-    /* Allocate memory */
-    blackbody_radiance = malloc (num_srs * sizeof (double));
-    if (blackbody_radiance == NULL)
+     /* Allocate memory */
+    if (num_srs > rad_work.size)
     {
-        RETURN_ERROR ("Allocating blackbody_radiance memory", FUNC_NAME,
-                      FAILURE);
+        rad_work.rad = realloc(rad_work.rad, num_srs*sizeof(double));
+        rad_work.prod = realloc(rad_work.prod, num_srs*sizeof(double));
+        if (rad_work.rad == NULL || rad_work.prod == NULL)
+        {
+            free_rad_workspace();
+            RETURN_ERROR ("Allocating blackbody workspace memory", FUNC_NAME,
+                          FAILURE);
+        }
+        rad_work.size = num_srs;
     }
-
-    product = malloc (num_srs * sizeof (double));
-    if (product == NULL)
-    {
-        RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
-    }
+    blackbody_radiance = rad_work.rad;
+    product = rad_work.prod;
 
     /* integrate spectral response over wavelength */
     if (int_tabulated (spectral_response[0], spectral_response[1], num_srs,
@@ -395,10 +153,6 @@ static int calculate_lt
 
     /* Divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
-
-    /* Free allocated memory */
-    free (blackbody_radiance);
-    free (product);
 
     return SUCCESS;
 }
@@ -496,17 +250,20 @@ static int calculate_lobs
     double *product;
 
     /* Allocate memory */
-    temp_rad = malloc (num_srs * sizeof (double));
-    if (temp_rad == NULL)
+    if (num_srs > rad_work.size)
     {
-        RETURN_ERROR ("Allocating temp_rad memory", FUNC_NAME, FAILURE);
+        rad_work.rad = realloc(rad_work.rad, num_srs*sizeof(double));
+        rad_work.prod = realloc(rad_work.prod, num_srs*sizeof(double));
+        if (rad_work.rad == NULL || rad_work.prod == NULL)
+        {
+            free_rad_workspace();
+            RETURN_ERROR ("Allocating blackbody workspace memory", FUNC_NAME,
+                          FAILURE);
+        }
+        rad_work.size = num_srs;
     }
-
-    product = malloc (num_srs * sizeof (double));
-    if (product == NULL)
-    {
-        RETURN_ERROR ("Allocating product memory", FUNC_NAME, FAILURE);
-    }
+    temp_rad = rad_work.rad;
+    product = rad_work.prod;
 
     /* Integrate spectral response over wavelength */
     if (int_tabulated (spectral_response[0], spectral_response[1], num_srs,
@@ -534,10 +291,6 @@ static int calculate_lobs
 
     /* Divide above result by integral of spectral response function */
     *radiance = temp_integral / rs_integral;
-
-    /* Free allocated memory */
-    free (temp_rad);
-    free (product);
 
     return SUCCESS;
 }
@@ -878,6 +631,8 @@ static int calculate_point_atmospheric_parameters
     spectral_response[0] = NULL;
     free(spectral_response[1]);
     spectral_response[1] = NULL;
+    free_integration_workspace();
+    free_rad_workspace();
 
     /* Write atmospheric transmission, upwelled radiance, and downwelled 
        radiance for each elevation for each point to a file */
@@ -916,313 +671,6 @@ static int calculate_point_atmospheric_parameters
     fclose (fd);
 
     return SUCCESS;
-}
-
-
-/******************************************************************************
-METHOD:  qsort_grid_compare_function
-
-PURPOSE: A qsort routine that can be used with the GRID_ITEM items to sort by
-         distance
-
-RETURN: int: -1 (a<b), 1 (b<a), 0 (a==b) 
-******************************************************************************/
-static int qsort_grid_compare_function
-(
-    const void *grid_item_a,
-    const void *grid_item_b
-)
-{
-    double a = (*(GRID_ITEM*)grid_item_a).distance;
-    double b = (*(GRID_ITEM*)grid_item_b).distance;
-
-    if (a < b)
-        return -1;
-    else if (b < a)
-        return 1;
-
-    return 0;
-}
-
-
-/******************************************************************************
-METHOD:  haversine_distance
-
-PURPOSE: Calculates the great-circle distance between 2 points in meters.
-         The points are given in decimal degrees.  The Haversine formula
-         is used. 
-
-RETURN: double - The great-circle distance in meters between the points.
-
-NOTE: This is based on the haversine_distance function in the ST Python
-      scripts.
-******************************************************************************/
-static double haversine_distance
-(
-    double lon_1,  /* I: longitude (radians) for the first point */
-    double lat_1,  /* I: latitude (radians) for the first point */
-    double lon_2,  /* I: longitude (radians) for the second point */
-    double lat_2   /* I: latitude (radians) for the second point */
-)
-{
-    double sin_lon = sin((lon_2 - lon_1)*0.5);
-    double sin_lat = sin((lat_2 - lat_1)*0.5);
-
-    /* Compute and return the distance */
-    return EQUATORIAL_RADIUS * 2
-        + asin(sqrt(sin_lat*sin_lat + cos(lat_1)*cos(lat_2)*sin_lon*sin_lon));
-}
-
-/******************************************************************************
-METHOD:  interpolate_to_height
-
-PURPOSE: Interpolate to height of current pixel
-******************************************************************************/
-static void interpolate_to_height
-(
-    MODTRAN_POINT modtran_point, /* I: results from MODTRAN runs for a point */
-    double interpolate_to,    /* I: current landsat pixel height */
-    double *at_height         /* O: interpolated height for point */
-)
-{
-    int parameter;
-    int elevation;
-    int below;
-    int above;
-
-    double below_parameters[AHP_NUM_PARAMETERS];
-    double above_parameters[AHP_NUM_PARAMETERS];
-
-    double interp_ratio; /* interpolation ratio */
-
-    /* Find the heights between which the pixel height sits.
-       The heights are in increasing order. */
-    for (elevation = 0; elevation < modtran_point.count; elevation++)
-    {
-        if (modtran_point.elevations[elevation].elevation >= interpolate_to)
-            break;
-    }
-    if (elevation < modtran_point.count)
-    {
-        above = elevation;
-        if (above != 0)
-            below = above - 1;
-        else
-            /* All heights are above the pixel height, use the first value. */
-            below = 0;
-    }
-    else
-    {
-        /* All heights are below the pixel height, so use the final value. */
-        above = modtran_point.count - 1;
-        below = above;
-    }
-
-    below_parameters[AHP_TRANSMISSION] =
-        modtran_point.elevations[below].transmission;
-    below_parameters[AHP_UPWELLED_RADIANCE] =
-        modtran_point.elevations[below].upwelled_radiance;
-    below_parameters[AHP_DOWNWELLED_RADIANCE] =
-        modtran_point.elevations[below].downwelled_radiance;
-
-    if (above == below)
-    {
-        /* Use the below parameters since the same */
-        at_height[AHP_TRANSMISSION] =
-            below_parameters[AHP_TRANSMISSION];
-        at_height[AHP_UPWELLED_RADIANCE] =
-            below_parameters[AHP_UPWELLED_RADIANCE];
-        at_height[AHP_DOWNWELLED_RADIANCE] =
-            below_parameters[AHP_DOWNWELLED_RADIANCE];
-    }
-    else
-    {
-        /* Interpolate between the heights for each parameter */
-        interp_ratio = (interpolate_to -
-                        modtran_point.elevations[above].elevation)
-                     / (modtran_point.elevations[above].elevation -
-                        modtran_point.elevations[below].elevation);
-
-        above_parameters[AHP_TRANSMISSION] =
-            modtran_point.elevations[above].transmission;
-        above_parameters[AHP_UPWELLED_RADIANCE] =
-            modtran_point.elevations[above].upwelled_radiance;
-        above_parameters[AHP_DOWNWELLED_RADIANCE] =
-            modtran_point.elevations[above].downwelled_radiance;
-
-        for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
-        {
-            at_height[parameter] = interp_ratio
-                * (above_parameters[parameter] - below_parameters[parameter])
-                + above_parameters[parameter];
-        }
-    }
-}
-
-
-/******************************************************************************
-METHOD:  interpolate_to_location
-
-PURPOSE: Interpolate to location of current pixel
-******************************************************************************/
-static void interpolate_to_location
-(
-    GRID_POINTS *points,         /* I: The coordinate points */
-    int *vertices,               /* I: The vertices for the points to use */
-    double at_height[][AHP_NUM_PARAMETERS], /* I: current height atmospheric
-                                                  results */
-    double interpolate_easting,  /* I: interpolate to easting */
-    double interpolate_northing, /* I: interpolate to northing */
-    double *parameters           /* O: interpolated pixel atmospheric 
-                                       parameters */
-)
-{
-    int point;
-    int parameter;
-
-    double w[NUM_CELL_POINTS];
-    double total = 0.0;
-    double inv_total;
-
-    /* Shepard's method */
-    for (point = 0; point < NUM_CELL_POINTS; point++)
-    {
-        double delta_x = points->points[vertices[point]].map_x
-                       - interpolate_easting;
-        double delta_y = points->points[vertices[point]].map_y
-                       - interpolate_northing;
-
-        w[point] = 1.0 / sqrt(delta_x*delta_x + delta_y*delta_y);
-
-        total += w[point];
-    }
-
-    /* Normalize the weights for each vertex. */
-    inv_total = 1/total;
-    for (point = 0; point < NUM_CELL_POINTS; point++)
-    {
-        w[point] *= inv_total;
-    }
-
-    /* For each parameter apply each vertex's weighted value */
-    for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
-    {
-        parameters[parameter] = 0.0;
-        for (point = 0; point < NUM_CELL_POINTS; point++)
-        {
-            parameters[parameter] += (w[point] * at_height[point][parameter]);
-        }
-    }
-}
-
-
-/*****************************************************************************
-METHOD:  determine_grid_point_distances
-
-PURPOSE: Determines the distances for the current set of grid points.
-
-NOTE: The indexes of the grid points are assumed to be populated.
-*****************************************************************************/
-static void determine_grid_point_distances
-(
-    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
-    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
-    double longitude,          /* I: Longitude of the current line/sample
-                                     (radians) */
-    double latitude,           /* I: Latitude of the current line/sample
-                                     (radians) */
-    int num_grid_points,       /* I: The number of grid points to operate on */
-    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
-                                       point */
-)
-{
-    int point;
-    GRID_ITEM *pt = grid_points;  /* array pointer */
-
-    /* Populate the distances to the grid points */
-    for (point = 0; point < num_grid_points; point++, pt++)
-    {
-        pt->distance = haversine_distance(grid_pt_lon[pt->index],
-                                          grid_pt_lat[pt->index],
-                                          longitude, latitude);
-    }
-}
-
-
-/*****************************************************************************
-METHOD:  determine_center_grid_point
-
-PURPOSE: Determines the index of the center point from the current set of grid
-         points.
-
-NOTE: The indexes of the grid points are assumed to be populated.
-
-RETURN: type = int
-    Value  Description
-    -----  -------------------------------------------------------------------
-    index  The index of the center point
-*****************************************************************************/
-static int determine_center_grid_point
-(
-    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
-    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
-    double longitude,          /* I: Longitude of the current line/sample
-                                     (radians) */
-    double latitude,           /* I: Latitude of the current line/sample
-                                     (radians) */
-    int num_grid_points,       /* I: Number of grid points to operate on */
-    GRID_ITEM *grid_points     /* I/O: Sorted to determine the center grid
-                                       point */
-)
-{
-    determine_grid_point_distances(grid_pt_lon, grid_pt_lat, longitude,
-                                   latitude, num_grid_points, grid_points);
-
-    /* Sort them to find the closest one */
-    qsort (grid_points, num_grid_points, sizeof (GRID_ITEM),
-           qsort_grid_compare_function);
-
-    return grid_points[0].index;
-}
-
-
-/*****************************************************************************
-METHOD:  determine_first_center_grid_point
-
-PURPOSE: Determines the index of the first center point to use for the current
-         line.  Only called when the fist valid point for a line is
-         encountered.  The point is determined from all of the available
-         points.
-
-RETURN: type = int
-    Value  Description
-    -----  -------------------------------------------------------------------
-    index  The index of the center point
-*****************************************************************************/
-static int determine_first_center_grid_point
-(
-    double *grid_pt_lon,       /* I: Grid point longitudes (radians) */
-    double *grid_pt_lat,       /* I: Grid point latitudes (radians) */
-    double longitude,          /* I: Longitude of the current line/sample
-                                     (radians) */
-    double latitude,           /* I: Latitude of the current line/sample
-                                     (radians) */
-    int num_grid_points,       /* I: Number of grid points to operate on */
-    GRID_ITEM *grid_points     /* I/O: Memory passed in, populated and
-                                       sorted to determine the center grid
-                                       point */
-)
-{
-    int point;
-
-    /* Assign the point indexes for all grid points */
-    for (point = 0; point < num_grid_points; point++)
-    {
-        grid_points[point].index = point;
-    }
-
-    return determine_center_grid_point(grid_pt_lon, grid_pt_lat, longitude,
-                                       latitude, num_grid_points, grid_points);
 }
 
 
@@ -1374,142 +822,8 @@ static int calculate_pixel_atmospheric_parameters
         first_sample = true;
         for (sample = 0; sample < input->samples; sample++, pixel_loc++)
         {
-            if (inter.band_thermal[pixel_loc] != ST_NO_DATA_VALUE)
-            {
-                /* Determine latitude and longitude for current line/sample */
-                img.l = line;
-                img.s = sample;
-                img.is_fill = false;
-                if (!from_space(space, &img, &geo))
-                {
-                    RETURN_ERROR ("Mapping from line/sample to longitude/"
-                        "latitude", FUNC_NAME, FAILURE);
-                }
-                easting = input->meta.ul_map_corner.x
-                    + (sample * input->x_pixel_size);
-                if (first_sample)
-                {
-                    /* Determine the first center point from all of the
-                       available points */
-                    center_point = determine_first_center_grid_point(
-                                       grid_pt_lon, grid_pt_lat, geo.lon,
-                                       geo.lat, num_points, grid_points);
-
-                    /* Set first_sample to be false */
-                    first_sample = false;
-                }
-                else
-                {
-                    /* Determine the center point from the current 9 grid
-                       points for the current line/sample */
-                    center_point = determine_center_grid_point(
-                                       grid_pt_lon, grid_pt_lat, geo.lon,
-                                       geo.lat, NUM_GRID_POINTS, grid_points);
-                }
-
-                /* Fix the index values, since the points are from a new line
-                   or were messed up during determining the center point */
-                grid_points[CC_GRID_POINT].index = center_point;
-                grid_points[LL_GRID_POINT].index = center_point - 1 - num_cols;
-                grid_points[LC_GRID_POINT].index = center_point - 1;
-                grid_points[UL_GRID_POINT].index = center_point - 1 + num_cols;
-                grid_points[UC_GRID_POINT].index = center_point + num_cols;
-                grid_points[UR_GRID_POINT].index = center_point + 1 + num_cols;
-                grid_points[RC_GRID_POINT].index = center_point + 1;
-                grid_points[LR_GRID_POINT].index = center_point + 1 - num_cols;
-                grid_points[DC_GRID_POINT].index = center_point - num_cols;
-
-                /* Fix the distances, since the points are from a new line or
-                   were messed up during determining the center point */
-                determine_grid_point_distances(grid_pt_lon, grid_pt_lat,
-                                               geo.lon, geo.lat,
-                                               NUM_GRID_POINTS, grid_points);
-
-                /* Determine the average distances for each quadrant around
-                   the center point. We only need to use the three outer grid 
-                   points.
-                   The true average values are the values computed
-                   below divided by 3.  But since we're only using these these
-                   values comparatively, we can forego the division. */
-                avg_distance_ll = grid_points[DC_GRID_POINT].distance
-                                + grid_points[LL_GRID_POINT].distance
-                                + grid_points[LC_GRID_POINT].distance;
-
-                avg_distance_ul = grid_points[LC_GRID_POINT].distance
-                                + grid_points[UL_GRID_POINT].distance
-                                + grid_points[UC_GRID_POINT].distance;
-
-                avg_distance_ur = grid_points[UC_GRID_POINT].distance
-                                + grid_points[UR_GRID_POINT].distance
-                                + grid_points[RC_GRID_POINT].distance;
-
-                avg_distance_lr = grid_points[RC_GRID_POINT].distance
-                                + grid_points[LR_GRID_POINT].distance
-                                + grid_points[DC_GRID_POINT].distance;
-
-                /* Determine which quadrant is closer and setup the cell
-                   vertices to interpolate over based on that */
-                if (avg_distance_ll < avg_distance_ul
-                    && avg_distance_ll < avg_distance_ur
-                    && avg_distance_ll < avg_distance_lr)
-                { /* LL Cell */
-                    cell_vertices[LL_POINT] = center_point - 1 - num_cols;
-                }
-                else if (avg_distance_ul < avg_distance_ur
-                    && avg_distance_ul < avg_distance_lr)
-                { /* UL Cell */
-                    cell_vertices[LL_POINT] = center_point - 1;
-                }
-                else if (avg_distance_ur < avg_distance_lr)
-                { /* UR Cell */
-                    cell_vertices[LL_POINT] = center_point;
-                }
-                else
-                { /* LR Cell */
-                    cell_vertices[LL_POINT] = center_point - num_cols;
-                }
-
-                /* UL Point */
-                cell_vertices[UL_POINT] = cell_vertices[LL_POINT] + num_cols;
-                /* UR Point */
-                cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
-                /* LR Point */
-                cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
-
-#if OUTPUT_CELL_DESIGNATION_BAND
-                inter.band_cell[pixel_loc] = cell_vertices[LL_POINT];
-#endif
-
-                /* Convert height from m to km -- Same as 1.0 / 1000.0 */
-                current_height = (double) elevation_data[pixel_loc] * 0.001;
-
-                /* Interpolate three parameters to that height at each of the
-                   four closest points */
-                for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
-                {
-                    int current_index = cell_vertices[vertex];
-
-                    /* Interpolate three atmospheric parameters to current
-                       height */
-                    interpolate_to_height(
-                        modtran_results->points[current_index],
-                        current_height, at_height[vertex]);
-                }
-
-                /* Interpolate parameters at appropriate height to location of
-                   current pixel */
-                interpolate_to_location(points, cell_vertices, at_height,
-                                        easting, northing, &parameters[0]);
-
-                /* Convert radiances to W*m^(-2)*sr(-1) */
-                inter.band_upwelled[pixel_loc] =
-                    parameters[AHP_UPWELLED_RADIANCE] * 10000.0;
-                inter.band_downwelled[pixel_loc] =
-                    parameters[AHP_DOWNWELLED_RADIANCE] * 10000.0;
-                inter.band_transmittance[pixel_loc] =
-                    parameters[AHP_TRANSMISSION];
-            } /* END - if not FILL */
-            else
+            /* Skip fill pixels. */
+            if (inter.band_thermal[pixel_loc] == ST_NO_DATA_VALUE)
             {
                 inter.band_upwelled[pixel_loc] = ST_NO_DATA_VALUE;
                 inter.band_downwelled[pixel_loc] = ST_NO_DATA_VALUE;
@@ -1518,9 +832,141 @@ static int calculate_pixel_atmospheric_parameters
 #if OUTPUT_CELL_DESIGNATION_BAND
                 inter.band_cell[pixel_loc] = 0;
 #endif
+                continue;
             }
-        } /* END - for sample */
 
+            /* Determine latitude and longitude for current line/sample */
+            img.l = line;
+            img.s = sample;
+            img.is_fill = false;
+            if (!from_space(space, &img, &geo))
+            {
+                RETURN_ERROR ("Mapping from line/sample to longitude/"
+                              "latitude", FUNC_NAME, FAILURE);
+            }
+            easting = input->meta.ul_map_corner.x + sample*input->x_pixel_size;
+
+            if (first_sample)
+            {
+                /* Determine the first center point from all of the
+                   available points */
+                center_point = determine_first_center_grid_point(
+                    grid_pt_lon, grid_pt_lat, geo.lon,
+                    geo.lat, num_points, grid_points);
+
+                /* Set first_sample to be false */
+                first_sample = false;
+            }
+            else
+            {
+                /* Determine the center point from the current 9 grid
+                   points for the current line/sample */
+                center_point = determine_center_grid_point(
+                    grid_pt_lon, grid_pt_lat, geo.lon,
+                    geo.lat, NUM_GRID_POINTS, grid_points);
+            }
+
+            /* Fix the index values, since the points are from a new line
+               or were messed up during determining the center point */
+            grid_points[CC_GRID_POINT].index = center_point;
+            grid_points[LL_GRID_POINT].index = center_point - 1 - num_cols;
+            grid_points[LC_GRID_POINT].index = center_point - 1;
+            grid_points[UL_GRID_POINT].index = center_point - 1 + num_cols;
+            grid_points[UC_GRID_POINT].index = center_point + num_cols;
+            grid_points[UR_GRID_POINT].index = center_point + 1 + num_cols;
+            grid_points[RC_GRID_POINT].index = center_point + 1;
+            grid_points[LR_GRID_POINT].index = center_point + 1 - num_cols;
+            grid_points[DC_GRID_POINT].index = center_point - num_cols;
+
+            /* Fix the distances, since the points are from a new line or
+               were messed up during determining the center point */
+            determine_grid_point_distances(grid_pt_lon, grid_pt_lat,
+                                           geo.lon, geo.lat,
+                                           NUM_GRID_POINTS, grid_points);
+
+            /* Determine the average distances for each quadrant around
+               the center point. We only need to use the three outer grid 
+               points.
+               The true average values are the values computed
+               below divided by 3.  But since we're only using these these
+               values comparatively, we can forego the division. */
+            avg_distance_ll = grid_points[DC_GRID_POINT].distance
+                            + grid_points[LL_GRID_POINT].distance
+                            + grid_points[LC_GRID_POINT].distance;
+
+            avg_distance_ul = grid_points[LC_GRID_POINT].distance
+                            + grid_points[UL_GRID_POINT].distance
+                            + grid_points[UC_GRID_POINT].distance;
+
+            avg_distance_ur = grid_points[UC_GRID_POINT].distance
+                            + grid_points[UR_GRID_POINT].distance
+                            + grid_points[RC_GRID_POINT].distance;
+
+            avg_distance_lr = grid_points[RC_GRID_POINT].distance
+                            + grid_points[LR_GRID_POINT].distance
+                            + grid_points[DC_GRID_POINT].distance;
+
+            /* Determine which quadrant is closer and setup the cell
+               vertices to interpolate over based on that */
+            if (avg_distance_ll < avg_distance_ul
+                && avg_distance_ll < avg_distance_ur
+                && avg_distance_ll < avg_distance_lr)
+            { /* LL Cell */
+                cell_vertices[LL_POINT] = center_point - 1 - num_cols;
+            }
+            else if (avg_distance_ul < avg_distance_ur
+                     && avg_distance_ul < avg_distance_lr)
+            { /* UL Cell */
+                cell_vertices[LL_POINT] = center_point - 1;
+            }
+            else if (avg_distance_ur < avg_distance_lr)
+            { /* UR Cell */
+                cell_vertices[LL_POINT] = center_point;
+            }
+            else
+            { /* LR Cell */
+                cell_vertices[LL_POINT] = center_point - num_cols;
+            }
+
+            /* UL Point */
+            cell_vertices[UL_POINT] = cell_vertices[LL_POINT] + num_cols;
+            /* UR Point */
+            cell_vertices[UR_POINT] = cell_vertices[UL_POINT] + 1;
+            /* LR Point */
+            cell_vertices[LR_POINT] = cell_vertices[LL_POINT] + 1;
+
+#if OUTPUT_CELL_DESIGNATION_BAND
+            inter.band_cell[pixel_loc] = cell_vertices[LL_POINT];
+#endif
+
+            /* Convert height from m to km -- Same as 1.0 / 1000.0 */
+            current_height = (double) elevation_data[pixel_loc] * 0.001;
+
+            /* Interpolate three parameters to that height at each of the
+               four closest points */
+            for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
+            {
+                int current_index = cell_vertices[vertex];
+
+                /* Interpolate three atmospheric parameters to current
+                   height */
+                interpolate_to_height(modtran_results->points[current_index],
+                                      current_height, at_height[vertex]);
+            }
+
+            /* Interpolate parameters at appropriate height to location of
+               current pixel */
+            interpolate_to_location(points, cell_vertices, at_height,
+                                    easting, northing, &parameters[0]);
+
+            /* Convert radiances to W*m^(-2)*sr(-1) */
+            inter.band_upwelled[pixel_loc] =
+                parameters[AHP_UPWELLED_RADIANCE] * 10000.0;
+            inter.band_downwelled[pixel_loc] =
+                parameters[AHP_DOWNWELLED_RADIANCE] * 10000.0;
+            inter.band_transmittance[pixel_loc] =
+                parameters[AHP_TRANSMISSION];
+        } /* END - for sample */
     } /* END - for line */
 
     /* Write out the temporary intermediate output files */
@@ -1599,332 +1045,6 @@ static int calculate_pixel_atmospheric_parameters
     {
         ERROR_MESSAGE ("Failed adding ST downwelled radiance band product", 
             FUNC_NAME);
-    }
-
-    return SUCCESS;
-}
-
-/* Setup and cleanup functions */
-
-/*****************************************************************************
-Method:  load_grid_points_hdr
-
-Description:  Loads the grid points header information.
-
-Notes:
-    1. The grid point header file must be present in the current working 
-       directory.
-
-RETURN: SUCCESS
-        FAILURE
-*****************************************************************************/
-int load_grid_points_hdr
-(
-    GRID_POINTS *grid_points
-)
-{
-    char FUNC_NAME[] = "load_grid_points_hdr";
-    FILE *grid_fd = NULL;
-    int status;
-    char header_filename[] = "grid_points.hdr";
-    char errmsg[PATH_MAX];
-
-    /* Open the grid header file. */
-    grid_fd = fopen(header_filename, "r");
-    if (grid_fd == NULL)
-    {
-        snprintf(errmsg, sizeof(errmsg), "Failed opening %s", header_filename);
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    /* Read the grid header file. */
-    errno = 0;
-    status = fscanf(grid_fd, "%d\n%d\n%d", &grid_points->count,
-                    &grid_points->rows, &grid_points->cols);
-    if (status != 3 || errno != 0)
-    {
-        fclose(grid_fd);
-        snprintf(errmsg, sizeof(errmsg), "Failed reading %s", header_filename);
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    fclose(grid_fd);
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-Method:  load_grid_points
-
-Description:  Loads the grid points into a data structure.
-
-Notes:
-    1. The grid point files must be present in the current working directory.
-
-RETURN: SUCCESS
-        FAILURE
-*****************************************************************************/
-static int load_grid_points
-(
-    GRID_POINTS *grid_points
-)
-{
-    char FUNC_NAME[] = "load_grid_points";
-
-    FILE *grid_fd = NULL;
-
-    int status;
-
-    char binary_filename[] = "grid_points.bin";
-    char errmsg[PATH_MAX];
-
-    /* Initialize the points */
-    grid_points->points = NULL;
-
-    if (load_grid_points_hdr(grid_points) != SUCCESS)
-    {
-        RETURN_ERROR("Failed loading grid point header information",
-                     FUNC_NAME, FAILURE);
-    }
-
-    grid_points->points = malloc(grid_points->count * sizeof(GRID_POINT));
-    if (grid_points->points == NULL)
-    {
-        RETURN_ERROR("Failed allocating memory for grid points",
-                     FUNC_NAME, FAILURE);
-    }
-
-    /* Open the grid point file */
-    grid_fd = fopen(binary_filename, "rb");
-    if (grid_fd == NULL)
-    {
-        snprintf(errmsg, sizeof(errmsg), "Failed opening %s", binary_filename);
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    /* Read the grid points */
-    status = fread(grid_points->points, sizeof(GRID_POINT),
-                   grid_points->count, grid_fd);
-    if (status != grid_points->count || errno != 0)
-    {
-        fclose(grid_fd);
-        snprintf(errmsg, sizeof(errmsg), "Failed reading %s", binary_filename);
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    fclose(grid_fd);
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-Method:  load_elevations
-
-Description:  Loads the grid elevations into a data structure.
-
-Notes:
-    1. The grid elevation file must be present in the current working directory.
-    2. The grid elevation entries should be in sync with the grid file.
-
-RETURN: SUCCESS
-        FAILURE
-*****************************************************************************/
-static int load_elevations
-(
-    MODTRAN_POINTS *modtran_points
-)
-{
-    char FUNC_NAME[] = "load_elevations";
-
-    FILE *elevation_fd = NULL;
-
-    int status;
-    int index;   /* Index into point structure */
-
-    char elevation_filename[] = "grid_elevations.txt";
-    char errmsg[PATH_MAX];
-
-    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", elevation_filename);
-
-    elevation_fd = fopen(elevation_filename, "r");
-    if (elevation_fd == NULL)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    /* Read the elevations into the 0 elevation positions in the MODTRAN 
-       point structure.  The file and structure should have the same order. */
-    for (index = 0; index < modtran_points->count; index++)
-    {
-        MODTRAN_POINT *modtran_ptr = &modtran_points->points[index];
-
-        /* Keep looking for a modtran point that was actually run. */
-        if (modtran_ptr->ran_modtran == 0)
-        {
-            continue; 
-        }
-
-        status = fscanf(elevation_fd, "%lf %lf\n", 
-            &(modtran_ptr->elevations->elevation),
-            &(modtran_ptr->elevations->elevation_directory));
-        if (status <= 0)
-        {
-            RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-        }
-    }
-
-    fclose(elevation_fd);
-
-    return SUCCESS;
-}
-
-
-/*****************************************************************************
-Method:  free_grid_points
-
-Description:  Free allocated memory for the grid points.
-*****************************************************************************/
-void free_grid_points
-(
-    GRID_POINTS *grid_points
-)
-{
-    free(grid_points->points);
-    grid_points->points = NULL;
-}
-
-/*****************************************************************************
-Method:  free_modtran_points
-
-Description:  Free allocated memory for the MODTRAN points.
-*****************************************************************************/
-void free_modtran_points
-(
-    MODTRAN_POINTS *modtran_points
-)
-{
-    int index;     /* Index into MODTRAN points structure */
-
-    for (index = 0; index < modtran_points->count; index++)
-    {
-        free(modtran_points->points[index].elevations);
-        modtran_points->points[index].elevations = NULL;
-    }
-
-    free(modtran_points->points);
-    modtran_points->points = NULL;
-}
-
-
-/*****************************************************************************
-Method:  initialize_modtran_points
-
-Description:  Allocate the memory need to hold the MODTRAN results and
-              initialize known values.
-
-RETURN: SUCCESS
-        FAILURE
-*****************************************************************************/
-static int initialize_modtran_points
-(
-    GRID_POINTS *grid_points,      /* I: The coordinate points */
-    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
-)
-{
-    char FUNC_NAME[] = "initialize_modtran_points";
-
-    double gndalt[MAX_NUM_ELEVATIONS];
-
-    int index;
-    int num_elevations;            /* Number of elevations actually used */
-    int elevation_index;           /* Index into elevations */
-    int status;                    /* Function return status */
-
-    FILE *modtran_elevation_fd = NULL;
-
-    char modtran_elevation_filename[] = "modtran_elevations.txt";
-    char errmsg[PATH_MAX];
-
-    snprintf(errmsg, sizeof(errmsg), "Failed reading %s", 
-        modtran_elevation_filename);
-
-    modtran_elevation_fd = fopen(modtran_elevation_filename, "r");
-    if (modtran_elevation_fd == NULL)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    status = fscanf(modtran_elevation_fd, "%d\n", &num_elevations);
-    if (status <= 0)
-    {
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
-
-    /* Read the elevations into the gndalt structure. */ 
-    for (index = 0; index < num_elevations; index++)
-    {
-        status = fscanf(modtran_elevation_fd, "%lf\n", &gndalt[index]);
-        if (status <= 0)
-        {
-            RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-        }
-    }
-
-    fclose(modtran_elevation_fd);
-
-    modtran_points->count = grid_points->count;
-
-    modtran_points->points = malloc(modtran_points->count *
-                                    sizeof(MODTRAN_POINT));
-    if (modtran_points->points == NULL)
-    {
-        RETURN_ERROR("Failed allocating memory for modtran points",
-                     FUNC_NAME, FAILURE);
-    }
-
-    for (index = 0; index < modtran_points->count; index++)
-    {
-        /* convenience pointers */
-        MODTRAN_POINT *modtran_ptr = &modtran_points->points[index];
-        GRID_POINT *grid_ptr = &grid_points->points[index];
-        
-        modtran_ptr->count = num_elevations;
-        modtran_ptr->ran_modtran = grid_ptr->run_modtran;
-        modtran_ptr->row = grid_ptr->row;
-        modtran_ptr->col = grid_ptr->col;
-        modtran_ptr->narr_row = grid_ptr->narr_row;
-        modtran_ptr->narr_col = grid_ptr->narr_col;
-        modtran_ptr->lon = grid_ptr->lon;
-        modtran_ptr->lat = grid_ptr->lat;
-        modtran_ptr->map_x = grid_ptr->map_x;
-        modtran_ptr->map_y = grid_ptr->map_y;
-
-        modtran_ptr->elevations = malloc(num_elevations*
-                                         sizeof(MODTRAN_ELEVATION));
-        if (modtran_ptr->elevations == NULL)
-        {
-            RETURN_ERROR("Failed allocating memory for modtran point"
-                         " elevations", FUNC_NAME, FAILURE);
-        }
-
-        /* Iterate over the elevations and assign the elevation values. */
-        for (elevation_index = 0; elevation_index < num_elevations; 
-            elevation_index++)
-        {
-            MODTRAN_ELEVATION *mt_elev =
-                                    &modtran_ptr->elevations[elevation_index];
-
-            mt_elev->elevation = gndalt[elevation_index];
-            mt_elev->elevation_directory = gndalt[elevation_index];
-        }
-    }
-
-    /* Load the first elevation values if needed. */
-    if (load_elevations(modtran_points) != SUCCESS)
-    {
-        RETURN_ERROR("calling load_elevations", FUNC_NAME, EXIT_FAILURE);
     }
 
     return SUCCESS;

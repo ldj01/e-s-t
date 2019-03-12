@@ -1,32 +1,12 @@
+#ifndef MODTRAN_UTILS_H
+#define MODTRAN_UTILS_H
 
-#ifndef ST_TYPES_H
-#define ST_TYPES_H
+#include "grid_points.h"
 
-#include <limits.h>
+#define MAX_NUM_ELEVATIONS 9
 
-typedef struct {
-    int16_t index;
-    int8_t run_modtran;
-    uint8_t row;
-    uint8_t col;
-    uint16_t narr_row;
-    uint16_t narr_col;
-    float lon;          /* longitude (degrees) */
-    float lat;          /* latitude (degrees) */
-    float map_x;
-    float map_y;
-} GRID_POINT;
-
-
-typedef struct {
-    int count;
-    int rows;
-    int cols;
-    GRID_POINT *points;
-} GRID_POINTS;
-
-
-typedef struct {
+typedef struct
+{
     double elevation;
     double elevation_directory;
     double transmission;
@@ -35,7 +15,8 @@ typedef struct {
 } MODTRAN_ELEVATION;
 
 
-typedef struct {
+typedef struct
+{
     int count;
     int ran_modtran;
     uint8_t row;
@@ -50,9 +31,22 @@ typedef struct {
 } MODTRAN_POINT;
 
 
-typedef struct {
+typedef struct
+{
     int count;
     MODTRAN_POINT *points;
 } MODTRAN_POINTS;
 
-#endif /* ST_TYPES_H */
+
+int initialize_modtran_points
+(
+    GRID_POINTS *grid_points,      /* I: The coordinate points */
+    MODTRAN_POINTS *modtran_points /* O: Memory Allocated */
+);
+
+void free_modtran_points
+(
+    MODTRAN_POINTS *modtran_points
+);
+
+#endif

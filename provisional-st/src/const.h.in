@@ -49,7 +49,6 @@
     #define FAILURE 1
 #endif
 
-#define MAX_NUM_ELEVATIONS 9
 #define NARR_ROWS 277
 #define NARR_COLS 349
 
@@ -58,9 +57,6 @@
 
 
 #define MAX_STR_LEN 512
-
-
-#define EQUATORIAL_RADIUS (6378137.0)
 
 
 /* Provides for the element size of the ST point result records, along with

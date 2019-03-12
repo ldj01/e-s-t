@@ -1,8 +1,6 @@
-
 #ifndef CALCULATE_ATMOSPHERIC_PARAMETERS_H
 #define CALCULATE_ATMOSPHERIC_PARAMETERS_H
 
-#include "st_types.h"
 #include "input.h"
 #include "espa_geoloc.h"
 
@@ -31,44 +29,7 @@ typedef enum
 } INTERMEDIATE_DATA_BANDS;
 
 
-/* Defines the distance to the current pixel, along with the index of the
-   point So that we can find the index of the closest point to start 
-   determining the correct cell to use */
-typedef struct
-{
-    int index;
-    double distance;
-} GRID_ITEM;
-
-
-/* Defines index locations in the vertices array for the current cell to be
-   used for interpolation of the pixel */
-typedef enum
-{
-    LL_POINT,
-    UL_POINT,
-    UR_POINT,
-    LR_POINT,
-    NUM_CELL_POINTS
-} CELL_POINTS;
-
-
-/* Defines index locations for the parameters in the at_height array */
-typedef enum
-{
-    AHP_TRANSMISSION,
-    AHP_UPWELLED_RADIANCE,
-    AHP_DOWNWELLED_RADIANCE,
-    AHP_NUM_PARAMETERS
-} AT_HEIGHT_PARAMETERS;
-
-
 /* Function prototypes */
-
-void free_grid_points
-(
-    GRID_POINTS *grid_points   /* I: Grid points to free */
-);
 
 #endif /* CALCULATE_ATMOSPHERIC_PARAMETERS_H */
 
