@@ -713,7 +713,6 @@ static int calculate_pixel_atmospheric_parameters
 
     GRID_ITEM *grid_points = NULL;
 
-    int vertex;
     int center_point;
     int cell_vertices[NUM_CELL_POINTS];
 
@@ -944,15 +943,8 @@ static int calculate_pixel_atmospheric_parameters
 
             /* Interpolate three parameters to that height at each of the
                four closest points */
-            for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
-            {
-                int current_index = cell_vertices[vertex];
-
-                /* Interpolate three atmospheric parameters to current
-                   height */
-                interpolate_to_height(modtran_results->points[current_index],
-                                      current_height, at_height[vertex]);
-            }
+            interpolate_to_height(modtran_results->points, cell_vertices,
+                                  current_height, at_height);
 
             /* Interpolate parameters at appropriate height to location of
                current pixel */

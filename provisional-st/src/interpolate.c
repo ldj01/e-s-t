@@ -14,9 +14,10 @@ PURPOSE: Interpolate to height of current pixel
 ******************************************************************************/
 void interpolate_to_height
 (
-    MODTRAN_POINT modtran_point, /* I: results from MODTRAN runs for a point */
-    double interpolate_to,    /* I: current landsat pixel height */
-    double *at_height         /* O: interpolated height for point */
+    MODTRAN_POINT *modtran_points, /* I: results from MODTRAN runs */
+    int *cell_vertices,            /* I: current cell vertices */
+    double interpolate_to,         /* I: current landsat pixel height */
+    double at_heights[][AHP_NUM_PARAMETERS]  /* I/O: interpolated parameters */
 )
 {
     int parameter;
@@ -29,68 +30,78 @@ void interpolate_to_height
 
     double interp_ratio; /* interpolation ratio */
 
-    /* Find the heights between which the pixel height sits.
-       The heights are in increasing order. */
-    for (elevation = 0; elevation < modtran_point.count; elevation++)
+    int vertex;
+    for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
     {
-        if (modtran_point.elevations[elevation].elevation >= interpolate_to)
-            break;
-    }
-    if (elevation < modtran_point.count)
-    {
-        above = elevation;
-        if (above != 0)
-            below = above - 1;
-        else
-            /* All heights are above the pixel height, use the first value. */
-            below = 0;
-    }
-    else
-    {
-        /* All heights are below the pixel height, so use the final value. */
-        above = modtran_point.count - 1;
-        below = above;
-    }
+        int current_index = cell_vertices[vertex];
+        MODTRAN_POINT point = modtran_points[current_index];
+        double *at_height = at_heights[vertex];
 
-    below_parameters[AHP_TRANSMISSION] =
-        modtran_point.elevations[below].transmission;
-    below_parameters[AHP_UPWELLED_RADIANCE] =
-        modtran_point.elevations[below].upwelled_radiance;
-    below_parameters[AHP_DOWNWELLED_RADIANCE] =
-        modtran_point.elevations[below].downwelled_radiance;
-
-    if (above == below)
-    {
-        /* Use the below parameters since the same */
-        at_height[AHP_TRANSMISSION] =
-            below_parameters[AHP_TRANSMISSION];
-        at_height[AHP_UPWELLED_RADIANCE] =
-            below_parameters[AHP_UPWELLED_RADIANCE];
-        at_height[AHP_DOWNWELLED_RADIANCE] =
-            below_parameters[AHP_DOWNWELLED_RADIANCE];
-    }
-    else
-    {
-        /* Interpolate between the heights for each parameter */
-        interp_ratio = (interpolate_to -
-                        modtran_point.elevations[above].elevation)
-                     / (modtran_point.elevations[above].elevation -
-                        modtran_point.elevations[below].elevation);
-
-        above_parameters[AHP_TRANSMISSION] =
-            modtran_point.elevations[above].transmission;
-        above_parameters[AHP_UPWELLED_RADIANCE] =
-            modtran_point.elevations[above].upwelled_radiance;
-        above_parameters[AHP_DOWNWELLED_RADIANCE] =
-            modtran_point.elevations[above].downwelled_radiance;
-
-        for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
+        /* Find the heights between which the pixel height sits.
+           The heights are in increasing order. */
+        for (elevation = 0; elevation < point.count; elevation++)
         {
-            at_height[parameter] = interp_ratio
-                * (above_parameters[parameter] - below_parameters[parameter])
-                + above_parameters[parameter];
+            if (point.elevations[elevation].elevation >= interpolate_to)
+                break;
         }
-    }
+        if (elevation < point.count)
+        {
+            above = elevation;
+            if (above != 0)
+                below = above - 1;
+            else
+                /* All heights are above the pixel height, so use the first
+                   value. */
+                below = 0;
+        }
+        else
+        {
+            /* All heights are below the pixel height, so use the final
+               value. */
+            above = point.count - 1;
+            below = above;
+        }
+
+        below_parameters[AHP_TRANSMISSION] =
+            point.elevations[below].transmission;
+        below_parameters[AHP_UPWELLED_RADIANCE] =
+            point.elevations[below].upwelled_radiance;
+        below_parameters[AHP_DOWNWELLED_RADIANCE] =
+            point.elevations[below].downwelled_radiance;
+
+        if (above == below)
+        {
+            /* Use the below parameters since the same */
+            at_height[AHP_TRANSMISSION] =
+                below_parameters[AHP_TRANSMISSION];
+            at_height[AHP_UPWELLED_RADIANCE] =
+                below_parameters[AHP_UPWELLED_RADIANCE];
+            at_height[AHP_DOWNWELLED_RADIANCE] =
+                below_parameters[AHP_DOWNWELLED_RADIANCE];
+        }
+        else
+        {
+            /* Interpolate between the heights for each parameter */
+            interp_ratio = (interpolate_to - point.elevations[above].elevation)
+                         / (point.elevations[above].elevation -
+                            point.elevations[below].elevation);
+
+            above_parameters[AHP_TRANSMISSION] =
+                point.elevations[above].transmission;
+            above_parameters[AHP_UPWELLED_RADIANCE] =
+                point.elevations[above].upwelled_radiance;
+            above_parameters[AHP_DOWNWELLED_RADIANCE] =
+                point.elevations[above].downwelled_radiance;
+
+            for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
+            {
+                at_height[parameter] = interp_ratio
+                                     * (above_parameters[parameter] -
+                                        below_parameters[parameter])
+                                     + above_parameters[parameter];
+            }
+        }
+    } /* vertex loop */
 }
 
 

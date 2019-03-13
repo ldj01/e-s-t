@@ -25,12 +25,12 @@ typedef enum
     NUM_CELL_POINTS
 } CELL_POINTS;
 
-
 void interpolate_to_height
 (
-    MODTRAN_POINT modtran_point, /* I: results from MODTRAN runs for a point */
-    double interpolate_to,    /* I: current landsat pixel height */
-    double *at_height         /* O: interpolated height for point */
+    MODTRAN_POINT *modtran_points, /* I: results from MODTRAN runs */
+    int *cell_vertices,            /* I: current cell vertices */
+    double interpolate_to,         /* I: current landsat pixel height */
+    double at_heights[][AHP_NUM_PARAMETERS]  /* I/O: interpolated parameters */
 );
 
 void interpolate_to_location
