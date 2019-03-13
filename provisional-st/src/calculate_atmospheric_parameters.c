@@ -969,6 +969,7 @@ static int calculate_pixel_atmospheric_parameters
     free(grid_pt_lon);
     free(elevation_data);
     free_intermediate(&inter);
+    free(space);
 
     /* Close the intermediate binary files */
     if (close_intermediate(&inter) != SUCCESS)
