@@ -716,7 +716,6 @@ static int calculate_pixel_atmospheric_parameters
     int center_point;
     int cell_vertices[NUM_CELL_POINTS];
 
-    double at_height[NUM_CELL_POINTS][AHP_NUM_PARAMETERS];
     double parameters[AHP_NUM_PARAMETERS];
     double avg_distance_ll;
     double avg_distance_ul;
@@ -941,15 +940,11 @@ static int calculate_pixel_atmospheric_parameters
             /* Convert height from m to km -- Same as 1.0 / 1000.0 */
             current_height = (double) elevation_data[pixel_loc] * 0.001;
 
-            /* Interpolate three parameters to that height at each of the
-               four closest points */
-            interpolate_to_height(modtran_results->points, cell_vertices,
-                                  current_height, at_height);
-
-            /* Interpolate parameters at appropriate height to location of
-               current pixel */
-            interpolate_to_location(points, cell_vertices, at_height,
-                                    easting, northing, &parameters[0]);
+            /* Interpolate three parameters to the height and location of
+               the current pixel. */
+            interpolate_parameters(modtran_results->points, points,
+                                   cell_vertices, current_height, easting,
+                                   northing, &parameters[0]);
 
             /* Convert radiances to W*m^(-2)*sr(-1) */
             inter.band_upwelled[pixel_loc] =

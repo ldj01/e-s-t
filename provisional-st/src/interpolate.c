@@ -8,40 +8,48 @@ PURPOSE:  This file includes routines to handle interpolation for the
 #include "interpolate.h"
 
 /******************************************************************************
-METHOD:  interpolate_to_height
+METHOD:  interpolate_parameters
 
-PURPOSE: Interpolate to height of current pixel
+PURPOSE: Interpolate atmospheric parameters to the location of the
+         current pixel.
 ******************************************************************************/
-void interpolate_to_height
+void interpolate_parameters
 (
     MODTRAN_POINT *modtran_points, /* I: results from MODTRAN runs */
+    GRID_POINTS *points,           /* I: coordinate points */
     int *cell_vertices,            /* I: current cell vertices */
-    double interpolate_to,         /* I: current landsat pixel height */
-    double at_heights[][AHP_NUM_PARAMETERS]  /* I/O: interpolated parameters */
+    double interpolate_height,     /* I: current landsat pixel height */
+    double interpolate_easting,    /* I: interpolate to easting */
+    double interpolate_northing,   /* I: interpolate to northing */
+    double *parameters             /* O: interpolated pixel atmospheric
+                                         parameters */
 )
 {
     int parameter;
     int elevation;
     int below;
     int above;
-
+    int vertex;
+    double at_heights[NUM_CELL_POINTS][AHP_NUM_PARAMETERS];
     double below_parameters[AHP_NUM_PARAMETERS];
     double above_parameters[AHP_NUM_PARAMETERS];
-
+    double w[NUM_CELL_POINTS];
+    double total = 0.0;
+    double inv_total;
     double interp_ratio; /* interpolation ratio */
 
-    int vertex;
+    /* Interpolate three parameters to the height at each of the four
+       closest points. */
     for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
     {
-        int current_index = cell_vertices[vertex];
-        MODTRAN_POINT point = modtran_points[current_index];
+        MODTRAN_POINT point = modtran_points[cell_vertices[vertex]];
         double *at_height = at_heights[vertex];
 
         /* Find the heights between which the pixel height sits.
            The heights are in increasing order. */
         for (elevation = 0; elevation < point.count; elevation++)
         {
-            if (point.elevations[elevation].elevation >= interpolate_to)
+            if (point.elevations[elevation].elevation >= interpolate_height)
                 break;
         }
         if (elevation < point.count)
@@ -82,7 +90,8 @@ void interpolate_to_height
         else
         {
             /* Interpolate between the heights for each parameter */
-            interp_ratio = (interpolate_to - point.elevations[above].elevation)
+            interp_ratio = (interpolate_height -
+                            point.elevations[above].elevation)
                          / (point.elevations[above].elevation -
                             point.elevations[below].elevation);
 
@@ -102,60 +111,37 @@ void interpolate_to_height
             }
         }
     } /* vertex loop */
-}
 
-
-/******************************************************************************
-METHOD:  interpolate_to_location
-
-PURPOSE: Interpolate to location of current pixel
-******************************************************************************/
-void interpolate_to_location
-(
-    GRID_POINTS *points,         /* I: The coordinate points */
-    int *vertices,               /* I: The vertices for the points to use */
-    double at_height[][AHP_NUM_PARAMETERS], /* I: current height atmospheric
-                                                  results */
-    double interpolate_easting,  /* I: interpolate to easting */
-    double interpolate_northing, /* I: interpolate to northing */
-    double *parameters           /* O: interpolated pixel atmospheric 
-                                       parameters */
-)
-{
-    int point;
-    int parameter;
-
-    double w[NUM_CELL_POINTS];
-    double total = 0.0;
-    double inv_total;
+    /* Interpolate parameters at appropriate height to location of the
+       current pixel. */
 
     /* Shepard's method */
-    for (point = 0; point < NUM_CELL_POINTS; point++)
+    for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
     {
-        double delta_x = points->points[vertices[point]].map_x
+        double delta_x = points->points[cell_vertices[vertex]].map_x
                        - interpolate_easting;
-        double delta_y = points->points[vertices[point]].map_y
+        double delta_y = points->points[cell_vertices[vertex]].map_y
                        - interpolate_northing;
 
-        w[point] = 1.0 / sqrt(delta_x*delta_x + delta_y*delta_y);
+        w[vertex] = 1.0 / sqrt(delta_x*delta_x + delta_y*delta_y);
 
-        total += w[point];
+        total += w[vertex];
     }
 
     /* Normalize the weights for each vertex. */
     inv_total = 1/total;
-    for (point = 0; point < NUM_CELL_POINTS; point++)
+    for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
     {
-        w[point] *= inv_total;
+        w[vertex] *= inv_total;
     }
 
     /* For each parameter apply each vertex's weighted value */
     for (parameter = 0; parameter < AHP_NUM_PARAMETERS; parameter++)
     {
         parameters[parameter] = 0.0;
-        for (point = 0; point < NUM_CELL_POINTS; point++)
+        for (vertex = 0; vertex < NUM_CELL_POINTS; vertex++)
         {
-            parameters[parameter] += (w[point] * at_height[point][parameter]);
+            parameters[parameter] += w[vertex] * at_heights[vertex][parameter];
         }
     }
 }
